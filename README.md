@@ -2,6 +2,8 @@
 
 広告・課金・アカウント・ネットワーク機能を持たない、Android向けのローカル漫画ビューワです。
 
+APKは[Releases](https://github.com/s-deme/comic_explorer_portable/releases/latest)からダウンロードできます。
+
 - SAF（システムのフォルダ選択）で選んだフォルダだけを読む
 - PDF、ZIP / CBZ、画像フォルダを閲覧
 - JPG、PNG、GIF、BMP、WebP、AVIFを表示
