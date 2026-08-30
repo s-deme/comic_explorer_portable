@@ -1,0 +1,64 @@
+name: Android CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and verify debug APK
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          check-latest: false
+
+      - name: Install Android SDK packages
+        run: |
+          $sdkRoot = if ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { $env:ANDROID_HOME }
+          if (-not $sdkRoot) { throw 'ANDROID_SDK_ROOT / ANDROID_HOME is not configured on the runner.' }
+          $sdkManager = Join-Path $sdkRoot 'cmdline-tools\latest\bin\sdkmanager.bat'
+          if (-not (Test-Path -LiteralPath $sdkManager)) {
+            $sdkManager = Get-ChildItem -LiteralPath (Join-Path $sdkRoot 'cmdline-tools') -Recurse -Filter sdkmanager.bat |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $sdkManager) { throw 'sdkmanager.bat was not found.' }
+          & $sdkManager 'platforms;android-35' 'build-tools;36.0.0'
+          if ($LASTEXITCODE -ne 0) { throw 'Android SDK package installation failed.' }
+
+      - name: Build and verify APK
+        run: ./build.ps1 -Configuration Debug -OutputPath 'dist/comic-explorer.apk'
+
+      - name: Upload verified APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: comic-explorer-${{ github.sha }}
+          path: dist/comic-explorer.apk
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

@@ -1,0 +1,122 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish signed APK
+    runs-on: windows-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          check-latest: false
+
+      - name: Validate tag and Android version
+        id: metadata
+        run: |
+          [xml]$manifest = Get-Content -Raw -LiteralPath 'AndroidManifest.xml'
+          $androidNamespace = 'http://schemas.android.com/apk/res/android'
+          $versionName = $manifest.manifest.GetAttribute('versionName', $androidNamespace)
+          $versionCodeText = $manifest.manifest.GetAttribute('versionCode', $androidNamespace)
+          $versionCode = 0
+          if (-not [int]::TryParse($versionCodeText, [ref]$versionCode) -or $versionCode -le 0) {
+            throw 'AndroidManifest.xmlのversionCodeは正の整数である必要があります。'
+          }
+          $expectedTag = "v$versionName"
+          if ($env:GITHUB_REF_NAME -ne $expectedTag) {
+            throw "タグ $env:GITHUB_REF_NAME とversionName $versionName が一致しません。期待するタグ: $expectedTag"
+          }
+          "version=$versionName" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+          "version_code=$versionCode" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+
+      - name: Reject an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --json tagName *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release $env:GITHUB_REF_NAME already exists. Refusing to overwrite it." }
+
+      - name: Install Android SDK packages
+        run: |
+          $sdkRoot = if ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { $env:ANDROID_HOME }
+          if (-not $sdkRoot) { throw 'ANDROID_SDK_ROOT / ANDROID_HOME is not configured on the runner.' }
+          $sdkManager = Join-Path $sdkRoot 'cmdline-tools\latest\bin\sdkmanager.bat'
+          if (-not (Test-Path -LiteralPath $sdkManager)) {
+            $sdkManager = Get-ChildItem -LiteralPath (Join-Path $sdkRoot 'cmdline-tools') -Recurse -Filter sdkmanager.bat |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $sdkManager) { throw 'sdkmanager.bat was not found.' }
+          & $sdkManager 'platforms;android-35' 'build-tools;36.0.0'
+          if ($LASTEXITCODE -ne 0) { throw 'Android SDK package installation failed.' }
+
+      - name: Restore release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ANDROID_KEYSTORE_BASE64)) {
+            throw 'GitHub Secret ANDROID_KEYSTORE_BASE64 is not configured.'
+          }
+          $keystorePath = Join-Path $env:RUNNER_TEMP 'comic-explorer-release.keystore'
+          $keystoreBytes = [Convert]::FromBase64String($env:ANDROID_KEYSTORE_BASE64)
+          [IO.File]::WriteAllBytes($keystorePath, $keystoreBytes)
+          "ANDROID_KEYSTORE_PATH=$keystorePath" | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
+
+      - name: Build and verify release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./build.ps1 -Configuration Release -OutputPath 'dist/comic-explorer.apk'
+
+      - name: Generate SHA-256 checksum
+        run: |
+          $apk = Resolve-Path 'dist/comic-explorer.apk'
+          $hash = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  comic-explorer.apk" | Set-Content -LiteralPath 'dist/comic-explorer.apk.sha256' -Encoding ascii
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            'dist/comic-explorer.apk#Comic Explorer APK' `
+            'dist/comic-explorer.apk.sha256#SHA-256 checksum' `
+            --repo $env:GITHUB_REPOSITORY `
+            --verify-tag `
+            --generate-notes `
+            --latest `
+            --title "Comic Explorer $env:RELEASE_VERSION"
+
+      - name: Remove restored signing key
+        if: always()
+        run: |
+          if ($env:ANDROID_KEYSTORE_PATH -and (Test-Path -LiteralPath $env:ANDROID_KEYSTORE_PATH)) {
+            Remove-Item -LiteralPath $env:ANDROID_KEYSTORE_PATH -Force
+          }
