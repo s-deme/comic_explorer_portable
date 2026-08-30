@@ -121,25 +121,28 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(dp(6), dp(6), dp(6), dp(6));
+        top.setPadding(dp(8), dp(8), dp(8), dp(8));
         top.setBackgroundColor(Ui.DARK_SURFACE);
         Button close = button("戻る", "作品を閉じる");
+        Ui.styleButton(close, Ui.ButtonStyle.DARK_GHOST);
         close.setTextSize(14);
         close.setOnClickListener(view -> finish());
-        top.addView(close, new LinearLayout.LayoutParams(dp(60), dp(48)));
+        top.addView(close, new LinearLayout.LayoutParams(dp(64), dp(48)));
         titleText = text(title, 16, Ui.DARK_TEXT);
+        Ui.label(titleText);
         titleText.setSingleLine(true);
         titleText.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        titleText.setPadding(dp(3), 0, dp(3), 0);
+        titleText.setPadding(dp(8), 0, dp(8), 0);
         top.addView(titleText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         bookmarkButton = button("しおり", "このページをしおりに追加");
         bookmarkButton.setTextSize(14);
         bookmarkButton.setOnClickListener(view -> toggleBookmark());
         top.addView(bookmarkButton, new LinearLayout.LayoutParams(dp(72), dp(48)));
         Button more = button("メニュー", "読書メニューを開く");
+        Ui.styleButton(more, Ui.ButtonStyle.DARK_GHOST);
         more.setTextSize(14);
         more.setOnClickListener(view -> showReaderMenu());
-        top.addView(more, new LinearLayout.LayoutParams(dp(78), dp(48)));
+        top.addView(more, new LinearLayout.LayoutParams(dp(80), dp(48)));
         chromeTop = top;
         root.addView(top);
 
@@ -148,36 +151,43 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         imageView.setInteractionListener(this);
         canvas.addView(imageView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         loading = new ProgressBar(this);
-        loading.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xFF8AB4F8));
+        loading.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.READER_ACCENT));
         FrameLayout.LayoutParams loadingParams = new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER);
         canvas.addView(loading, loadingParams);
         LinearLayout error = new LinearLayout(this);
         error.setOrientation(LinearLayout.VERTICAL);
         error.setGravity(Gravity.CENTER);
         error.setPadding(dp(24), dp(24), dp(24), dp(24));
-        error.setBackgroundColor(Ui.DARK_SURFACE);
+        Ui.styleDarkPanel(error);
         errorText = text("", 16, Ui.DARK_TEXT);
         errorText.setGravity(Gravity.CENTER);
+        errorText.setLineSpacing(0, 1.08f);
         error.addView(errorText);
         Button retry = button("再試行", "ファイルを再度読み込む");
+        Ui.styleButton(retry, Ui.ButtonStyle.DARK_PRIMARY);
         retry.setOnClickListener(view -> initializeSource());
-        error.addView(retry);
+        LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
+        retryParams.setMargins(0, dp(16), 0, 0);
+        error.addView(retry, retryParams);
         errorPanel = error;
         errorPanel.setVisibility(View.GONE);
-        canvas.addView(errorPanel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        FrameLayout.LayoutParams errorParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        errorParams.setMargins(dp(18), 0, dp(18), 0);
+        canvas.addView(errorPanel, errorParams);
         root.addView(canvas, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         LinearLayout bottom = new LinearLayout(this);
         bottom.setOrientation(LinearLayout.VERTICAL);
-        bottom.setPadding(dp(10), dp(6), dp(10), dp(8));
+        bottom.setPadding(dp(12), dp(8), dp(12), dp(12));
         bottom.setBackgroundColor(Ui.DARK_SURFACE);
         LinearLayout sliderRow = new LinearLayout(this);
         sliderRow.setGravity(Gravity.CENTER_VERTICAL);
         pageText = text("読み込み中…", 15, Ui.DARK_TEXT);
         pageText.setGravity(Gravity.CENTER);
+        Ui.styleDarkChip(pageText, false);
         pageText.setContentDescription("ページ番号。タップして移動");
         pageText.setOnClickListener(view -> showPageJump());
-        sliderRow.addView(pageText, new LinearLayout.LayoutParams(dp(112), ViewGroup.LayoutParams.WRAP_CONTENT));
+        sliderRow.addView(pageText, new LinearLayout.LayoutParams(dp(112), dp(48)));
         pageSlider = new SeekBar(this);
         pageSlider.setMax(0);
         pageSlider.setContentDescription("ページスライダー");
@@ -194,20 +204,27 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         LinearLayout buttons = new LinearLayout(this);
         buttons.setGravity(Gravity.CENTER_VERTICAL);
         previousButton = button("前へ", "前のページ");
+        Ui.styleButton(previousButton, Ui.ButtonStyle.DARK_PRIMARY);
         previousButton.setOnClickListener(view -> back());
-        buttons.addView(previousButton, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        LinearLayout.LayoutParams previousParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        previousParams.setMargins(0, 0, dp(6), 0);
+        buttons.addView(previousButton, previousParams);
         autoButton = button("自動送り", "自動ページ送りを設定");
         autoButton.setOnClickListener(view -> {
             if (autoDelayMs > 0) stopAutoPage(); else showAutoPageDialog();
         });
-        buttons.addView(autoButton, new LinearLayout.LayoutParams(0, dp(48), .8f));
+        LinearLayout.LayoutParams autoParams = new LinearLayout.LayoutParams(0, dp(48), .9f);
+        autoParams.setMargins(0, 0, dp(6), 0);
+        buttons.addView(autoButton, autoParams);
         nextButton = button("次へ", "次のページ");
+        Ui.styleButton(nextButton, Ui.ButtonStyle.DARK_PRIMARY);
         nextButton.setOnClickListener(view -> forward());
         buttons.addView(nextButton, new LinearLayout.LayoutParams(0, dp(48), 1f));
         bottom.addView(buttons);
         chromeBottom = bottom;
         root.addView(bottom);
         setContentView(root);
+        Ui.applySystemBarInsets(this, root);
     }
 
     private void applyReaderPreferences() {
@@ -578,12 +595,28 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             WindowInsetsController controller = window.getInsetsController();
             if (controller != null) {
-                if (fullScreen) controller.hide(WindowInsets.Type.systemBars());
-                else controller.show(WindowInsets.Type.systemBars());
+                controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                if (fullScreen) {
+                    controller.hide(WindowInsets.Type.systemBars());
+                } else {
+                    controller.show(WindowInsets.Type.systemBars());
+                }
             }
         } else {
-            window.getDecorView().setSystemUiVisibility(fullScreen ? View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY : View.SYSTEM_UI_FLAG_VISIBLE);
+            int layoutFlags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            int fullscreenFlags = View.SYSTEM_UI_FLAG_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            window.getDecorView().setSystemUiVisibility(layoutFlags | (fullScreen ? fullscreenFlags : 0));
         }
+        window.getDecorView().requestApplyInsets();
+    }
+
+    @Override public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && fullScreen) applyFullscreen();
     }
 
     private void applyDarkSystemBarIcons() {
