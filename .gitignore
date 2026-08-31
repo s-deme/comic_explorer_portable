@@ -1,5 +1,10 @@
 build/
 dist/
+.gradle/
+.android/
+.android-user-home/
+*.iml
+.idea/
 *.keystore
 *.jks
 *.p12

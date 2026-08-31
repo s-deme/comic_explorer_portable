@@ -40,13 +40,12 @@ jobs:
       - name: Validate tag and Android version
         id: metadata
         run: |
-          [xml]$manifest = Get-Content -Raw -LiteralPath 'AndroidManifest.xml'
-          $androidNamespace = 'http://schemas.android.com/apk/res/android'
-          $versionName = $manifest.manifest.GetAttribute('versionName', $androidNamespace)
-          $versionCodeText = $manifest.manifest.GetAttribute('versionCode', $androidNamespace)
+          $properties = ConvertFrom-StringData (Get-Content -Raw -LiteralPath 'gradle.properties')
+          $versionName = $properties['comicExplorerVersionName']
+          $versionCodeText = $properties['comicExplorerVersionCode']
           $versionCode = 0
           if (-not [int]::TryParse($versionCodeText, [ref]$versionCode) -or $versionCode -le 0) {
-            throw 'AndroidManifest.xmlのversionCodeは正の整数である必要があります。'
+            throw 'gradle.propertiesのcomicExplorerVersionCodeは正の整数である必要があります。'
           }
           $expectedTag = "v$versionName"
           if ($env:GITHUB_REF_NAME -ne $expectedTag) {

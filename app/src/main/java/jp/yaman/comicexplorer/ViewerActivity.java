@@ -36,7 +36,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -55,7 +54,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler autoHandler = new Handler(Looper.getMainLooper());
-    private LruBitmapCache pageCache;
+    private BitmapMemoryCache pageCache;
     private final Runnable autoPage = new Runnable() {
         @Override public void run() {
             if (autoDelayMs <= 0 || isFinishing()) return;
@@ -100,7 +99,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         super.onCreate(state);
         ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         int maxKb = manager == null ? 20 * 1024 : Math.min(32 * 1024, manager.getMemoryClass() * 1024 / 6);
-        pageCache = new LruBitmapCache(Math.max(8 * 1024, maxKb));
+        pageCache = new BitmapMemoryCache(Math.max(8 * 1024, maxKb));
         getWindow().setStatusBarColor(Ui.DARK_BACKGROUND);
         getWindow().setNavigationBarColor(Ui.DARK_BACKGROUND);
         applyDarkSystemBarIcons();
@@ -250,7 +249,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
                     int start = getIntent().getIntExtra(EXTRA_START_INDEX, AppState.getPosition(this, sourceUri));
                     page = Math.max(0, Math.min(start, totalPages - 1));
                 } else {
-                    String extension = MainActivity.extension(title);
+                    String extension = ComicFile.extension(title);
                     if ("pdf".equals(extension)) {
                         closePdf();
                         pdfDescriptor = getContentResolver().openFileDescriptor(sourceUri, "r");
@@ -295,9 +294,9 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         if (input == null) throw new IOException("CBZを開けません。");
         try (InputStream source = input; ZipInputStream zip = new ZipInputStream(source)) {
             ZipEntry entry;
-            while ((entry = zip.getNextEntry()) != null) if (!entry.isDirectory() && MainActivity.isImage(entry.getName(), null)) entries.add(entry.getName());
+            while ((entry = zip.getNextEntry()) != null) if (!entry.isDirectory() && ComicFile.isImage(entry.getName(), null)) entries.add(entry.getName());
         }
-        Collections.sort(entries, new NaturalNameComparator());
+        Collections.sort(entries, ComicFile.NATURAL_NAME_ORDER);
         return entries;
     }
 
@@ -689,35 +688,4 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
-    private static final class LruBitmapCache extends android.util.LruCache<String, Bitmap> {
-        LruBitmapCache(int size) { super(size); }
-        @Override protected int sizeOf(String key, Bitmap value) { return Math.max(1, value.getByteCount() / 1024); }
-        void release() {
-            for (Bitmap bitmap : snapshot().values()) if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
-            evictAll();
-        }
-    }
-
-    private static final class NaturalNameComparator implements Comparator<String> {
-        @Override public int compare(String left, String right) {
-            int li = 0, ri = 0;
-            while (li < left.length() && ri < right.length()) {
-                char lc = left.charAt(li), rc = right.charAt(ri);
-                if (Character.isDigit(lc) && Character.isDigit(rc)) {
-                    int ls = li, rs = ri;
-                    while (li < left.length() && Character.isDigit(left.charAt(li))) li++;
-                    while (ri < right.length() && Character.isDigit(right.charAt(ri))) ri++;
-                    try {
-                        long ln = Long.parseLong(left.substring(ls, li)), rn = Long.parseLong(right.substring(rs, ri));
-                        if (ln != rn) return ln < rn ? -1 : 1;
-                    } catch (NumberFormatException ignored) { }
-                } else {
-                    int difference = Character.toLowerCase(lc) - Character.toLowerCase(rc);
-                    if (difference != 0) return difference;
-                    li++; ri++;
-                }
-            }
-            return left.length() - right.length();
-        }
-    }
 }

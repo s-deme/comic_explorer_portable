@@ -3,16 +3,13 @@ package jp.yaman.comicexplorer;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.DocumentsContract;
-import android.provider.OpenableColumns;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.format.DateFormat;
-import android.util.LruCache;
 import android.util.Size;
 import android.view.Gravity;
 import android.view.View;
@@ -51,12 +48,10 @@ public final class MainActivity extends Activity {
 
     private final ExecutorService folderWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService thumbnailWorker = Executors.newFixedThreadPool(2);
-    private final LruCache<String, Bitmap> thumbnails = new LruCache<String, Bitmap>(12 * 1024) {
-        @Override protected int sizeOf(String key, Bitmap value) { return value.getByteCount() / 1024; }
-    };
+    private final BitmapMemoryCache thumbnails = new BitmapMemoryCache(12 * 1024);
     private final Collator collator = Collator.getInstance(Locale.getDefault());
-    private final ArrayList<Entry> allRows = new ArrayList<>();
-    private final ArrayList<Entry> visibleRows = new ArrayList<>();
+    private final ArrayList<LibraryEntry> allRows = new ArrayList<>();
+    private final ArrayList<LibraryEntry> visibleRows = new ArrayList<>();
 
     private Uri treeUri;
     private Uri directoryUri;
@@ -64,6 +59,7 @@ public final class MainActivity extends Activity {
     private int sortMode = SORT_NAME;
     private boolean descending;
     private String query = "";
+    private int directoryLoadToken;
     private TextView pathText;
     private TextView stateText;
     private Button libraryTab;
@@ -80,26 +76,6 @@ public final class MainActivity extends Activity {
     private ImageView emptyIcon;
     private boolean compactHeight;
     private LibraryAdapter adapter;
-
-    static final class Entry {
-        final Uri uri;
-        final String name;
-        final String mime;
-        final String kind;
-        final boolean directory;
-        final long size;
-        final long modified;
-
-        Entry(Uri uri, String name, String mime, String kind, boolean directory, long size, long modified) {
-            this.uri = uri;
-            this.name = name == null || name.trim().isEmpty() ? "名称なし" : name;
-            this.mime = mime;
-            this.kind = kind;
-            this.directory = directory;
-            this.size = size;
-            this.modified = modified;
-        }
-    }
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -366,11 +342,12 @@ public final class MainActivity extends Activity {
     }
 
     private void showEmptyLibrary() {
+        directoryLoadToken++;
         allRows.clear();
         visibleRows.clear();
         pathText.setText("本棚の準備");
         stateText.setText("選択したフォルダだけを安全に読み取ります");
-        showEmptyState("本棚をつくりましょう", "漫画を保存したフォルダを選ぶと、PDF・CBZ・ZIP・画像をここに並べます。", "フォルダを選ぶ", false);
+        showEmptyState("本棚をつくりましょう", "漫画を保存したフォルダを選ぶと、PDF・CBZ・ZIP・画像をここに並べます。\n\nAndroid の仕様上、「Download」自体は選べません。中にある漫画用のサブフォルダを選んでください。", "フォルダを選ぶ", false);
         updateButtons();
         if (adapter != null) adapter.notifyDataSetChanged();
     }
@@ -378,6 +355,9 @@ public final class MainActivity extends Activity {
     private void loadDirectory() {
         if (treeUri == null || directoryUri == null) { showEmptyLibrary(); return; }
         mode = MODE_LIBRARY;
+        final Uri requestedTree = treeUri;
+        final Uri requestedDirectory = directoryUri;
+        final int token = ++directoryLoadToken;
         updateButtons();
         allRows.clear();
         visibleRows.clear();
@@ -386,33 +366,18 @@ public final class MainActivity extends Activity {
         stateText.setText("対応作品を探しています");
         showEmptyState("本棚を読み込み中", "フォルダ内の作品を確認しています。", null, true);
         folderWorker.execute(() -> {
-            ArrayList<Entry> loaded = new ArrayList<>();
+            List<LibraryEntry> loaded = new ArrayList<>();
             String error = null;
-            try {
-                String documentId = DocumentsContract.getDocumentId(directoryUri);
-                Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId);
-                String[] projection = {DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                        DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED};
-                try (Cursor cursor = getContentResolver().query(children, projection, null, null, null)) {
-                    if (cursor == null) throw new IllegalStateException("フォルダを読み取れません。");
-                    while (cursor.moveToNext()) {
-                        String childId = cursor.getString(0);
-                        String name = cursor.getString(1);
-                        String mime = cursor.getString(2);
-                        long size = cursor.isNull(3) ? 0 : cursor.getLong(3);
-                        long modified = cursor.isNull(4) ? 0 : cursor.getLong(4);
-                        boolean directory = DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
-                        if (directory || isSupported(name, mime)) loaded.add(new Entry(DocumentsContract.buildDocumentUriUsingTree(treeUri, childId), name, mime,
-                                directory ? "フォルダ" : kindFor(name, mime), directory, size, modified));
-                    }
-                }
-            } catch (Exception exception) { error = readableError(exception); }
+            try { loaded = LibraryDirectoryReader.read(getContentResolver(), requestedTree, requestedDirectory); }
+            catch (Exception exception) { error = readableError(exception); }
+            List<LibraryEntry> finalLoaded = loaded;
             String finalError = error;
             runOnUiThread(() -> {
+                if (isFinishing() || token != directoryLoadToken || !requestedDirectory.equals(directoryUri)) return;
                 allRows.clear();
-                if (finalError == null) allRows.addAll(loaded);
-                pathText.setText(finalError == null ? displayName(directoryUri) : "フォルダを開けません");
-                stateText.setText(finalError == null ? "対応作品 " + loaded.size() + " 件  •  長押しで詳細メニュー" : finalError);
+                if (finalError == null) allRows.addAll(finalLoaded);
+                pathText.setText(finalError == null ? LibraryDirectoryReader.displayName(getContentResolver(), requestedDirectory) : "フォルダを開けません");
+                stateText.setText(finalError == null ? "対応作品 " + finalLoaded.size() + " 件  •  長押しで詳細メニュー" : finalError);
                 if (finalError != null) showEmptyState("フォルダを開けません", finalError + " フォルダを選び直してください。", "選び直す", false);
                 applyFilters();
             });
@@ -420,20 +385,21 @@ public final class MainActivity extends Activity {
     }
 
     private void loadSavedItems() {
+        directoryLoadToken++;
         updateButtons();
         pathText.setText(mode == MODE_FAVORITES ? "お気に入り" : "最近開いた作品");
         allRows.clear();
         List<AppState.SavedItem> items = mode == MODE_FAVORITES ? AppState.favorites(this) : AppState.recents(this);
-        for (AppState.SavedItem item : items) allRows.add(new Entry(item.uri, item.title, null, item.kind, false, 0, item.timestamp));
+        for (AppState.SavedItem item : items) allRows.add(new LibraryEntry(item.uri, item.title, null, item.kind, false, 0, item.timestamp));
         stateText.setText(items.isEmpty() ? (mode == MODE_FAVORITES ? "気になる作品を保存して、すぐ戻れるようにしましょう" : "開いた作品がここに新しい順で並びます") : items.size() + " 件");
         applyFilters();
     }
 
     private void applyFilters() {
         visibleRows.clear();
-        for (Entry item : allRows) if (query.isEmpty() || item.name.toLowerCase(Locale.ROOT).contains(query) || item.kind.toLowerCase(Locale.ROOT).contains(query)) visibleRows.add(item);
-        Collections.sort(visibleRows, new Comparator<Entry>() {
-            @Override public int compare(Entry left, Entry right) {
+        for (LibraryEntry item : allRows) if (query.isEmpty() || item.name.toLowerCase(Locale.ROOT).contains(query) || item.kind.toLowerCase(Locale.ROOT).contains(query)) visibleRows.add(item);
+        Collections.sort(visibleRows, new Comparator<LibraryEntry>() {
+            @Override public int compare(LibraryEntry left, LibraryEntry right) {
                 if (left.directory != right.directory) return left.directory ? -1 : 1;
                 int result = sortMode == SORT_MODIFIED ? Long.compare(left.modified, right.modified) : sortMode == SORT_SIZE ? Long.compare(left.size, right.size) : collator.compare(left.name, right.name);
                 if (result == 0) result = collator.compare(left.name, right.name);
@@ -484,23 +450,23 @@ public final class MainActivity extends Activity {
         loadDirectory();
     }
 
-    private void open(Entry item) {
+    private void open(LibraryEntry item) {
         if (item.directory) { directoryUri = item.uri; loadDirectory(); return; }
         AppState.addRecent(this, item.uri, item.name, item.kind);
         Intent viewer = new Intent(this, ViewerActivity.class);
         viewer.setData(item.uri);
         viewer.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         viewer.putExtra(ViewerActivity.EXTRA_TITLE, item.name);
-        if (isImage(item.name, item.mime) && mode == MODE_LIBRARY) {
+        if (ComicFile.isImage(item.name, item.mime) && mode == MODE_LIBRARY) {
             ArrayList<Uri> pages = new ArrayList<>();
-            for (Entry candidate : allRows) if (!candidate.directory && isImage(candidate.name, candidate.mime)) pages.add(candidate.uri);
+            for (LibraryEntry candidate : allRows) if (!candidate.directory && ComicFile.isImage(candidate.name, candidate.mime)) pages.add(candidate.uri);
             viewer.putParcelableArrayListExtra(ViewerActivity.EXTRA_IMAGE_URIS, pages);
             viewer.putExtra(ViewerActivity.EXTRA_START_INDEX, pages.indexOf(item.uri));
         }
         startActivity(viewer);
     }
 
-    private void showActions(Entry item) {
+    private void showActions(LibraryEntry item) {
         if (item.directory) { Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setItems(new String[]{"開く"}, (dialog, which) -> open(item))); return; }
         boolean favorite = AppState.isFavorite(this, item.uri);
         String[] actions = {favorite ? "お気に入りから外す" : "お気に入りに追加", "復帰位置を消去", "詳細を表示"};
@@ -517,34 +483,17 @@ public final class MainActivity extends Activity {
         }));
     }
 
-    private void showDetails(Entry item) {
-        String message = "形式: " + item.kind + "\n" + (item.size > 0 ? "サイズ: " + formatSize(item.size) + "\n" : "")
+    private void showDetails(LibraryEntry item) {
+        String message = "形式: " + item.kind + "\n" + (item.size > 0 ? "サイズ: " + ComicFile.formatSize(item.size) + "\n" : "")
                 + (item.modified > 0 ? "更新: " + DateFormat.getMediumDateFormat(this).format(new Date(item.modified)) + "\n" : "")
                 + "復帰位置: " + (AppState.getPosition(this, item.uri) + 1) + " ページ";
         Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setMessage(message).setPositiveButton("閉じる", null));
-    }
-
-    private String displayName(Uri uri) {
-        try (Cursor cursor = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) return cursor.getString(0);
-        } catch (Exception ignored) { }
-        return "ライブラリ";
     }
 
     private String readableError(Exception exception) {
         if (exception instanceof SecurityException) return "フォルダへのアクセス許可が失われました。";
         return exception.getMessage() == null ? "フォルダを読み取れません。" : exception.getMessage();
     }
-
-    static boolean isSupported(String name, String mime) { return isImage(name, mime) || extension(name).equals("pdf") || extension(name).equals("zip") || extension(name).equals("cbz"); }
-    static boolean isImage(String name, String mime) {
-        if (mime != null && mime.startsWith("image/")) return true;
-        String ext = extension(name);
-        return ext.equals("jpg") || ext.equals("jpeg") || ext.equals("png") || ext.equals("gif") || ext.equals("bmp") || ext.equals("webp") || ext.equals("avif");
-    }
-    static String extension(String name) { int dot = name == null ? -1 : name.lastIndexOf('.'); return dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT); }
-    static String kindFor(String name, String mime) { if (isImage(name, mime)) return "画像"; String ext = extension(name); return ext.equals("pdf") ? "PDF" : ext.equals("cbz") ? "CBZ" : "ZIP"; }
-    private String formatSize(long bytes) { return bytes < 1024 * 1024 ? Math.max(1, bytes / 1024) + " KB" : String.format(Locale.getDefault(), "%.1f MB", bytes / (1024f * 1024f)); }
 
     private Button button(String label) { return Ui.button(this, label, Ui.ButtonStyle.SECONDARY); }
     private Button compactButton(String label, String description) { Button view = button(label); view.setContentDescription(description); return view; }
@@ -556,11 +505,17 @@ public final class MainActivity extends Activity {
         else if (directoryUri != null && !directoryUri.equals(treeUri)) goUp(); else super.onBackPressed();
     }
 
-    @Override protected void onDestroy() { folderWorker.shutdownNow(); thumbnailWorker.shutdownNow(); super.onDestroy(); }
+    @Override protected void onDestroy() {
+        directoryLoadToken++;
+        folderWorker.shutdownNow();
+        thumbnailWorker.shutdownNow();
+        thumbnails.evictAll();
+        super.onDestroy();
+    }
 
     private final class LibraryAdapter extends BaseAdapter {
         @Override public int getCount() { return visibleRows.size(); }
-        @Override public Entry getItem(int position) { return visibleRows.get(position); }
+        @Override public LibraryEntry getItem(int position) { return visibleRows.get(position); }
         @Override public long getItemId(int position) { return position; }
 
         @Override public View getView(int position, View convertView, ViewGroup parent) {
@@ -603,9 +558,9 @@ public final class MainActivity extends Activity {
                 row.setTag(holder);
                 convertView = row;
             } else holder = (Holder) convertView.getTag();
-            Entry item = getItem(position);
+            LibraryEntry item = getItem(position);
             holder.name.setText(item.name);
-            holder.detail.setText(item.directory ? "フォルダ" : item.kind + (item.size > 0 ? "  •  " + formatSize(item.size) : ""));
+            holder.detail.setText(item.directory ? "フォルダ" : item.kind + (item.size > 0 ? "  •  " + ComicFile.formatSize(item.size) : ""));
             int saved = AppState.getPosition(MainActivity.this, item.uri);
             holder.progress.setVisibility(item.directory || saved <= 0 ? View.GONE : View.VISIBLE);
             holder.progress.setText(item.directory || saved <= 0 ? "" : "続き  " + (saved + 1) + "ページ");
@@ -624,12 +579,12 @@ public final class MainActivity extends Activity {
             return convertView;
         }
 
-        private void bindThumbnail(ImageView view, TextView formatMark, Entry item) {
+        private void bindThumbnail(ImageView view, TextView formatMark, LibraryEntry item) {
             view.setTag(item.uri.toString());
             view.setImageDrawable(null);
             formatMark.setText(item.directory ? "DIR" : item.kind);
             formatMark.setVisibility(View.VISIBLE);
-            if (item.directory || !isImage(item.name, item.mime)) return;
+            if (item.directory || !ComicFile.isImage(item.name, item.mime)) return;
             formatMark.setText("IMG");
             String key = item.uri.toString();
             Bitmap cached = thumbnails.get(key);
@@ -638,8 +593,9 @@ public final class MainActivity extends Activity {
                 try {
                     Bitmap bitmap = getContentResolver().loadThumbnail(item.uri, new Size(dp(112), dp(144)), null);
                     if (bitmap == null) return;
-                    thumbnails.put(key, bitmap);
                     runOnUiThread(() -> {
+                        if (isFinishing()) return;
+                        thumbnails.put(key, bitmap);
                         if (key.equals(view.getTag())) {
                             view.setImageBitmap(bitmap);
                             formatMark.setVisibility(View.GONE);

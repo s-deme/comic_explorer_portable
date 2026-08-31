@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+}
+
+def releaseSigning = [
+        keystorePath: System.getenv('ANDROID_KEYSTORE_PATH'),
+        storePassword: System.getenv('ANDROID_KEYSTORE_PASSWORD'),
+        keyAlias: System.getenv('ANDROID_KEY_ALIAS'),
+        keyPassword: System.getenv('ANDROID_KEY_PASSWORD')
+]
+def missingReleaseSigning = releaseSigning.findAll { entry ->
+    entry.value == null || entry.value.trim().isEmpty()
+}.keySet()
+
+android {
+    namespace 'jp.yaman.comicexplorer'
+    compileSdk 35
+    buildToolsVersion '36.0.0'
+
+    defaultConfig {
+        applicationId 'jp.yaman.comicexplorer'
+        minSdk 29
+        targetSdk 35
+        versionCode providers.gradleProperty('comicExplorerVersionCode').get().toInteger()
+        versionName providers.gradleProperty('comicExplorerVersionName').get()
+    }
+
+    signingConfigs {
+        release {
+            if (missingReleaseSigning.isEmpty()) {
+                storeFile file(releaseSigning.keystorePath)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    boolean releasePackagingRequested = graph.allTasks.any { task ->
+        task.path ==~ /.*:(assemble|bundle|package).*Release.*/
+    }
+    if (releasePackagingRequested && !missingReleaseSigning.isEmpty()) {
+        throw new GradleException('Release signing is incomplete. Set ANDROID_KEYSTORE_PATH, '
+                + 'ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD.')
+    }
+}
