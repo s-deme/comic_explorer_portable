@@ -226,6 +226,8 @@ public final class MainActivity extends Activity {
         list.setPadding(dp(1), dp(4), dp(1), dp(4));
         list.setClipToPadding(false);
         list.setContentDescription("作品一覧");
+        // Keep row-level tap and long-press handling available when a row has a star control.
+        list.setItemsCanFocus(false);
         adapter = new LibraryAdapter();
         list.setAdapter(adapter);
         list.setOnItemClickListener((parent, view, position, id) -> open(visibleRows.get(position)));
@@ -411,7 +413,7 @@ public final class MainActivity extends Activity {
             stateText.setText("「" + query + "」に一致する作品はありません");
             showEmptyState("見つかりませんでした", "検索語を短くするか、別の名前で試してください。", null, false);
         } else if (visibleRows.isEmpty()) {
-            if (mode == MODE_FAVORITES) showEmptyState("お気に入りはまだありません", "作品の「保存」を押すと、読みたい本だけをここに集められます。", null, false);
+            if (mode == MODE_FAVORITES) showEmptyState("お気に入りはまだありません", "作品の星（☆）を押すと、読みたい本だけをここに集められます。", null, false);
             else if (mode == MODE_RECENTS) showEmptyState("読書履歴はまだありません", "本棚から作品を開くと、続きへ戻りやすいようここに並びます。", "本棚を見る", false);
             else if (treeUri != null && emptyProgress.getVisibility() != View.VISIBLE && !pathText.getText().toString().equals("フォルダを開けません"))
                 showEmptyState("このフォルダは空です", "対応するPDF・CBZ・ZIP・画像、またはサブフォルダが見つかりませんでした。", "別のフォルダを選ぶ", false);
@@ -472,15 +474,19 @@ public final class MainActivity extends Activity {
         String[] actions = {favorite ? "お気に入りから外す" : "お気に入りに追加", "復帰位置を消去", "詳細を表示"};
         Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setItems(actions, (dialog, which) -> {
             if (which == 0) {
-                AppState.setFavorite(this, item.uri, item.name, item.kind, !favorite);
+                setFavorite(item, !favorite);
                 Toast.makeText(this, !favorite ? "お気に入りに追加しました" : "お気に入りから外しました", Toast.LENGTH_SHORT).show();
-                if (mode == MODE_FAVORITES) loadSavedItems(); else adapter.notifyDataSetChanged();
             } else if (which == 1) {
                 AppState.clearPosition(this, item.uri);
                 Toast.makeText(this, "復帰位置を消去しました", Toast.LENGTH_SHORT).show();
                 adapter.notifyDataSetChanged();
             } else showDetails(item);
         }));
+    }
+
+    private void setFavorite(LibraryEntry item, boolean favorite) {
+        AppState.setFavorite(this, item.uri, item.name, item.kind, favorite);
+        if (mode == MODE_FAVORITES && !favorite) loadSavedItems(); else adapter.notifyDataSetChanged();
     }
 
     private void showDetails(LibraryEntry item) {
@@ -552,8 +558,11 @@ public final class MainActivity extends Activity {
                 progressParams.setMargins(0, dp(6), 0, 0);
                 info.addView(progress, progressParams);
                 row.addView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-                Button favorite = button("保存");
-                row.addView(favorite, new LinearLayout.LayoutParams(dp(76), dp(48)));
+                Button favorite = button("☆");
+                favorite.setFocusable(false);
+                favorite.setFocusableInTouchMode(false);
+                favorite.setTextSize(28);
+                row.addView(favorite, new LinearLayout.LayoutParams(dp(48), dp(48)));
                 holder = new Holder(thumbnail, formatMark, name, detail, progress, favorite);
                 row.setTag(holder);
                 convertView = row;
@@ -566,13 +575,17 @@ public final class MainActivity extends Activity {
             holder.progress.setText(item.directory || saved <= 0 ? "" : "続き  " + (saved + 1) + "ページ");
             boolean favorite = !item.directory && AppState.isFavorite(MainActivity.this, item.uri);
             holder.favorite.setVisibility(item.directory ? View.GONE : View.VISIBLE);
-            holder.favorite.setText(favorite ? "保存済" : "保存");
-            holder.favorite.setContentDescription(favorite ? "お気に入りから外す" : "お気に入りに追加");
+            holder.favorite.setText(favorite ? "★" : "☆");
+            holder.favorite.setContentDescription(item.name + (favorite ? "をお気に入りから外す" : "をお気に入りに追加"));
             Ui.styleButton(holder.favorite, favorite ? Ui.ButtonStyle.TONAL : Ui.ButtonStyle.SECONDARY);
+            holder.favorite.setTextSize(28);
             holder.favorite.setOnClickListener(view -> {
                 boolean next = !AppState.isFavorite(MainActivity.this, item.uri);
-                AppState.setFavorite(MainActivity.this, item.uri, item.name, item.kind, next);
-                if (mode == MODE_FAVORITES && !next) loadSavedItems(); else notifyDataSetChanged();
+                setFavorite(item, next);
+            });
+            holder.favorite.setOnLongClickListener(view -> {
+                showActions(item);
+                return true;
             });
             bindThumbnail(holder.thumbnail, holder.formatMark, item);
             convertView.setContentDescription(item.name + "、" + holder.detail.getText() + (holder.progress.getText().length() > 0 ? "、" + holder.progress.getText() : ""));
