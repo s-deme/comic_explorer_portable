@@ -199,6 +199,16 @@ public final class Ui {
         if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? "選択中" : "未選択");
     }
 
+    /** Bottom navigation keeps the library's stable destinations reachable without a top tab row. */
+    public static void styleNavigationDestination(Button view, boolean selected) {
+        styleButton(view, selected ? ButtonStyle.TONAL : ButtonStyle.GHOST);
+        view.setTextSize(14);
+        view.setPadding(dp(view.getContext(), 4), 0, dp(view.getContext(), 4), 0);
+        view.setSelected(selected);
+        view.setContentDescription(view.getText() + (selected ? "、選択中" : "を表示"));
+        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? "選択中" : "未選択");
+    }
+
     public static void styleSearch(EditText input) {
         input.setTextColor(TEXT_PRIMARY);
         input.setHintTextColor(TEXT_MUTED);

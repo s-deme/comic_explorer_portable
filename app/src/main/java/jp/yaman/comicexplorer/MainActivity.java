@@ -62,12 +62,14 @@ public final class MainActivity extends Activity {
     private int directoryLoadToken;
     private TextView pathText;
     private TextView stateText;
-    private Button libraryTab;
-    private Button favoritesTab;
-    private Button recentsTab;
+    private TextView screenTitle;
+    private Button libraryDestination;
+    private Button favoritesDestination;
+    private Button recentsDestination;
     private Button sortButton;
-    private Button upButton;
+    private Button browseControlsButton;
     private EditText search;
+    private View searchPanel;
     private View emptyPanel;
     private TextView emptyTitle;
     private TextView emptyMessage;
@@ -98,39 +100,21 @@ public final class MainActivity extends Activity {
 
     private void buildUi() {
         compactHeight = getResources().getDisplayMetrics().heightPixels / getResources().getDisplayMetrics().density < 600f;
-        boolean narrowWidth = getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density < 360f;
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(10), dp(16), dp(8));
+        root.setPadding(dp(16), dp(8), dp(16), dp(8));
         root.setBackgroundColor(Ui.LIGHT_BACKGROUND);
 
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout identity = new LinearLayout(this);
-        identity.setOrientation(LinearLayout.VERTICAL);
-        TextView eyebrow = text("PRIVATE COMIC LIBRARY", 14, Ui.BRAND_DARK);
-        Ui.label(eyebrow);
-        eyebrow.setLetterSpacing(.08f);
-        eyebrow.setVisibility(narrowWidth ? View.GONE : View.VISIBLE);
-        identity.addView(eyebrow);
-        TextView title = text("Comic Explorer", narrowWidth ? 24 : 28, Ui.TEXT_PRIMARY);
-        Ui.title(title);
-        identity.addView(title);
-        header.addView(identity, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        Button refresh = compactButton("更新", "ライブラリを更新");
-        Ui.styleButton(refresh, Ui.ButtonStyle.GHOST);
-        refresh.setOnClickListener(view -> refresh());
-        header.addView(refresh, new LinearLayout.LayoutParams(dp(64), dp(48)));
-        Button settings = compactButton("設定", "設定を開く");
-        Ui.styleButton(settings, Ui.ButtonStyle.TONAL);
-        settings.setOnClickListener(view -> startActivity(new Intent(this, SettingsActivity.class)));
-        header.addView(settings, new LinearLayout.LayoutParams(dp(68), dp(48)));
+        screenTitle = text("本棚", 24, Ui.TEXT_PRIMARY);
+        Ui.title(screenTitle);
+        header.addView(screenTitle, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        Button menu = compactButton("メニュー", "本棚のメニューを開く");
+        Ui.styleButton(menu, Ui.ButtonStyle.SECONDARY);
+        menu.setOnClickListener(view -> showAppMenu());
+        header.addView(menu, new LinearLayout.LayoutParams(dp(88), dp(48)));
         root.addView(header);
-
-        TextView subtitle = text("端末の中だけで、好きな作品を静かに楽しむ本棚", 14, Ui.TEXT_SECONDARY);
-        subtitle.setPadding(0, dp(2), 0, dp(14));
-        subtitle.setVisibility(compactHeight ? View.GONE : View.VISIBLE);
-        root.addView(subtitle);
 
         search = new EditText(this);
         search.setSingleLine(true);
@@ -145,80 +129,45 @@ public final class MainActivity extends Activity {
             }
             @Override public void afterTextChanged(Editable value) { }
         });
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setGravity(Gravity.CENTER_VERTICAL);
-        tabs.setPadding(dp(4), dp(4), dp(4), dp(4));
-        Ui.styleInsetPanel(tabs);
-        libraryTab = tabButton("本棚", MODE_LIBRARY, "ライブラリを表示");
-        favoritesTab = tabButton("お気に入り", MODE_FAVORITES, "お気に入りを表示");
-        recentsTab = tabButton("最近", MODE_RECENTS, "最近開いた作品を表示");
-        tabs.addView(libraryTab, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        tabs.addView(favoritesTab, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        tabs.addView(recentsTab, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        LinearLayout.LayoutParams tabsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
-        tabsParams.setMargins(0, dp(10), 0, dp(10));
-        if (compactHeight) {
-            LinearLayout discovery = new LinearLayout(this);
-            discovery.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, dp(52), 1.25f);
-            searchParams.setMargins(0, 0, dp(8), 0);
-            discovery.addView(search, searchParams);
-            discovery.addView(tabs, new LinearLayout.LayoutParams(0, dp(56), 1f));
-            LinearLayout.LayoutParams discoveryParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
-            discoveryParams.setMargins(0, dp(4), 0, dp(6));
-            root.addView(discovery, discoveryParams);
-        } else {
-            root.addView(search, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
-            root.addView(tabs, tabsParams);
-        }
-
-        LinearLayout actions = new LinearLayout(this);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
-        Button folder = button("フォルダ");
-        Ui.styleButton(folder, Ui.ButtonStyle.PRIMARY);
-        folder.setContentDescription("ライブラリフォルダを選択");
-        folder.setOnClickListener(view -> chooseFolder());
-        LinearLayout.LayoutParams folderParams = new LinearLayout.LayoutParams(0, dp(48), 1.2f);
-        folderParams.setMargins(0, 0, dp(6), 0);
-        actions.addView(folder, folderParams);
-        upButton = compactButton("上へ", "親フォルダへ移動");
-        upButton.setOnClickListener(view -> goUp());
-        LinearLayout.LayoutParams upParams = new LinearLayout.LayoutParams(0, dp(48), .9f);
-        upParams.setMargins(0, 0, dp(6), 0);
-        actions.addView(upButton, upParams);
+        LinearLayout searchAndSort = new LinearLayout(this);
+        searchAndSort.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
+        searchParams.setMargins(0, 0, dp(8), 0);
+        searchAndSort.addView(search, searchParams);
         sortButton = button("名前 ↑");
         sortButton.setContentDescription("並び順を変更");
         sortButton.setOnClickListener(view -> chooseSort());
-        actions.addView(sortButton, new LinearLayout.LayoutParams(0, dp(48), .85f));
+        searchAndSort.addView(sortButton, new LinearLayout.LayoutParams(dp(88), dp(52)));
+        LinearLayout.LayoutParams searchPanelParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
+        searchPanelParams.setMargins(0, dp(4), 0, dp(4));
+        root.addView(searchAndSort, searchPanelParams);
+        searchPanel = searchAndSort;
+        searchPanel.setVisibility(View.GONE);
 
         LinearLayout location = new LinearLayout(this);
-        location.setOrientation(LinearLayout.VERTICAL);
-        location.setPadding(dp(14), dp(10), dp(14), dp(10));
-        Ui.styleInsetPanel(location);
+        location.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout locationText = new LinearLayout(this);
+        locationText.setOrientation(LinearLayout.VERTICAL);
+        locationText.setPadding(0, dp(4), dp(8), dp(4));
         pathText = text("", 15, Ui.TEXT_PRIMARY);
         Ui.label(pathText);
         pathText.setSingleLine(true);
         pathText.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-        location.addView(pathText);
+        locationText.addView(pathText);
         stateText = text("", 14, Ui.TEXT_SECONDARY);
         stateText.setPadding(0, dp(2), 0, 0);
-        location.addView(stateText);
-        LinearLayout.LayoutParams locationParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        locationParams.setMargins(0, dp(10), 0, dp(4));
-        if (compactHeight) {
-            LinearLayout contextRow = new LinearLayout(this);
-            contextRow.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(0, dp(48), 1.1f);
-            actionParams.setMargins(0, 0, dp(8), 0);
-            contextRow.addView(actions, actionParams);
-            contextRow.addView(location, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-            LinearLayout.LayoutParams contextParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            contextParams.setMargins(0, 0, 0, dp(4));
-            root.addView(contextRow, contextParams);
-        } else {
-            root.addView(actions);
-            root.addView(location, locationParams);
-        }
+        stateText.setSingleLine(true);
+        stateText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        locationText.addView(stateText);
+        location.addView(locationText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        browseControlsButton = compactButton("検索・並び替え", "検索と並び替えを表示");
+        Ui.styleButton(browseControlsButton, Ui.ButtonStyle.GHOST);
+        browseControlsButton.setAutoSizeTextTypeUniformWithConfiguration(12, 14, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        browseControlsButton.setOnClickListener(view -> toggleSearchPanel());
+        location.addView(browseControlsButton, new LinearLayout.LayoutParams(dp(120), dp(48)));
+        LinearLayout.LayoutParams locationParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
+        locationParams.setMargins(0, dp(2), 0, dp(4));
+        root.addView(location, locationParams);
 
         ListView list = new ListView(this);
         list.setDivider(null);
@@ -240,11 +189,24 @@ public final class MainActivity extends Activity {
         emptyPanel = createEmptyPanel();
         content.addView(emptyPanel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
         root.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        LinearLayout navigation = new LinearLayout(this);
+        navigation.setGravity(Gravity.CENTER_VERTICAL);
+        navigation.setPadding(dp(4), dp(4), dp(4), dp(4));
+        Ui.styleInsetPanel(navigation);
+        libraryDestination = navigationButton("本棚", MODE_LIBRARY, "本棚を表示");
+        favoritesDestination = navigationButton("お気に入り", MODE_FAVORITES, "お気に入りを表示");
+        recentsDestination = navigationButton("最近", MODE_RECENTS, "最近開いた作品を表示");
+        navigation.addView(libraryDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        navigation.addView(favoritesDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        navigation.addView(recentsDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        LinearLayout.LayoutParams navigationParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56));
+        navigationParams.setMargins(0, dp(6), 0, 0);
+        root.addView(navigation, navigationParams);
         setContentView(root);
         Ui.applySystemBarInsets(this, root);
     }
 
-    private Button tabButton(String label, int targetMode, String description) {
+    private Button navigationButton(String label, int targetMode, String description) {
         Button button = Ui.button(this, label, Ui.ButtonStyle.GHOST);
         button.setContentDescription(description);
         button.setOnClickListener(view -> selectMode(targetMode));
@@ -313,7 +275,7 @@ public final class MainActivity extends Activity {
         if (mode == selected) return;
         mode = selected;
         search.setText("");
-        updateButtons();
+        updateNavigation();
         if (mode == MODE_LIBRARY) {
             if (treeUri == null) showEmptyLibrary(); else loadDirectory();
         } else {
@@ -336,11 +298,46 @@ public final class MainActivity extends Activity {
                 }));
     }
 
-    private void updateButtons() {
-        Ui.styleSegment(libraryTab, mode == MODE_LIBRARY);
-        Ui.styleSegment(favoritesTab, mode == MODE_FAVORITES);
-        Ui.styleSegment(recentsTab, mode == MODE_RECENTS);
-        Ui.setVisibleAsDisabled(upButton, mode == MODE_LIBRARY && directoryUri != null && !directoryUri.equals(treeUri));
+    private void updateNavigation() {
+        Ui.styleNavigationDestination(libraryDestination, mode == MODE_LIBRARY);
+        Ui.styleNavigationDestination(favoritesDestination, mode == MODE_FAVORITES);
+        Ui.styleNavigationDestination(recentsDestination, mode == MODE_RECENTS);
+        if (screenTitle != null) screenTitle.setText(mode == MODE_FAVORITES ? "お気に入り" : mode == MODE_RECENTS ? "最近" : "本棚");
+    }
+
+    private void toggleSearchPanel() {
+        boolean expanded = searchPanel.getVisibility() != View.VISIBLE;
+        searchPanel.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        browseControlsButton.setText(expanded ? "閉じる" : "検索・並び替え");
+        browseControlsButton.setContentDescription(expanded ? "検索と並び替えを閉じる" : "検索と並び替えを表示");
+    }
+
+    private void showAppMenu() {
+        ArrayList<String> labels = new ArrayList<>();
+        ArrayList<Integer> actions = new ArrayList<>();
+        labels.add("更新");
+        actions.add(0);
+        if (mode == MODE_LIBRARY) {
+            labels.add("フォルダを選び直す");
+            actions.add(1);
+            if (treeUri != null && directoryUri != null && !directoryUri.equals(treeUri)) {
+                labels.add("親フォルダへ");
+                actions.add(2);
+            }
+        }
+        labels.add("設定");
+        actions.add(3);
+        Ui.show(new AlertDialog.Builder(this)
+                .setTitle("メニュー")
+                .setItems(labels.toArray(new String[0]), (dialog, selected) -> {
+                    switch (actions.get(selected)) {
+                        case 0: refresh(); break;
+                        case 1: chooseFolder(); break;
+                        case 2: goUp(); break;
+                        case 3: startActivity(new Intent(this, SettingsActivity.class)); break;
+                        default: break;
+                    }
+                }));
     }
 
     private void showEmptyLibrary() {
@@ -350,7 +347,7 @@ public final class MainActivity extends Activity {
         pathText.setText("本棚の準備");
         stateText.setText("選択したフォルダだけを安全に読み取ります");
         showEmptyState("本棚をつくりましょう", "漫画を保存したフォルダを選ぶと、PDF・CBZ・ZIP・画像をここに並べます。\n\nAndroid の仕様上、「Download」自体は選べません。中にある漫画用のサブフォルダを選んでください。", "フォルダを選ぶ", false);
-        updateButtons();
+        updateNavigation();
         if (adapter != null) adapter.notifyDataSetChanged();
     }
 
@@ -360,7 +357,7 @@ public final class MainActivity extends Activity {
         final Uri requestedTree = treeUri;
         final Uri requestedDirectory = directoryUri;
         final int token = ++directoryLoadToken;
-        updateButtons();
+        updateNavigation();
         allRows.clear();
         visibleRows.clear();
         if (adapter != null) adapter.notifyDataSetChanged();
@@ -388,7 +385,7 @@ public final class MainActivity extends Activity {
 
     private void loadSavedItems() {
         directoryLoadToken++;
-        updateButtons();
+        updateNavigation();
         pathText.setText(mode == MODE_FAVORITES ? "お気に入り" : "最近開いた作品");
         allRows.clear();
         List<AppState.SavedItem> items = mode == MODE_FAVORITES ? AppState.favorites(this) : AppState.recents(this);
