@@ -31,7 +31,8 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -51,13 +52,20 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     private static final int TYPE_IMAGES = 1;
     private static final int TYPE_PDF = 2;
     private static final int TYPE_ARCHIVE = 3;
+    private static final int MAX_ARCHIVE_PAGES = 20_000;
+    private static final long MAX_ARCHIVE_ENTRY_BYTES = 48L * 1024 * 1024;
+    private static final int MAX_PAGE_DIMENSION = 8192;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler autoHandler = new Handler(Looper.getMainLooper());
     private BitmapMemoryCache pageCache;
     private final Runnable autoPage = new Runnable() {
         @Override public void run() {
-            if (autoDelayMs <= 0 || isFinishing()) return;
+            if (autoDelayMs <= 0 || destroyed || isFinishing()) return;
+            if (loading != null && loading.getVisibility() == View.VISIBLE) {
+                autoHandler.postDelayed(this, autoDelayMs);
+                return;
+            }
             int before = page;
             forward();
             if (page == before) { stopAutoPage(); return; }
@@ -76,10 +84,12 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     private int totalPages;
     private int loadToken;
     private int autoDelayMs;
+    private int maxBitmapPixels;
     private boolean initialized;
     private boolean chromeVisible = true;
     private boolean fullScreen;
     private boolean inverted;
+    private volatile boolean destroyed;
 
     private ZoomImageView imageView;
     private TextView titleText;
@@ -100,6 +110,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         int maxKb = manager == null ? 20 * 1024 : Math.min(32 * 1024, manager.getMemoryClass() * 1024 / 6);
         pageCache = new BitmapMemoryCache(Math.max(8 * 1024, maxKb));
+        maxBitmapPixels = Math.max(2 * 1024 * 1024, maxKb * 1024 / 4);
         getWindow().setStatusBarColor(Ui.DARK_BACKGROUND);
         getWindow().setNavigationBarColor(Ui.DARK_BACKGROUND);
         applyDarkSystemBarIcons();
@@ -164,7 +175,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         error.addView(errorText);
         Button retry = button("再試行", "ファイルを再度読み込む");
         Ui.styleButton(retry, Ui.ButtonStyle.DARK_PRIMARY);
-        retry.setOnClickListener(view -> initializeSource());
+        retry.setOnClickListener(view -> { if (initialized) loadPage(page, false); else initializeSource(); });
         LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
         retryParams.setMargins(0, dp(16), 0, 0);
         error.addView(retry, retryParams);
@@ -242,6 +253,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         showError(null);
         int token = ++loadToken;
         worker.execute(() -> {
+            if (destroyed) return;
             try {
                 if (imageUris != null && !imageUris.isEmpty()) {
                     type = TYPE_IMAGES;
@@ -268,7 +280,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
                     page = Math.max(0, Math.min(AppState.getPosition(this, sourceUri), totalPages - 1));
                 }
                 runOnUiThread(() -> {
-                    if (token != loadToken || isFinishing()) return;
+                    if (destroyed || token != loadToken || isFinishing()) return;
                     initialized = true;
                     pageSlider.setMax(Math.max(0, totalPages - 1));
                     updateControls();
@@ -278,9 +290,10 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
                         AppState.markReaderHintSeen(this);
                     }
                 });
-            } catch (Exception exception) {
+            } catch (Exception | OutOfMemoryError exception) {
+                if (exception instanceof OutOfMemoryError) pageCache.evictAll();
                 runOnUiThread(() -> {
-                    if (token != loadToken || isFinishing()) return;
+                    if (destroyed || token != loadToken || isFinishing()) return;
                     showLoading(false);
                     showError(readableError(exception));
                 });
@@ -294,7 +307,12 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         if (input == null) throw new IOException("CBZを開けません。");
         try (InputStream source = input; ZipInputStream zip = new ZipInputStream(source)) {
             ZipEntry entry;
-            while ((entry = zip.getNextEntry()) != null) if (!entry.isDirectory() && ComicFile.isImage(entry.getName(), null)) entries.add(entry.getName());
+            while (!destroyed && (entry = zip.getNextEntry()) != null) {
+                if (!entry.isDirectory() && ComicFile.isImage(entry.getName(), null)) {
+                    if (entries.size() >= MAX_ARCHIVE_PAGES) throw new IOException("CBZのページ数が多すぎます（上限20,000ページ）。");
+                    entries.add(entry.getName());
+                }
+            }
         }
         Collections.sort(entries, ComicFile.NATURAL_NAME_ORDER);
         return entries;
@@ -302,6 +320,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
 
     private void loadPage(int target, boolean prefetch) {
         if (!initialized || target < 0 || target >= totalPages) return;
+        int token = prefetch ? loadToken : ++loadToken;
         String cacheKey = type + ":" + target;
         Bitmap cached = pageCache.get(cacheKey);
         if (!prefetch) {
@@ -310,29 +329,39 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
             showError(null);
         }
         if (cached != null) {
-            if (!prefetch) displayBitmap(cached);
-            if (!prefetch) prefetchAround(target);
+            if (!prefetch) {
+                showLoading(false);
+                displayBitmap(cached);
+                AppState.setPosition(this, sourceUri, target);
+                prefetchAround(target);
+            }
             return;
         }
-        int token = ++loadToken;
         if (!prefetch) showLoading(true);
         worker.execute(() -> {
+            if (destroyed) return;
             Bitmap bitmap = null;
-            Exception failure = null;
+            Throwable failure = null;
             try { bitmap = decodePage(target); if (bitmap == null) throw new IOException("画像を読み取れません。"); }
-            catch (Exception exception) { failure = exception; }
+            catch (Exception | OutOfMemoryError exception) {
+                if (exception instanceof OutOfMemoryError) pageCache.evictAll();
+                failure = exception;
+            }
             Bitmap finalBitmap = bitmap;
-            Exception finalFailure = failure;
+            Throwable finalFailure = failure;
             runOnUiThread(() -> {
-                if (isFinishing()) return;
+                if (destroyed || isFinishing()) return;
                 if (finalBitmap != null) pageCache.put(cacheKey, finalBitmap);
                 if (prefetch) return;
                 if (token != loadToken) return;
                 showLoading(false);
-                if (finalFailure != null) showError(readableError(finalFailure));
+                if (finalFailure != null) {
+                    stopAutoPage();
+                    showError(readableError(finalFailure));
+                }
                 else {
                     displayBitmap(finalBitmap);
-                    AppState.setPosition(this, sourceUri, page);
+                    AppState.setPosition(this, sourceUri, target);
                     refreshBookmark();
                     prefetchAround(page);
                 }
@@ -366,45 +395,37 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private Bitmap decodeArchivePage(String target) throws IOException {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        decodeArchiveEntry(target, bounds);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IOException("CBZ内の画像が壊れています。");
+        return decodeArchiveEntry(target, decodeOptions(bounds.outWidth, bounds.outHeight));
+    }
+
+    // ponytail: SAF ZIP streams are rescanned; spool to a temporary ZipFile only if late-page latency is measured.
+    private Bitmap decodeArchiveEntry(String target, BitmapFactory.Options options) throws IOException {
         InputStream input = getContentResolver().openInputStream(sourceUri);
         if (input == null) throw new IOException("CBZを開けません。");
         try (InputStream source = input; ZipInputStream zip = new ZipInputStream(source)) {
             ZipEntry entry;
-            while ((entry = zip.getNextEntry()) != null) {
+            while (!destroyed && (entry = zip.getNextEntry()) != null) {
                 if (target.equals(entry.getName())) {
-                    byte[] bytes = readEntry(zip);
-                    BitmapFactory.Options bounds = new BitmapFactory.Options();
-                    bounds.inJustDecodeBounds = true;
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
-                    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IOException("CBZ内の画像が壊れています。");
-                    return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, decodeOptions(bounds.outWidth, bounds.outHeight));
+                    if (entry.getSize() > MAX_ARCHIVE_ENTRY_BYTES) throw new IOException("画像ページが大きすぎます（上限48MB）。");
+                    return BitmapFactory.decodeStream(new BoundedInputStream(zip, MAX_ARCHIVE_ENTRY_BYTES), null, options);
                 }
             }
         }
         throw new IOException("CBZ内のページが見つかりません。");
     }
 
-    private byte[] readEntry(InputStream stream) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        byte[] buffer = new byte[32 * 1024];
-        int count;
-        int total = 0;
-        while ((count = stream.read(buffer)) != -1) {
-            total += count;
-            if (total > 48 * 1024 * 1024) throw new IOException("画像ページが大きすぎます（上限48MB）。");
-            output.write(buffer, 0, count);
-        }
-        return output.toByteArray();
-    }
-
     private Bitmap renderPdfPage(int index) throws IOException {
         if (pdf == null) throw new IOException("PDFを開けません。");
         PdfRenderer.Page current = pdf.openPage(index);
         try {
+            if (current.getWidth() <= 0 || current.getHeight() <= 0) throw new IOException("PDFのページサイズが不正です。");
             int screenWidth = imageView.getWidth() > 0 ? imageView.getWidth() : getResources().getDisplayMetrics().widthPixels;
-            int width = Math.min(2048, Math.max(1080, Math.max(screenWidth, current.getWidth())));
-            int height = Math.max(1, Math.round(width * (current.getHeight() / (float) current.getWidth())));
-            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            int[] size = pdfBitmapSize(current.getWidth(), current.getHeight(), screenWidth, maxBitmapPixels);
+            Bitmap bitmap = Bitmap.createBitmap(size[0], size[1], Bitmap.Config.ARGB_8888);
             bitmap.eraseColor(0xFFFFFFFF);
             current.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
             return bitmap;
@@ -414,11 +435,8 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private BitmapFactory.Options decodeOptions(int width, int height) {
-        int target = Math.max(1080, getResources().getDisplayMetrics().widthPixels * 2);
-        int sample = 1;
-        while (width / sample > target * 2 || height / sample > target * 2) sample *= 2;
         BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = sample;
+        options.inSampleSize = bitmapSampleSize(width, height, maxBitmapPixels);
         options.inPreferredConfig = Bitmap.Config.ARGB_8888;
         return options;
     }
@@ -434,9 +452,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private int nextIndex(int index, boolean forward) {
-        int delta = forward ? (AppState.direction(this) == AppState.DIRECTION_RTL ? -1 : 1) : (AppState.direction(this) == AppState.DIRECTION_RTL ? 1 : -1);
-        int next = index + delta;
-        return next >= 0 && next < totalPages ? next : -1;
+        return adjacentPage(index, forward, totalPages);
     }
 
     private void forward() { int next = nextIndex(page, true); if (next >= 0) goToPage(next); else Toast.makeText(this, "最後のページです", Toast.LENGTH_SHORT).show(); }
@@ -570,6 +586,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     private void stopAutoPage() {
         autoDelayMs = 0;
         autoHandler.removeCallbacks(autoPage);
+        if (autoButton == null) return;
         autoButton.setText("自動送り");
         autoButton.setContentDescription("自動ページ送りを設定");
         Ui.styleButton(autoButton, Ui.ButtonStyle.DARK_SECONDARY);
@@ -623,14 +640,18 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
             WindowInsetsController controller = getWindow().getInsetsController();
             if (controller != null) controller.setSystemBarsAppearance(0,
                     WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
-        } else if (android.os.Build.VERSION.SDK_INT >= 23) {
+        } else {
             getWindow().getDecorView().setSystemUiVisibility(0);
         }
     }
 
     private void showLoading(boolean show) { loading.setVisibility(show ? View.VISIBLE : View.GONE); }
     private void showError(String message) { errorPanel.setVisibility(message == null ? View.GONE : View.VISIBLE); if (message != null) errorText.setText(message); }
-    private String readableError(Exception error) { return error instanceof SecurityException ? "ファイルへのアクセス許可が失われました。ライブラリでフォルダを選び直してください。" : error.getMessage() == null ? "ファイルを開けません。" : error.getMessage(); }
+    private String readableError(Throwable error) {
+        if (error instanceof SecurityException) return "ファイルへのアクセス許可が失われました。ライブラリでフォルダを選び直してください。";
+        if (error instanceof OutOfMemoryError) return "ページが大きすぎてメモリに収まりません。ほかのアプリを閉じるか、解像度を下げた本を使用してください。";
+        return error.getMessage() == null ? "ファイルを開けません。" : error.getMessage();
+    }
     private String fitLabel(int mode) { return mode == AppState.FIT_WIDTH ? "幅に合わせる" : mode == AppState.FIT_HEIGHT ? "高さに合わせる" : "画面に合わせる"; }
 
     @Override public void onTap(float normalizedX) {
@@ -641,6 +662,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     @Override public void onSwipe(int direction) {
+        if (!initialized) return;
         if (direction < 0) { if (AppState.direction(this) == AppState.DIRECTION_RTL) back(); else forward(); }
         else { if (AppState.direction(this) == AppState.DIRECTION_RTL) forward(); else back(); }
     }
@@ -658,17 +680,94 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         if (!chromeVisible) toggleChrome(); else super.onBackPressed();
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        if (imageView == null) return;
+        imageView.setFitMode(AppState.fitMode(this));
+        applyBrightness(AppState.brightness(this));
+        if (AppState.keepScreenOn(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (autoDelayMs > 0) autoHandler.postDelayed(autoPage, autoDelayMs);
+    }
+
     @Override protected void onPause() {
-        if (initialized) AppState.setPosition(this, sourceUri, page);
+        autoHandler.removeCallbacks(autoPage);
         super.onPause();
     }
 
     @Override protected void onDestroy() {
+        destroyed = true;
+        loadToken++;
         stopAutoPage();
-        worker.shutdownNow();
-        closePdf();
-        pageCache.release();
+        if (imageView != null) imageView.setImageDrawable(null);
+        pageCache.evictAll();
+        worker.execute(this::closePdf);
+        worker.shutdown();
         super.onDestroy();
+    }
+
+    static int adjacentPage(int index, boolean forward, int count) {
+        int next = index + (forward ? 1 : -1);
+        return next >= 0 && next < count ? next : -1;
+    }
+
+    static int bitmapSampleSize(int width, int height, int maxPixels) {
+        int sample = 1;
+        while ((long) Math.max(1, width / sample) * Math.max(1, height / sample) > maxPixels
+                || Math.max(width / sample, height / sample) > MAX_PAGE_DIMENSION) sample *= 2;
+        return sample;
+    }
+
+    static int[] pdfBitmapSize(int sourceWidth, int sourceHeight, int screenWidth, int maxPixels) {
+        int width = Math.min(2048, Math.max(1080, Math.max(screenWidth, sourceWidth)));
+        int height = (int) Math.min(Integer.MAX_VALUE, Math.max(1L, Math.round(width * (sourceHeight / (double) sourceWidth))));
+        double scale = Math.min(1d, Math.min(MAX_PAGE_DIMENSION / (double) Math.max(width, height),
+                Math.sqrt(maxPixels / (double) ((long) width * height))));
+        width = Math.max(1, (int) Math.floor(width * scale));
+        height = Math.max(1, (int) Math.floor(height * scale));
+        while ((long) width * height > maxPixels) { if (width >= height) width--; else height--; }
+        return new int[]{width, height};
+    }
+
+    public static void main(String[] arguments) throws IOException {
+        assert adjacentPage(0, true, 3) == 1;
+        assert adjacentPage(0, false, 3) == -1;
+        assert bitmapSampleSize(4000, 6000, 2_000_000) == 4;
+        int[] tallPdf = pdfBitmapSize(1, 100_000, 1080, 2_000_000);
+        assert tallPdf[0] <= MAX_PAGE_DIMENSION && tallPdf[1] <= MAX_PAGE_DIMENSION;
+        assert (long) tallPdf[0] * tallPdf[1] <= 2_000_000;
+        BoundedInputStream bounded = new BoundedInputStream(new ByteArrayInputStream(new byte[]{1, 2, 3}), 2);
+        assert bounded.read(new byte[2]) == 2;
+        try { bounded.read(); assert false; } catch (IOException expected) { }
+    }
+
+    private static final class BoundedInputStream extends FilterInputStream {
+        private final long maxBytes;
+        private long bytesRead;
+
+        BoundedInputStream(InputStream input, long maxBytes) {
+            super(input);
+            this.maxBytes = maxBytes;
+        }
+
+        @Override public int read() throws IOException {
+            int value = super.read();
+            if (value >= 0 && ++bytesRead > maxBytes) throw new IOException("画像ページが大きすぎます（上限48MB）。");
+            return value;
+        }
+
+        @Override public int read(byte[] buffer, int offset, int length) throws IOException {
+            int allowed = (int) Math.min(length, maxBytes - bytesRead + 1);
+            int count = super.read(buffer, offset, allowed);
+            if (count > 0 && (bytesRead += count) > maxBytes) throw new IOException("画像ページが大きすぎます（上限48MB）。");
+            return count;
+        }
+
+        @Override public long skip(long count) throws IOException {
+            long skipped = super.skip(Math.min(count, maxBytes - bytesRead + 1));
+            if (skipped > 0 && (bytesRead += skipped) > maxBytes) throw new IOException("画像ページが大きすぎます（上限48MB）。");
+            return skipped;
+        }
     }
 
     private void closePdf() {

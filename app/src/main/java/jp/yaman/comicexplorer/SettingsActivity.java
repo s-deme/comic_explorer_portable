@@ -120,15 +120,15 @@ public final class SettingsActivity extends Activity {
         RadioButton ltr = new RadioButton(this);
         ltr.setText("左から右");
         Ui.styleCheckable(ltr);
-        ltr.setId(1);
+        ltr.setId(View.generateViewId());
         RadioButton rtl = new RadioButton(this);
         rtl.setText("右から左（漫画向け）");
         Ui.styleCheckable(rtl);
-        rtl.setId(2);
+        rtl.setId(View.generateViewId());
         direction.addView(ltr);
         direction.addView(rtl);
-        direction.check(AppState.direction(this) == AppState.DIRECTION_RTL ? 2 : 1);
-        direction.setOnCheckedChangeListener((group, id) -> AppState.setDirection(this, id == 2 ? AppState.DIRECTION_RTL : AppState.DIRECTION_LTR));
+        direction.check(AppState.direction(this) == AppState.DIRECTION_RTL ? rtl.getId() : ltr.getId());
+        direction.setOnCheckedChangeListener((group, id) -> AppState.setDirection(this, id == rtl.getId() ? AppState.DIRECTION_RTL : AppState.DIRECTION_LTR));
         card.addView(direction);
         divider(card);
 

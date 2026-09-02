@@ -98,6 +98,11 @@ public final class MainActivity extends Activity {
         }
     }
 
+    @Override protected void onRestart() {
+        super.onRestart();
+        if (mode == MODE_LIBRARY) adapter.notifyDataSetChanged(); else loadSavedItems();
+    }
+
     private void buildUi() {
         compactHeight = getResources().getDisplayMetrics().heightPixels / getResources().getDisplayMetrics().density < 600f;
         LinearLayout root = new LinearLayout(this);
@@ -258,8 +263,7 @@ public final class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQUEST_TREE || resultCode != RESULT_OK || data == null || data.getData() == null) return;
         treeUri = data.getData();
-        int flags = data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
-        try { getContentResolver().takePersistableUriPermission(treeUri, flags); } catch (SecurityException ignored) { }
+        try { getContentResolver().takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignored) { }
         AppState.setTree(this, treeUri);
         directoryUri = treeUri;
         mode = MODE_LIBRARY;
@@ -456,9 +460,13 @@ public final class MainActivity extends Activity {
         viewer.setData(item.uri);
         viewer.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         viewer.putExtra(ViewerActivity.EXTRA_TITLE, item.name);
-        if (ComicFile.isImage(item.name, item.mime) && mode == MODE_LIBRARY) {
+        if (ComicFile.isImage(item.name, item.mime)) {
             ArrayList<Uri> pages = new ArrayList<>();
-            for (LibraryEntry candidate : allRows) if (!candidate.directory && ComicFile.isImage(candidate.name, candidate.mime)) pages.add(candidate.uri);
+            if (mode == MODE_LIBRARY) {
+                for (LibraryEntry candidate : visibleRows) if (!candidate.directory && ComicFile.isImage(candidate.name, candidate.mime)) pages.add(candidate.uri);
+            } else {
+                pages.add(item.uri);
+            }
             viewer.putParcelableArrayListExtra(ViewerActivity.EXTRA_IMAGE_URIS, pages);
             viewer.putExtra(ViewerActivity.EXTRA_START_INDEX, pages.indexOf(item.uri));
         }
