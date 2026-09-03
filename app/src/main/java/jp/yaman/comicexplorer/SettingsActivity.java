@@ -2,21 +2,22 @@ package jp.yaman.comicexplorer;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-/** Small local settings surface; it deliberately contains no account or network options. */
+import java.util.function.IntConsumer;
+
+/** Dense ComicScreen-style preferences backed only by local app state. */
 public final class SettingsActivity extends Activity {
     private LinearLayout content;
 
@@ -28,206 +29,182 @@ public final class SettingsActivity extends Activity {
     private void buildUi() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(10), dp(16), dp(12));
-        root.setBackgroundColor(Ui.LIGHT_BACKGROUND);
+        root.setBackgroundColor(Ui.TOOLBAR);
 
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        Button back = button("戻る");
-        Ui.styleButton(back, Ui.ButtonStyle.GHOST);
+        LinearLayout toolbar = new LinearLayout(this);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.setPadding(dp(4), 0, dp(4), 0);
+        toolbar.setBackgroundColor(Ui.TOOLBAR);
+        ImageButton back = new ImageButton(this);
+        back.setImageResource(R.drawable.ic_arrow_back);
+        Ui.styleToolbarButton(back, Ui.TOOLBAR);
         back.setContentDescription("設定を閉じる");
         back.setOnClickListener(view -> finish());
-        header.addView(back, new LinearLayout.LayoutParams(dp(64), dp(48)));
-        LinearLayout identity = new LinearLayout(this);
-        identity.setOrientation(LinearLayout.VERTICAL);
-        identity.setPadding(dp(6), 0, 0, 0);
-        TextView eyebrow = text("PREFERENCES", 14, Ui.BRAND_DARK);
-        Ui.label(eyebrow);
-        eyebrow.setLetterSpacing(.08f);
-        identity.addView(eyebrow);
-        TextView title = text("設定", 28, Ui.TEXT_PRIMARY);
+        toolbar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(56)));
+        TextView title = text("設定", 20, Ui.TOOLBAR_TEXT);
         Ui.title(title);
-        identity.addView(title);
-        header.addView(identity, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        root.addView(header);
-
-        TextView intro = text("読むときの動きと、端末内に残す情報を管理します。", 14, Ui.TEXT_SECONDARY);
-        intro.setPadding(dp(70), 0, 0, dp(10));
-        root.addView(intro);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        title.setPadding(dp(8), 0, 0, 0);
+        toolbar.addView(title, new LinearLayout.LayoutParams(0, dp(56), 1f));
+        root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Ui.DARK_BACKGROUND);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(0, 0, 0, dp(12));
         scroll.addView(content, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        addReadingSettings();
-        addStorageSettings();
-
-        LinearLayout privacyCard = new LinearLayout(this);
-        privacyCard.setOrientation(LinearLayout.VERTICAL);
-        privacyCard.setPadding(dp(16), dp(14), dp(16), dp(14));
-        Ui.styleInsetPanel(privacyCard);
-        TextView privacyTitle = text("PRIVACY BY DESIGN", 14, Ui.BRAND_DARK);
-        Ui.label(privacyTitle);
-        privacyTitle.setLetterSpacing(.07f);
-        privacyCard.addView(privacyTitle);
-        TextView privacy = text("選択したフォルダだけを読み取ります。広告・課金・アカウント・ネットワーク通信はありません。", 14, Ui.TEXT_SECONDARY);
-        privacy.setLineSpacing(0, 1.08f);
-        privacy.setPadding(0, dp(4), 0, 0);
-        privacyCard.addView(privacy);
-        LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        privacyParams.setMargins(0, dp(18), 0, dp(6));
-        content.addView(privacyCard, privacyParams);
+        addGeneralSettings();
+        addListSettings();
+        addImageSettings();
+        addDataSettings();
+        addInformation();
         setContentView(root);
         Ui.applySystemBarInsets(this, root);
     }
 
-    private void addReadingSettings() {
-        LinearLayout card = section("読書体験", "ページ送りと画面表示");
-        CheckBox keepScreen = new CheckBox(this);
-        keepScreen.setText("読書中は画面を消灯しない");
-        Ui.styleCheckable(keepScreen);
-        keepScreen.setChecked(AppState.keepScreenOn(this));
-        keepScreen.setOnCheckedChangeListener((button, checked) -> AppState.setKeepScreenOn(this, checked));
-        card.addView(keepScreen);
-        divider(card);
-
-        CheckBox fullscreen = new CheckBox(this);
-        fullscreen.setText("作品を開いたら全画面表示にする");
-        Ui.styleCheckable(fullscreen);
-        fullscreen.setChecked(AppState.startFullscreen(this));
-        fullscreen.setOnCheckedChangeListener((button, checked) -> AppState.setStartFullscreen(this, checked));
-        card.addView(fullscreen);
-        divider(card);
-
-        CheckBox volume = new CheckBox(this);
-        volume.setText("音量キーでページを移動する");
-        Ui.styleCheckable(volume);
-        volume.setChecked(AppState.volumeNavigation(this));
-        volume.setOnCheckedChangeListener((button, checked) -> AppState.setVolumeNavigation(this, checked));
-        card.addView(volume);
-        divider(card);
-
-        TextView directionLabel = text("ページ送り方向", 14, Ui.TEXT_SECONDARY);
-        Ui.label(directionLabel);
-        directionLabel.setPadding(dp(14), dp(12), dp(14), dp(2));
-        card.addView(directionLabel);
-        RadioGroup direction = new RadioGroup(this);
-        direction.setOrientation(RadioGroup.VERTICAL);
-        direction.setPadding(dp(6), 0, dp(6), dp(6));
-        RadioButton ltr = new RadioButton(this);
-        ltr.setText("左から右");
-        Ui.styleCheckable(ltr);
-        ltr.setId(View.generateViewId());
-        RadioButton rtl = new RadioButton(this);
-        rtl.setText("右から左（漫画向け）");
-        Ui.styleCheckable(rtl);
-        rtl.setId(View.generateViewId());
-        direction.addView(ltr);
-        direction.addView(rtl);
-        direction.check(AppState.direction(this) == AppState.DIRECTION_RTL ? rtl.getId() : ltr.getId());
-        direction.setOnCheckedChangeListener((group, id) -> AppState.setDirection(this, id == rtl.getId() ? AppState.DIRECTION_RTL : AppState.DIRECTION_LTR));
-        card.addView(direction);
-        divider(card);
-
-        Button fit = wideButton("初期表示: " + fitLabel(AppState.fitMode(this)));
-        fit.setContentDescription("初期表示方法を変更");
-        fit.setOnClickListener(view -> Ui.show(new AlertDialog.Builder(this)
-                .setTitle("初期表示")
-                .setSingleChoiceItems(new String[]{"画面に合わせる", "幅に合わせる", "高さに合わせる"}, AppState.fitMode(this), (dialog, index) -> {
-                    AppState.setFitMode(this, index);
-                    fit.setText("初期表示: " + fitLabel(index));
-                    dialog.dismiss();
-                })));
-        LinearLayout.LayoutParams fitParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
-        fitParams.setMargins(dp(10), dp(10), dp(10), dp(10));
-        card.addView(fit, fitParams);
+    private void addGeneralSettings() {
+        LinearLayout section = section("GENERAL");
+        addCheck(section, "読書中は画面を消灯しない", AppState.keepScreenOn(this),
+                (button, checked) -> AppState.setKeepScreenOn(this, checked));
+        addCheck(section, "作品を開いたら全画面表示にする", AppState.startFullscreen(this),
+                (button, checked) -> AppState.setStartFullscreen(this, checked));
+        addCheck(section, "画面上にページ移動ボタンを表示", AppState.pageButtons(this),
+                (button, checked) -> AppState.setPageButtons(this, checked));
+        addChoice(section, "ページボタン透明度", new String[]{"30%", "50%", "70%", "100%"},
+                opacityIndex(AppState.pageButtonOpacity(this)), index -> AppState.setPageButtonOpacity(this, new int[]{30, 50, 70, 100}[index]));
+        addChoice(section, "ページボタンサイズ", new String[]{"小", "標準", "大"},
+                AppState.pageButtonHeight(this) <= 72 ? 0 : AppState.pageButtonHeight(this) >= 128 ? 2 : 1,
+                index -> AppState.setPageButtonHeight(this, new int[]{64, 96, 144}[index]));
+        addCheck(section, "音量キーでページを移動する", AppState.volumeNavigation(this),
+                (button, checked) -> AppState.setVolumeNavigation(this, checked));
+        addCheck(section, "音量キーのページ移動を反転", AppState.reverseVolumeNavigation(this),
+                (button, checked) -> AppState.setReverseVolumeNavigation(this, checked));
     }
 
-    private void addStorageSettings() {
-        LinearLayout card = section("端末内データ", "履歴や保存位置の整理");
-        Button clearProgress = dangerWideButton("復帰位置としおりを消去");
-        clearProgress.setOnClickListener(view -> confirm("復帰位置としおりを消去しますか？", () -> AppState.clearReadingData(this)));
-        addAction(card, clearProgress, true);
-        Button clearRecent = dangerWideButton("最近開いた作品を消去");
-        clearRecent.setOnClickListener(view -> confirm("最近開いた作品の一覧を消去しますか？", () -> AppState.clearRecents(this)));
-        addAction(card, clearRecent, false);
-        Button resetLibrary = dangerWideButton("ライブラリの選択を解除");
-        resetLibrary.setOnClickListener(view -> confirm("選択したフォルダとお気に入りを解除しますか？ 作品ファイルは削除されません。", () -> {
+    private void addListSettings() {
+        LinearLayout section = section("LIST VIEW");
+        addCheck(section, "サムネイルをグリッド表示", AppState.gridView(this),
+                (button, checked) -> AppState.setGridView(this, checked));
+        addChoice(section, "グリッド列数", new String[]{"2列", "3列", "4列"},
+                AppState.gridColumns(this) - 2, index -> AppState.setGridColumns(this, index + 2));
+    }
+
+    private void addImageSettings() {
+        LinearLayout section = section("IMAGE VIEW");
+        addChoice(section, "ページ送り方向", new String[]{"左から右", "右から左（漫画向け）"},
+                AppState.direction(this), index -> AppState.setDirection(this, index));
+        addChoice(section, "ページ移動", new String[]{"横スワイプ", "縦スワイプ"},
+                AppState.readingFlow(this), index -> AppState.setReadingFlow(this, index));
+        addChoice(section, "ページレイアウト", new String[]{"単ページ", "見開き"},
+                AppState.pageLayout(this), index -> AppState.setPageLayout(this, index));
+        addChoice(section, "表示方法", new String[]{"画面に合わせる", "幅に合わせる", "高さに合わせる", "画面いっぱいに伸縮"},
+                AppState.fitMode(this), index -> AppState.setFitMode(this, index));
+        addChoice(section, "ダブルタップ", new String[]{"無効", "拡大", "フィット", "拡大／フィット切替"},
+                AppState.doubleTapMode(this), index -> AppState.setDoubleTapMode(this, index));
+        String[] scales = {"1.5倍", "2.0倍", "2.25倍", "2.5倍", "3.0倍", "4.0倍"};
+        int[] scaleValues = {150, 200, 225, 250, 300, 400};
+        int currentScale = 2;
+        for (int index = 0; index < scaleValues.length; index++) if (scaleValues[index] == AppState.doubleTapScale(this)) currentScale = index;
+        addChoice(section, "ダブルタップ倍率", scales, currentScale,
+                index -> AppState.setDoubleTapScale(this, scaleValues[index]));
+        addChoice(section, "画像フィルター", new String[]{"なし", "グレースケール", "自動コントラスト", "セピア", "ブルーライト軽減"},
+                AppState.imageFilter(this), index -> AppState.setImageFilter(this, index));
+        addChoice(section, "ZIP文字コード", new String[]{"UTF-8", "Shift_JIS"},
+                AppState.archiveEncoding(this), index -> AppState.setArchiveEncoding(this, index));
+    }
+
+    private void addDataSettings() {
+        LinearLayout section = section("CACHE DATA");
+        addDanger(section, "復帰位置としおりを消去", "復帰位置としおりを消去しますか？", () -> AppState.clearReadingData(this));
+        addDanger(section, "最近開いた作品を消去", "最近開いた作品の一覧を消去しますか？", () -> AppState.clearRecents(this));
+        addDanger(section, "ライブラリの選択を解除", "選択したフォルダとお気に入りを解除しますか？ 作品ファイルは削除されません。", () -> {
             AppState.clearLibrary(this);
             finish();
-        }));
-        addAction(card, resetLibrary, false);
+        });
     }
 
-    private LinearLayout section(String title, String subtitle) {
-        LinearLayout heading = new LinearLayout(this);
-        heading.setOrientation(LinearLayout.VERTICAL);
-        heading.setPadding(dp(2), dp(18), dp(2), dp(8));
-        TextView titleView = text(title, 20, Ui.TEXT_PRIMARY);
-        Ui.title(titleView);
-        heading.addView(titleView);
-        TextView subtitleView = text(subtitle, 14, Ui.TEXT_SECONDARY);
-        heading.addView(subtitleView);
-        content.addView(heading);
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(6), dp(4), dp(6), dp(4));
-        Ui.styleCard(card, false);
-        content.addView(card, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        return card;
+    private void addInformation() {
+        LinearLayout section = section("INFORMATION");
+        TextView info = text("Comic Explorer 1.1.2\nローカル専用・広告なし・ネットワーク通信なし", 14, Ui.DARK_MUTED);
+        info.setPadding(dp(16), dp(14), dp(16), dp(18));
+        section.addView(info);
+    }
+
+    private int opacityIndex(int value) { return value <= 30 ? 0 : value <= 50 ? 1 : value <= 70 ? 2 : 3; }
+
+    private void addCheck(LinearLayout parent, String label, boolean checked, CompoundButton.OnCheckedChangeListener listener) {
+        CheckBox control = new CheckBox(this);
+        control.setText(label);
+        Ui.styleDarkCheckable(control);
+        control.setChecked(checked);
+        control.setOnCheckedChangeListener(listener);
+        parent.addView(control, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+        divider(parent);
+    }
+
+    private void addChoice(LinearLayout parent, String title, String[] labels, int selected, IntConsumer setter) {
+        int current = Math.max(0, Math.min(selected, labels.length - 1));
+        Button button = preferenceButton(title + ": " + labels[current]);
+        button.setContentDescription(title + "を変更。現在は" + labels[current]);
+        button.setOnClickListener(view -> Ui.show(new AlertDialog.Builder(this).setTitle(title)
+                .setSingleChoiceItems(labels, current, (dialog, index) -> {
+                    setter.accept(index);
+                    button.setText(title + ": " + labels[index]);
+                    button.setContentDescription(title + "を変更。現在は" + labels[index]);
+                    dialog.dismiss();
+                })));
+        parent.addView(button, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+        divider(parent);
+    }
+
+    private LinearLayout section(String title) {
+        TextView titleView = text(title, 12, Ui.LIBRARY_ACCENT);
+        Ui.label(titleView);
+        titleView.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        titleView.setPadding(dp(16), 0, dp(16), 0);
+        titleView.setBackgroundColor(Ui.DARK_SURFACE_RAISED);
+        content.addView(titleView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34)));
+        LinearLayout section = new LinearLayout(this);
+        section.setOrientation(LinearLayout.VERTICAL);
+        section.setBackgroundColor(Ui.DARK_BACKGROUND);
+        content.addView(section, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return section;
+    }
+
+    private Button preferenceButton(String label) {
+        Button button = Ui.button(this, label, Ui.ButtonStyle.DARK_GHOST);
+        button.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        button.setPadding(dp(16), 0, dp(16), 0);
+        return button;
+    }
+
+    private void addDanger(LinearLayout parent, String label, String message, Runnable action) {
+        Button button = preferenceButton(label);
+        button.setTextColor(0xFFFFB4AB);
+        button.setOnClickListener(view -> confirm(message, action));
+        parent.addView(button, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+        divider(parent);
     }
 
     private void divider(LinearLayout parent) {
         View divider = new View(this);
-        divider.setBackgroundColor(Ui.OUTLINE_VARIANT);
+        divider.setBackgroundColor(Ui.DARK_OUTLINE);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
-        params.setMargins(dp(14), 0, dp(14), 0);
+        params.setMargins(dp(16), 0, 0, 0);
         parent.addView(divider, params);
     }
 
-    private void addAction(LinearLayout parent, Button button, boolean first) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
-        params.setMargins(dp(8), first ? dp(8) : dp(4), dp(8), dp(4));
-        parent.addView(button, params);
-    }
-
     private void confirm(String message, Runnable action) {
-        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setMessage(message).setNegativeButton("キャンセル", null).setPositiveButton("消去", (ignored, which) -> {
-            action.run();
-            Toast.makeText(this, "端末内データを消去しました", Toast.LENGTH_SHORT).show();
-        }));
+        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setMessage(message).setNegativeButton("キャンセル", null)
+                .setPositiveButton("消去", (ignored, which) -> {
+                    action.run();
+                    Toast.makeText(this, "端末内データを消去しました", Toast.LENGTH_SHORT).show();
+                }));
         Ui.styleButton(dialog.getButton(AlertDialog.BUTTON_POSITIVE), Ui.ButtonStyle.DANGER);
     }
 
-    private String fitLabel(int mode) {
-        return mode == AppState.FIT_WIDTH ? "幅に合わせる" : mode == AppState.FIT_HEIGHT ? "高さに合わせる" : "画面に合わせる";
-    }
-
-    private Button wideButton(String label) {
-        Button button = button(label);
-        button.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        button.setPadding(dp(8), 0, dp(8), 0);
-        button.setAllCaps(false);
-        return button;
-    }
-
-    private Button dangerWideButton(String label) {
-        Button button = wideButton(label);
-        Ui.styleButton(button, Ui.ButtonStyle.DANGER_TONAL);
-        button.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        return button;
-    }
-
-    private Button button(String value) {
-        return Ui.button(this, value, Ui.ButtonStyle.SECONDARY);
-    }
-
-    private TextView text(String value, int size, int color) {
-        return Ui.text(this, value, size, color);
-    }
-
+    private TextView text(String value, int size, int color) { return Ui.text(this, value, size, color); }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 }

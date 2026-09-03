@@ -11,7 +11,7 @@ public final class ComicFile {
 
     public static boolean isSupported(String name, String mime) {
         String extension = extension(name);
-        return isImage(name, mime) || "pdf".equals(extension) || "zip".equals(extension) || "cbz".equals(extension);
+        return isImage(name, mime) || isPdf(extension, mime) || isArchive(extension, mime);
     }
 
     public static boolean isImage(String name, String mime) {
@@ -30,8 +30,17 @@ public final class ComicFile {
     public static String kindFor(String name, String mime) {
         if (isImage(name, mime)) return "画像";
         String extension = extension(name);
-        if ("pdf".equals(extension)) return "PDF";
+        if (isPdf(extension, mime)) return "PDF";
         return "cbz".equals(extension) ? "CBZ" : "ZIP";
+    }
+
+    private static boolean isPdf(String extension, String mime) {
+        return "pdf".equals(extension) || "application/pdf".equals(mime);
+    }
+
+    private static boolean isArchive(String extension, String mime) {
+        return "zip".equals(extension) || "cbz".equals(extension) || "application/zip".equals(mime)
+                || "application/x-cbz".equals(mime) || "application/vnd.comicbook+zip".equals(mime);
     }
 
     public static String formatSize(long bytes) {

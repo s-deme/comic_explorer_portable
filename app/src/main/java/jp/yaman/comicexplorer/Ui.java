@@ -20,34 +20,40 @@ import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
 /** Semantic visual language shared by the library, settings and reader surfaces. */
 public final class Ui {
-    public static final int LIGHT_BACKGROUND = 0xFFF8F5EF;
-    public static final int LIGHT_SURFACE = 0xFFFFFDF8;
-    public static final int LIGHT_SURFACE_TINT = 0xFFF0EBE3;
-    public static final int LIGHT_SURFACE_HIGH = 0xFFE8E1D8;
-    public static final int TEXT_PRIMARY = 0xFF211F26;
-    public static final int TEXT_SECONDARY = 0xFF514D59;
-    public static final int TEXT_MUTED = 0xFF68626E;
-    public static final int BRAND = 0xFF5940B6;
-    public static final int BRAND_DARK = 0xFF40268E;
-    public static final int BRAND_CONTAINER = 0xFFE9E0FF;
-    public static final int ON_BRAND_CONTAINER = 0xFF27105F;
-    public static final int OUTLINE = 0xFF79727F;
-    public static final int OUTLINE_VARIANT = 0xFFD1C9D4;
+    public static final int LIGHT_BACKGROUND = 0xFFFAFAFA;
+    public static final int LIGHT_SURFACE = 0xFFFFFFFF;
+    public static final int LIGHT_SURFACE_TINT = 0xFFF5F5F5;
+    public static final int LIGHT_SURFACE_HIGH = 0xFFE7E7E7;
+    public static final int TEXT_PRIMARY = 0xFF212121;
+    public static final int TEXT_SECONDARY = 0xFF616161;
+    public static final int TEXT_MUTED = 0xFF757575;
+    public static final int BRAND = 0xFF2196F3;
+    public static final int BRAND_DARK = 0xFF1565C0;
+    public static final int BRAND_CONTAINER = 0xFFE3F2FD;
+    public static final int ON_BRAND_CONTAINER = 0xFF0D47A1;
+    public static final int OUTLINE = 0xFF9E9E9E;
+    public static final int OUTLINE_VARIANT = 0xFFD0D0D0;
     public static final int DANGER = 0xFFB3261E;
     public static final int SUCCESS = 0xFF2E6B45;
     public static final int INFO = 0xFF355F82;
 
-    public static final int DARK_BACKGROUND = 0xFF090A0E;
-    public static final int DARK_SURFACE = 0xFF15171E;
-    public static final int DARK_SURFACE_RAISED = 0xFF252934;
-    public static final int DARK_TEXT = 0xFFF1EDF5;
-    public static final int DARK_MUTED = 0xFFC9C2D0;
-    public static final int READER_ACCENT = 0xFFC9BEFF;
+    public static final int TOOLBAR = 0xFF37474F;
+    public static final int SETTINGS_TOOLBAR = 0xFF689F38;
+    public static final int TOOLBAR_TEXT = 0xFFEEEEEE;
+    public static final int DARK_BACKGROUND = 0xFF212121;
+    public static final int DARK_SURFACE = 0xFF303030;
+    public static final int DARK_SURFACE_RAISED = 0xFF3C3C3C;
+    public static final int DARK_TEXT = 0xFFFAFAFA;
+    public static final int DARK_MUTED = 0xFFB0BEC5;
+    public static final int DARK_OUTLINE = 0xFF4A4A4A;
+    public static final int READER_ACCENT = 0xFF90CAF9;
+    public static final int LIBRARY_ACCENT = 0xFFB4A7E8;
 
     public enum ButtonStyle { PRIMARY, SECONDARY, TONAL, GHOST, DANGER, DANGER_TONAL, DARK_PRIMARY, DARK_SECONDARY, DARK_GHOST }
 
@@ -157,7 +163,7 @@ public final class Ui {
             case DANGER_TONAL:
                 normalBackground = 0xFFF9DEDC; normalText = 0xFF8C1D18; normalStroke = 0xFFF2B8B5; break;
             case DARK_PRIMARY:
-                normalBackground = READER_ACCENT; normalText = 0xFF251A54; normalStroke = READER_ACCENT; break;
+                normalBackground = READER_ACCENT; normalText = 0xFF102027; normalStroke = READER_ACCENT; break;
             case DARK_SECONDARY:
                 normalBackground = DARK_SURFACE_RAISED; normalText = DARK_TEXT; normalStroke = 0xFF555B6A; break;
             case DARK_GHOST:
@@ -178,8 +184,8 @@ public final class Ui {
         view.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         view.setTextColor(colors(normalText, darkStyle ? 0xFFB6B1BD : 0xFF625D66));
         view.setBackground(controlBackground(normalBackground, normalStroke,
-                darkStyle ? 0xFF30333D : 0xFFE0DAD2,
-                darkStyle ? 0xFF555A67 : 0xFFA19AA4, 14,
+                darkStyle ? 0xFF555555 : 0xFFE0E0E0,
+                darkStyle ? 0xFF777777 : 0xFFBDBDBD, 2,
                 darkStyle ? READER_ACCENT : BRAND));
         view.setStateListAnimator(null);
         view.setElevation(0);
@@ -201,11 +207,31 @@ public final class Ui {
 
     /** Bottom navigation keeps the library's stable destinations reachable without a top tab row. */
     public static void styleNavigationDestination(Button view, boolean selected) {
-        styleButton(view, selected ? ButtonStyle.TONAL : ButtonStyle.GHOST);
-        view.setTextSize(14);
+        styleButton(view, ButtonStyle.DARK_GHOST);
+        view.setTextSize(11);
         view.setPadding(dp(view.getContext(), 4), 0, dp(view.getContext(), 4), 0);
+        view.setCompoundDrawablePadding(dp(view.getContext(), 1));
+        view.setTextColor(selected ? LIBRARY_ACCENT : DARK_TEXT);
+        view.setCompoundDrawableTintList(ColorStateList.valueOf(selected ? LIBRARY_ACCENT : DARK_MUTED));
+        view.setBackground(controlBackground(selected ? DARK_SURFACE : DARK_SURFACE_RAISED,
+                selected ? DARK_SURFACE : DARK_SURFACE_RAISED, DARK_SURFACE, DARK_SURFACE, 0, LIBRARY_ACCENT));
         view.setSelected(selected);
         view.setContentDescription(view.getText() + (selected ? "、選択中" : "を表示"));
+        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? "選択中" : "未選択");
+    }
+
+    public static void styleTopTab(Button view, boolean selected) {
+        view.setAllCaps(false);
+        view.setTextSize(12);
+        view.setGravity(Gravity.CENTER);
+        view.setMinHeight(dp(view.getContext(), 48));
+        view.setPadding(dp(view.getContext(), 2), 0, dp(view.getContext(), 2), 0);
+        view.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        view.setTextColor(selected ? LIBRARY_ACCENT : DARK_MUTED);
+        view.setBackground(controlBackground(selected ? 0xFF34313E : DARK_SURFACE,
+                selected ? LIBRARY_ACCENT : DARK_SURFACE, DARK_SURFACE, DARK_SURFACE, selected ? 1 : 0, LIBRARY_ACCENT));
+        view.setStateListAnimator(null);
+        view.setSelected(selected);
         if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? "選択中" : "未選択");
     }
 
@@ -216,15 +242,35 @@ public final class Ui {
         input.setSingleLine(true);
         input.setBackground(inputBackground());
         input.setPadding(dp(input.getContext(), 16), 0, dp(input.getContext(), 16), 0);
-        input.setMinHeight(dp(input.getContext(), 52));
+        input.setMinHeight(dp(input.getContext(), 44));
+    }
+
+    public static void styleDarkSearch(EditText input) {
+        input.setTextColor(DARK_TEXT);
+        input.setHintTextColor(DARK_MUTED);
+        input.setTextSize(15);
+        input.setSingleLine(true);
+        input.setBackground(darkInputBackground());
+        input.setPadding(dp(input.getContext(), 14), 0, dp(input.getContext(), 14), 0);
+        input.setMinHeight(dp(input.getContext(), 44));
     }
 
     public static void styleCheckable(CompoundButton control) {
         control.setTextColor(TEXT_PRIMARY);
         control.setTextSize(16);
-        control.setMinHeight(dp(control.getContext(), 56));
+        control.setMinHeight(dp(control.getContext(), 52));
         control.setButtonTintList(checkableColors());
         control.setPadding(dp(control.getContext(), 8), 0, dp(control.getContext(), 8), 0);
+    }
+
+    public static void styleDarkCheckable(CompoundButton control) {
+        control.setTextColor(DARK_TEXT);
+        control.setTextSize(15);
+        control.setMinHeight(dp(control.getContext(), 52));
+        control.setButtonTintList(new ColorStateList(
+                new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{android.R.attr.state_checked}, new int[]{}},
+                new int[]{0xFF777777, LIBRARY_ACCENT, DARK_MUTED}));
+        control.setPadding(dp(control.getContext(), 12), 0, dp(control.getContext(), 12), 0);
     }
 
     public static void styleSeekBar(SeekBar bar, boolean onDarkSurface) {
@@ -263,11 +309,11 @@ public final class Ui {
         Drawable content;
         if (interactive) {
             StateListDrawable states = new StateListDrawable();
-            states.addState(new int[]{android.R.attr.state_focused}, shape(LIGHT_SURFACE, BRAND, 2, 18));
-            states.addState(new int[]{}, shape(LIGHT_SURFACE, OUTLINE_VARIANT, 1, 18));
+            states.addState(new int[]{android.R.attr.state_focused}, shape(LIGHT_SURFACE, BRAND, 2, 0));
+            states.addState(new int[]{}, shape(LIGHT_SURFACE, OUTLINE_VARIANT, 1, 0));
             content = new RippleDrawable(ColorStateList.valueOf(0x245940B6), states, null);
         } else {
-            content = shape(LIGHT_SURFACE, OUTLINE_VARIANT, 1, 18);
+            content = shape(LIGHT_SURFACE, OUTLINE_VARIANT, 1, 0);
         }
         view.setBackground(content);
         view.setElevation(dp(view.getContext(), 1));
@@ -282,16 +328,57 @@ public final class Ui {
     }
 
     public static void styleDarkChip(TextView view, boolean accent) {
-        view.setTextColor(accent ? 0xFF251A54 : DARK_TEXT);
+        view.setTextColor(accent ? 0xFF102027 : DARK_TEXT);
         view.setBackground(shape(accent ? READER_ACCENT : DARK_SURFACE_RAISED,
-                accent ? READER_ACCENT : 0xFF555B6A, 1, 14));
-        view.setPadding(dp(view.getContext(), 12), 0, dp(view.getContext(), 12), 0);
+                accent ? READER_ACCENT : 0xFF555555, 1, 2));
+        view.setPadding(dp(view.getContext(), 8), 0, dp(view.getContext(), 8), 0);
         label(view);
     }
 
     public static void styleThumbnail(View view) {
-        view.setBackground(shape(LIGHT_SURFACE_TINT, OUTLINE_VARIANT, 1, 10));
+        view.setBackground(shape(DARK_SURFACE_RAISED, DARK_OUTLINE, 1, 0));
         view.setClipToOutline(true);
+    }
+
+    public static void styleToolbarButton(ImageButton view, int background) {
+        view.setImageTintList(ColorStateList.valueOf(TOOLBAR_TEXT));
+        view.setBackground(controlBackground(background, background, background, background, 0, READER_ACCENT));
+        view.setPadding(dp(view.getContext(), 12), dp(view.getContext(), 12), dp(view.getContext(), 12), dp(view.getContext(), 12));
+        view.setMinimumWidth(dp(view.getContext(), 48));
+        view.setMinimumHeight(dp(view.getContext(), 48));
+    }
+
+    public static void styleReaderAction(Button view) {
+        view.setTextColor(DARK_TEXT);
+        view.setTextSize(21);
+        view.setAllCaps(false);
+        view.setGravity(Gravity.CENTER);
+        view.setPadding(0, 0, 0, 0);
+        view.setMinWidth(dp(view.getContext(), 48));
+        view.setMinHeight(dp(view.getContext(), 48));
+        view.setBackground(controlBackground(DARK_SURFACE_RAISED, DARK_SURFACE_RAISED,
+                DARK_SURFACE, DARK_SURFACE, 0, READER_ACCENT));
+        view.setStateListAnimator(null);
+        view.setElevation(0);
+    }
+
+    public static void styleReaderPageButton(Button view) {
+        view.setTextSize(28);
+        view.setTextColor(DARK_TEXT);
+        view.setAlpha(.72f);
+        view.setPadding(0, 0, 0, 0);
+        view.setBackground(controlBackground(0x993C3C3C, 0x99555555,
+                0x66303030, 0x66303030, 2, READER_ACCENT));
+        view.setMinWidth(dp(view.getContext(), 48));
+        view.setMinHeight(dp(view.getContext(), 96));
+    }
+
+    public static void styleListRow(View view) {
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_focused}, shape(0xFF34313E, LIBRARY_ACCENT, 1, 0));
+        states.addState(new int[]{}, shape(DARK_BACKGROUND, DARK_BACKGROUND, 0, 0));
+        view.setBackground(new RippleDrawable(ColorStateList.valueOf(0x33B4A7E8), states, null));
+        view.setElevation(0);
     }
 
     public static TextView badge(Context context, String value, int foreground, int background) {
@@ -322,6 +409,13 @@ public final class Ui {
         state.addState(new int[]{android.R.attr.state_focused}, shape(LIGHT_SURFACE, BRAND, 2, 16));
         state.addState(new int[]{}, shape(LIGHT_SURFACE, OUTLINE_VARIANT, 1, 16));
         return new RippleDrawable(ColorStateList.valueOf(0x1F5940B6), state, null);
+    }
+
+    private static Drawable darkInputBackground() {
+        StateListDrawable state = new StateListDrawable();
+        state.addState(new int[]{android.R.attr.state_focused}, shape(DARK_SURFACE, LIBRARY_ACCENT, 2, 4));
+        state.addState(new int[]{}, shape(DARK_SURFACE, DARK_OUTLINE, 1, 4));
+        return new RippleDrawable(ColorStateList.valueOf(0x33B4A7E8), state, null);
     }
 
     private static Drawable controlBackground(int normal, int normalStroke, int disabled, int disabledStroke, int radius, int focus) {

@@ -24,7 +24,12 @@ public final class ZoomImageView extends ImageView {
     private float lastX;
     private float lastY;
     private float relativeScale = 1f;
+    private float doubleTapScale = 2.25f;
+    private int doubleTapMode = AppState.DOUBLE_TAP_TOGGLE;
     private boolean dragging;
+    private boolean verticalPaging;
+    private boolean inverted;
+    private int filterMode;
     private int fitMode = AppState.FIT_SCREEN;
     private InteractionListener listener;
 
@@ -53,9 +58,10 @@ public final class ZoomImageView extends ImageView {
             }
 
             @Override public boolean onDoubleTap(MotionEvent event) {
-                if (relativeScale > 1.05f) fitImage();
-                else {
-                    relativeScale = 2.25f;
+                if (doubleTapMode == AppState.DOUBLE_TAP_OFF) return true;
+                if (doubleTapMode == AppState.DOUBLE_TAP_FIT || doubleTapMode == AppState.DOUBLE_TAP_TOGGLE && relativeScale > 1.05f) fitImage();
+                else if (doubleTapMode == AppState.DOUBLE_TAP_TOGGLE || relativeScale <= 1.05f) {
+                    relativeScale = doubleTapScale;
                     matrix.postScale(relativeScale, relativeScale, event.getX(), event.getY());
                     setImageMatrix(matrix);
                 }
@@ -65,7 +71,12 @@ public final class ZoomImageView extends ImageView {
             @Override public boolean onFling(MotionEvent start, MotionEvent end, float velocityX, float velocityY) {
                 if (listener == null || relativeScale > 1.05f) return false;
                 float dx = end.getX() - start.getX();
-                if (Math.abs(dx) > 96 && Math.abs(dx) > Math.abs(end.getY() - start.getY()) * 1.5f && Math.abs(velocityX) > 400) {
+                float dy = end.getY() - start.getY();
+                if (verticalPaging && Math.abs(dy) > 96 && Math.abs(dy) > Math.abs(dx) * 1.5f && Math.abs(velocityY) > 400) {
+                    listener.onSwipe(dy < 0 ? -2 : 2);
+                    return true;
+                }
+                if (!verticalPaging && Math.abs(dx) > 96 && Math.abs(dx) > Math.abs(dy) * 1.5f && Math.abs(velocityX) > 400) {
                     listener.onSwipe(dx < 0 ? -1 : 1);
                     return true;
                 }
@@ -76,18 +87,52 @@ public final class ZoomImageView extends ImageView {
 
     public void setInteractionListener(InteractionListener value) { listener = value; }
     public void setFitMode(int mode) { fitMode = mode; fitImage(); }
+    public void setDoubleTapScale(float scale) { doubleTapScale = Math.max(1.5f, Math.min(4f, scale)); }
+    public void setDoubleTapMode(int mode) { doubleTapMode = mode; }
+    public void setVerticalPaging(boolean enabled) { verticalPaging = enabled; }
+    public void setFilterMode(int mode) { filterMode = mode; applyColorFilter(); }
 
     public void setInverted(boolean inverted) {
+        this.inverted = inverted;
+        applyColorFilter();
+    }
+
+    private void applyColorFilter() {
+        ColorMatrix matrix = new ColorMatrix();
+        if (filterMode == AppState.FILTER_GRAYSCALE) {
+            matrix.setSaturation(0f);
+        } else if (filterMode == AppState.FILTER_CONTRAST) {
+            matrix.set(new float[]{
+                    1.25f, 0, 0, 0, -31.875f,
+                    0, 1.25f, 0, 0, -31.875f,
+                    0, 0, 1.25f, 0, -31.875f,
+                    0, 0, 0, 1, 0
+            });
+        } else if (filterMode == AppState.FILTER_SEPIA) {
+            matrix.set(new float[]{
+                    .393f, .769f, .189f, 0, 0,
+                    .349f, .686f, .168f, 0, 0,
+                    .272f, .534f, .131f, 0, 0,
+                    0, 0, 0, 1, 0
+            });
+        } else if (filterMode == AppState.FILTER_BLUE_LIGHT) {
+            matrix.set(new float[]{
+                    1.04f, 0, 0, 0, 8,
+                    0, .96f, 0, 0, 3,
+                    0, 0, .72f, 0, 0,
+                    0, 0, 0, 1, 0
+            });
+        }
         if (inverted) {
-            setColorFilter(new ColorMatrixColorFilter(new ColorMatrix(new float[]{
+            matrix.postConcat(new ColorMatrix(new float[]{
                     -1, 0, 0, 0, 255,
                     0, -1, 0, 0, 255,
                     0, 0, -1, 0, 255,
                     0, 0, 0, 1, 0
-            })));
-        } else {
-            clearColorFilter();
+            }));
         }
+        if (filterMode == AppState.FILTER_NONE && !inverted) clearColorFilter();
+        else setColorFilter(new ColorMatrixColorFilter(matrix));
     }
 
     @Override public void setImageBitmap(android.graphics.Bitmap bitmap) {
@@ -108,6 +153,13 @@ public final class ZoomImageView extends ImageView {
         if (imageWidth <= 0 || imageHeight <= 0) return;
         float widthScale = getWidth() / imageWidth;
         float heightScale = getHeight() / imageHeight;
+        if (fitMode == AppState.FIT_STRETCH) {
+            matrix.reset();
+            matrix.postScale(widthScale, heightScale);
+            relativeScale = 1f;
+            setImageMatrix(matrix);
+            return;
+        }
         float scale = fitMode == AppState.FIT_WIDTH ? widthScale : fitMode == AppState.FIT_HEIGHT ? heightScale : Math.min(widthScale, heightScale);
         float dx = (getWidth() - imageWidth * scale) / 2f;
         float dy = (getHeight() - imageHeight * scale) / 2f;
