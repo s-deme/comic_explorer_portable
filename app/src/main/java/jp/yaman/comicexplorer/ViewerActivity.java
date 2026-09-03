@@ -3,6 +3,7 @@ package jp.yaman.comicexplorer;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.AlertDialog;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
@@ -16,6 +17,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+import android.provider.MediaStore;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -39,6 +41,7 @@ import java.io.ByteArrayInputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -103,12 +106,15 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     private TextView errorText;
     private View chromeTop;
     private View chromeBottom;
+    private LinearLayout readerMenuRow;
+    private TextView readerMenuIndicator;
     private View errorPanel;
     private ProgressBar loading;
     private SeekBar pageSlider;
     private Button quickBookmarkButton;
     private Button leftPageButton;
     private Button rightPageButton;
+    private int readerMenuPage;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -133,6 +139,9 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Ui.DARK_BACKGROUND);
 
+        LinearLayout topChrome = new LinearLayout(this);
+        topChrome.setOrientation(LinearLayout.VERTICAL);
+        topChrome.setBackgroundColor(Ui.DARK_SURFACE);
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setPadding(dp(4), 0, dp(4), 0);
@@ -151,11 +160,13 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         top.addView(titleText, new LinearLayout.LayoutParams(0, dp(56), 1f));
         ImageButton more = new ImageButton(this);
         more.setImageResource(R.drawable.ic_toolbar_more);
-        more.setContentDescription("読書メニューを開く");
+        more.setContentDescription("次の読書メニューを表示");
         Ui.styleToolbarButton(more, Ui.DARK_SURFACE);
         more.setOnClickListener(view -> showReaderMenu());
         top.addView(more, new LinearLayout.LayoutParams(dp(48), dp(56)));
-        chromeTop = top;
+        topChrome.addView(top, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
+        topChrome.addView(buildReaderMenu(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(72)));
+        chromeTop = topChrome;
 
         FrameLayout canvas = new FrameLayout(this);
         imageView = new ZoomImageView(this);
@@ -201,26 +212,6 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         bottom.setOrientation(LinearLayout.VERTICAL);
         bottom.setBackgroundColor(Ui.DARK_SURFACE);
 
-        LinearLayout quickActions = new LinearLayout(this);
-        quickActions.setGravity(Gravity.CENTER_VERTICAL);
-        quickActions.setBackgroundColor(Ui.DARK_SURFACE_RAISED);
-        Button direction = readerAction("⇆", "ページ送り方向");
-        direction.setOnClickListener(view -> showDirectionDialog());
-        Button rotate = readerAction("↻", "画面回転");
-        rotate.setOnClickListener(view -> showOrientationDialog());
-        Button fit = readerAction("□", "表示方法");
-        fit.setOnClickListener(view -> showFitDialog());
-        Button brightness = readerAction("◐", "明るさ");
-        brightness.setOnClickListener(view -> showBrightnessDialog());
-        quickBookmarkButton = readerAction("☆", "このページにしおりを追加");
-        quickBookmarkButton.setOnClickListener(view -> toggleBookmark());
-        quickActions.addView(direction, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        quickActions.addView(rotate, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        quickActions.addView(fit, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        quickActions.addView(brightness, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        quickActions.addView(quickBookmarkButton, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        bottom.addView(quickActions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
-
         LinearLayout sliderRow = new LinearLayout(this);
         sliderRow.setGravity(Gravity.CENTER_VERTICAL);
         sliderRow.setPadding(dp(8), 0, dp(8), 0);
@@ -247,12 +238,70 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         chromeBottom = bottom;
         FrameLayout.LayoutParams topParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP);
         FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        root.addView(top, topParams);
+        root.addView(topChrome, topParams);
         root.addView(bottom, bottomParams);
         chromeTop.setVisibility(View.GONE);
         chromeBottom.setVisibility(View.GONE);
         setContentView(root);
         Ui.applySystemBarInsets(this, root);
+    }
+
+    private View buildReaderMenu() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setBackgroundColor(Ui.DARK_SURFACE_RAISED);
+        readerMenuRow = new LinearLayout(this);
+        readerMenuRow.setGravity(Gravity.CENTER_VERTICAL);
+        panel.addView(readerMenuRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
+        readerMenuIndicator = text("", 9, Ui.READER_ACCENT);
+        readerMenuIndicator.setGravity(Gravity.CENTER);
+        readerMenuIndicator.setContentDescription("読書メニュー 1 / 3");
+        readerMenuIndicator.setOnClickListener(view -> showReaderMenu());
+        panel.addView(readerMenuIndicator, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(16)));
+        showReaderMenuPage(0);
+        return panel;
+    }
+
+    private void showReaderMenuPage(int target) {
+        readerMenuPage = target;
+        readerMenuRow.removeAllViews();
+        quickBookmarkButton = null;
+        if (target == 0) {
+            addReaderMenuAction("⇆", "ページ送り方向", view -> showDirectionDialog());
+            addReaderMenuAction("↻", "画面回転", view -> showOrientationDialog());
+            addReaderMenuAction("▥", "ページレイアウト", view -> showPageLayoutDialog());
+            addReaderMenuAction("□", "表示方法", view -> showFitDialog());
+            addReaderMenuAction("◐", "明るさ", view -> showBrightnessDialog());
+        } else if (target == 1) {
+            addReaderMenuAction("◎", "拡大固定", view -> showZoomDialog());
+            addReaderMenuAction("◒", "画像フィルター", view -> showFilterDialog());
+            addReaderMenuAction("↕", "ページ移動", view -> showReadingFlowDialog());
+            quickBookmarkButton = addReaderMenuAction("☆", "このページにしおりを追加", view -> toggleBookmark());
+            addReaderMenuAction("☷", "しおり一覧", view -> showBookmarks());
+            refreshQuickBookmark();
+        } else {
+            addReaderMenuAction("▣", "画面を画像として保存", view -> capturePage());
+            addReaderMenuAction("#", "ページへ移動", view -> showPageJump());
+            addReaderMenuAction("⛶", fullScreen ? "全画面を解除" : "全画面にする", view -> { toggleFullscreen(); showReaderMenuPage(2); });
+            addReaderMenuAction(autoDelayMs > 0 ? "Ⅱ" : "▶", autoDelayMs > 0 ? "自動送りを停止" : "自動ページ送り", view -> {
+                if (autoDelayMs > 0) { stopAutoPage(); showReaderMenuPage(2); }
+                else showAutoPageDialog();
+            });
+            addReaderMenuAction("⋮", "その他の読書設定", view -> showMoreReaderSettings());
+        }
+        Button next = readerAction(target < 2 ? "›" : "‹", target < 2 ? "次のメニューページ" : "最初のメニューページ");
+        next.setOnClickListener(view -> showReaderMenuPage(target < 2 ? target + 1 : 0));
+        readerMenuRow.addView(next, new LinearLayout.LayoutParams(dp(48), dp(56)));
+        readerMenuIndicator.setText(target == 0 ? "●  ○  ○" : target == 1 ? "○  ●  ○" : "○  ○  ●");
+        readerMenuIndicator.setContentDescription("読書メニュー " + (target + 1) + " / 3。タップで次へ");
+    }
+
+    private Button addReaderMenuAction(String symbol, String description, View.OnClickListener listener) {
+        Button button = readerAction(symbol, description);
+        button.setTooltipText(description);
+        button.setOnClickListener(listener);
+        readerMenuRow.addView(button, new LinearLayout.LayoutParams(0, dp(56), 1f));
+        return button;
     }
 
     private void applyReaderPreferences() {
@@ -588,26 +637,19 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private void showReaderMenu() {
-        boolean bookmarked = initialized && AppState.hasBookmark(this, sourceUri, page);
-        String[] actions = {bookmarked ? "このページのしおりを削除" : "このページにしおりを追加", "しおりメモを編集", "ページへ移動", fullScreen ? "全画面を解除" : "全画面にする", "ページレイアウト: " + (pageLayout == AppState.PAGE_DUAL ? "見開き" : "単ページ"), "ページ移動: " + (AppState.readingFlow(this) == AppState.FLOW_VERTICAL ? "縦" : "横"), "表示方法: " + fitLabel(AppState.fitMode(this)), "明るさ", "画像フィルター: " + filterLabel(filterMode), inverted ? "色反転を戻す" : "色を反転", "画面回転", "しおり一覧", autoDelayMs > 0 ? "自動送りを停止" : "自動ページ送り", "復帰位置を先頭に戻す", "設定"};
-        Ui.show(new AlertDialog.Builder(this).setTitle("読書メニュー").setItems(actions, (dialog, which) -> {
-            switch (which) {
-                case 0: toggleBookmark(); break;
-                case 1: showBookmarkMemo(); break;
-                case 2: showPageJump(); break;
-                case 3: toggleFullscreen(); break;
-                case 4: showPageLayoutDialog(); break;
-                case 5: showReadingFlowDialog(); break;
-                case 6: showFitDialog(); break;
-                case 7: showBrightnessDialog(); break;
-                case 8: showFilterDialog(); break;
-                case 9: inverted = !inverted; imageView.setInverted(inverted); break;
-                case 10: showOrientationDialog(); break;
-                case 11: showBookmarks(); break;
-                case 12: if (autoDelayMs > 0) stopAutoPage(); else showAutoPageDialog(); break;
-                case 13: AppState.clearPosition(this, sourceUri); goToPage(0); Toast.makeText(this, "復帰位置を先頭に戻しました", Toast.LENGTH_SHORT).show(); break;
-                case 14: startActivity(new Intent(this, SettingsActivity.class)); break;
-            }
+        showReaderMenuPage((readerMenuPage + 1) % 3);
+    }
+
+    private void showMoreReaderSettings() {
+        String[] actions = {"しおりメモを編集", inverted ? "色反転を戻す" : "色を反転", "復帰位置を先頭に戻す", "設定"};
+        Ui.show(new AlertDialog.Builder(this).setTitle("その他").setItems(actions, (dialog, which) -> {
+            if (which == 0) showBookmarkMemo();
+            else if (which == 1) { inverted = !inverted; imageView.setInverted(inverted); }
+            else if (which == 2) {
+                AppState.clearPosition(this, sourceUri);
+                goToPage(0);
+                Toast.makeText(this, "復帰位置を先頭に戻しました", Toast.LENGTH_SHORT).show();
+            } else startActivity(new Intent(this, SettingsActivity.class));
         }));
     }
 
@@ -638,6 +680,23 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
             filterMode = selected;
             AppState.setImageFilter(this, selected);
             imageView.setFilterMode(selected);
+            dialog.dismiss();
+        }));
+    }
+
+    private void showZoomDialog() {
+        String[] labels = {"無効", "1.5倍", "2.0倍", "2.25倍", "2.5倍", "3.0倍", "4.0倍"};
+        int[] values = {0, 150, 200, 225, 250, 300, 400};
+        int selected = 0;
+        if (AppState.doubleTapMode(this) != AppState.DOUBLE_TAP_OFF) {
+            int scale = AppState.doubleTapScale(this);
+            for (int index = 1; index < values.length; index++) if (values[index] == scale) selected = index;
+        }
+        Ui.show(new AlertDialog.Builder(this).setTitle("ダブルタップ拡大").setSingleChoiceItems(labels, selected, (dialog, chosen) -> {
+            AppState.setDoubleTapMode(this, chosen == 0 ? AppState.DOUBLE_TAP_OFF : AppState.DOUBLE_TAP_TOGGLE);
+            if (chosen > 0) AppState.setDoubleTapScale(this, values[chosen]);
+            imageView.setDoubleTapMode(AppState.doubleTapMode(this));
+            imageView.setDoubleTapScale(AppState.doubleTapScale(this) / 100f);
             dialog.dismiss();
         }));
     }
@@ -732,12 +791,48 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
             autoDelayMs = new int[]{5000, 10000, 15000}[selected];
             autoHandler.removeCallbacks(autoPage);
             autoHandler.postDelayed(autoPage, autoDelayMs);
+            if (readerMenuPage == 2) showReaderMenuPage(2);
         }));
     }
 
     private void stopAutoPage() {
         autoDelayMs = 0;
         autoHandler.removeCallbacks(autoPage);
+    }
+
+    private void capturePage() {
+        if (!initialized || imageView.getWidth() == 0 || imageView.getHeight() == 0 || imageView.getDrawable() == null) {
+            Toast.makeText(this, "ページの読み込み後に保存してください", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Bitmap capture = Bitmap.createBitmap(imageView.getWidth(), imageView.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(capture);
+        canvas.drawColor(Ui.DARK_BACKGROUND);
+        imageView.draw(canvas);
+        worker.execute(() -> {
+            Uri output = null;
+            try {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Images.Media.DISPLAY_NAME, "ComicExplorer_" + System.currentTimeMillis() + ".png");
+                values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+                values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Comic Explorer");
+                values.put(MediaStore.Images.Media.IS_PENDING, 1);
+                output = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                if (output == null) throw new IOException("保存先を作成できません。");
+                try (OutputStream stream = getContentResolver().openOutputStream(output)) {
+                    if (stream == null || !capture.compress(Bitmap.CompressFormat.PNG, 100, stream)) throw new IOException("画像を書き込めません。");
+                }
+                ContentValues publish = new ContentValues();
+                publish.put(MediaStore.Images.Media.IS_PENDING, 0);
+                getContentResolver().update(output, publish, null, null);
+                runOnUiThread(() -> Toast.makeText(this, "Pictures/Comic Explorer に保存しました", Toast.LENGTH_SHORT).show());
+            } catch (Exception error) {
+                if (output != null) getContentResolver().delete(output, null, null);
+                runOnUiThread(() -> Toast.makeText(this, "画像を保存できませんでした", Toast.LENGTH_SHORT).show());
+            } finally {
+                capture.recycle();
+            }
+        });
     }
 
     private void applyBrightness(int value) {
@@ -800,12 +895,6 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         if (error instanceof OutOfMemoryError) return "ページが大きすぎてメモリに収まりません。ほかのアプリを閉じるか、解像度を下げた本を使用してください。";
         return error.getMessage() == null ? "ファイルを開けません。" : error.getMessage();
     }
-    private String fitLabel(int mode) { return mode == AppState.FIT_WIDTH ? "幅に合わせる" : mode == AppState.FIT_HEIGHT ? "高さに合わせる" : mode == AppState.FIT_STRETCH ? "画面いっぱい" : "画面に合わせる"; }
-    private String filterLabel(int mode) {
-        return mode == AppState.FILTER_GRAYSCALE ? "グレースケール" : mode == AppState.FILTER_CONTRAST ? "自動コントラスト"
-                : mode == AppState.FILTER_SEPIA ? "セピア" : mode == AppState.FILTER_BLUE_LIGHT ? "ブルーライト軽減" : "なし";
-    }
-
     @Override public void onTap(float normalizedX) {
         if (!initialized) return;
         if (normalizedX < .28f) { if (AppState.direction(this) == AppState.DIRECTION_RTL) forward(); else back(); }
