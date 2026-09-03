@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ public final class AppState {
     private static final String PREFS = "comic_explorer";
     private static final String TREE_URI = "library.tree";
     private static final String FAVORITES = "library.favorites";
+    private static final String DIRECTORIES = "library.directories";
     private static final String BOOKMARKED_ITEMS = "library.bookmarked_items";
     private static final int RECENT_LIMIT = 100;
 
@@ -30,6 +32,7 @@ public final class AppState {
     public static final int FLOW_VERTICAL = 1;
     public static final int PAGE_SINGLE = 0;
     public static final int PAGE_DUAL = 1;
+    public static final int PAGE_AUTO = 2;
     public static final int FILTER_NONE = 0;
     public static final int FILTER_GRAYSCALE = 1;
     public static final int FILTER_CONTRAST = 2;
@@ -110,6 +113,47 @@ public final class AppState {
         }
         Collections.sort(result, (left, right) -> Long.compare(right.timestamp, left.timestamp));
         return result;
+    }
+
+    public static boolean isDirectory(Context context, Uri uri) {
+        return prefs(context).getStringSet(DIRECTORIES, Collections.<String>emptySet()).contains(uri.toString());
+    }
+
+    public static void setDirectory(Context context, Uri uri, String title, boolean saved) {
+        SharedPreferences pref = prefs(context);
+        Set<String> values = new HashSet<>(pref.getStringSet(DIRECTORIES, Collections.<String>emptySet()));
+        String raw = uri.toString();
+        String id = key(uri);
+        SharedPreferences.Editor editor = pref.edit();
+        if (saved) {
+            values.add(raw);
+            editor.putString("directory." + id + ".title", title)
+                    .putLong("directory." + id + ".time", System.currentTimeMillis());
+        } else {
+            values.remove(raw);
+            editor.remove("directory." + id + ".title").remove("directory." + id + ".time");
+        }
+        editor.putStringSet(DIRECTORIES, values).apply();
+    }
+
+    public static List<SavedItem> directories(Context context) {
+        SharedPreferences pref = prefs(context);
+        ArrayList<SavedItem> result = new ArrayList<>();
+        for (String raw : pref.getStringSet(DIRECTORIES, Collections.<String>emptySet())) {
+            Uri uri = Uri.parse(raw);
+            String id = key(uri);
+            result.add(new SavedItem(uri, pref.getString("directory." + id + ".title", "名称なし"),
+                    "フォルダ", pref.getLong("directory." + id + ".time", 0), 0, 0));
+        }
+        Collections.sort(result, (left, right) -> Long.compare(right.timestamp, left.timestamp));
+        return result;
+    }
+
+    public static void clearDirectories(Context context) {
+        SharedPreferences pref = prefs(context);
+        SharedPreferences.Editor editor = pref.edit();
+        for (String name : pref.getAll().keySet()) if (name.startsWith("directory.")) editor.remove(name);
+        editor.remove(DIRECTORIES).apply();
     }
 
     public static void addRecent(Context context, Uri uri, String title, String kind) {
@@ -300,6 +344,14 @@ public final class AppState {
         prefs(context).edit().putBoolean("setting.keep_screen_on", enabled).apply();
     }
 
+    public static boolean resumeLastPosition(Context context) {
+        return prefs(context).getBoolean("setting.resume_last_position", true);
+    }
+
+    public static void setResumeLastPosition(Context context, boolean enabled) {
+        prefs(context).edit().putBoolean("setting.resume_last_position", enabled).apply();
+    }
+
     public static boolean startFullscreen(Context context) {
         return prefs(context).getBoolean("setting.start_fullscreen", true);
     }
@@ -322,6 +374,10 @@ public final class AppState {
     public static void setGridView(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.grid_view", enabled).apply(); }
     public static int gridColumns(Context context) { return Math.max(2, Math.min(4, prefs(context).getInt("setting.grid_columns", 3))); }
     public static void setGridColumns(Context context, int columns) { prefs(context).edit().putInt("setting.grid_columns", Math.max(2, Math.min(4, columns))).apply(); }
+    public static boolean showLibraryPath(Context context) { return prefs(context).getBoolean("setting.show_library_path", true); }
+    public static void setShowLibraryPath(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.show_library_path", enabled).apply(); }
+    public static boolean leftLibraryScrollbar(Context context) { return prefs(context).getBoolean("setting.left_library_scrollbar", false); }
+    public static void setLeftLibraryScrollbar(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.left_library_scrollbar", enabled).apply(); }
     public static boolean pageButtons(Context context) { return prefs(context).getBoolean("setting.page_buttons", true); }
     public static void setPageButtons(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.page_buttons", enabled).apply(); }
     public static int pageButtonOpacity(Context context) { return Math.max(30, Math.min(100, prefs(context).getInt("setting.page_button_opacity", 70))); }
@@ -330,14 +386,18 @@ public final class AppState {
     public static void setPageButtonHeight(Context context, int height) { prefs(context).edit().putInt("setting.page_button_height", Math.max(64, Math.min(160, height))).apply(); }
     public static int readingFlow(Context context) { return prefs(context).getInt("setting.reading_flow", FLOW_HORIZONTAL); }
     public static void setReadingFlow(Context context, int mode) { prefs(context).edit().putInt("setting.reading_flow", mode).apply(); }
-    public static int pageLayout(Context context) { return prefs(context).getInt("setting.page_layout", PAGE_SINGLE); }
-    public static void setPageLayout(Context context, int mode) { prefs(context).edit().putInt("setting.page_layout", mode).apply(); }
+    public static int pageLayout(Context context) { return Math.max(PAGE_SINGLE, Math.min(PAGE_AUTO, prefs(context).getInt("setting.page_layout", PAGE_SINGLE))); }
+    public static void setPageLayout(Context context, int mode) { prefs(context).edit().putInt("setting.page_layout", Math.max(PAGE_SINGLE, Math.min(PAGE_AUTO, mode))).apply(); }
+    public static boolean dualPageDivider(Context context) { return prefs(context).getBoolean("setting.dual_page_divider", true); }
+    public static void setDualPageDivider(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.dual_page_divider", enabled).apply(); }
     public static int doubleTapScale(Context context) { return Math.max(150, Math.min(400, prefs(context).getInt("setting.double_tap_scale", 225))); }
     public static void setDoubleTapScale(Context context, int percent) { prefs(context).edit().putInt("setting.double_tap_scale", Math.max(150, Math.min(400, percent))).apply(); }
     public static int doubleTapMode(Context context) { return prefs(context).getInt("setting.double_tap_mode", DOUBLE_TAP_TOGGLE); }
     public static void setDoubleTapMode(Context context, int mode) { prefs(context).edit().putInt("setting.double_tap_mode", mode).apply(); }
     public static int imageFilter(Context context) { return prefs(context).getInt("setting.image_filter", FILTER_NONE); }
     public static void setImageFilter(Context context, int filter) { prefs(context).edit().putInt("setting.image_filter", filter).apply(); }
+    public static int cropPercent(Context context) { return Math.max(0, Math.min(10, prefs(context).getInt("setting.crop_percent", 0))); }
+    public static void setCropPercent(Context context, int percent) { prefs(context).edit().putInt("setting.crop_percent", Math.max(0, Math.min(10, percent))).apply(); }
     public static int archiveEncoding(Context context) { return prefs(context).getInt("setting.archive_encoding", 0); }
     public static void setArchiveEncoding(Context context, int encoding) { prefs(context).edit().putInt("setting.archive_encoding", encoding).apply(); }
 
@@ -357,6 +417,24 @@ public final class AppState {
         prefs(context).edit().putInt("setting.brightness", value).apply();
     }
 
+    public static File coverFile(Context context, Uri uri) {
+        return new File(new File(context.getFilesDir(), "covers"), key(uri) + ".jpg");
+    }
+
+    public static boolean hasCover(Context context, Uri uri) {
+        return coverFile(context, uri).isFile();
+    }
+
+    public static void removeCover(Context context, Uri uri) {
+        File file = coverFile(context, uri);
+        if (file.isFile()) file.delete();
+    }
+
+    public static void clearCovers(Context context) {
+        File[] files = new File(context.getFilesDir(), "covers").listFiles();
+        if (files != null) for (File file : files) if (file.isFile()) file.delete();
+    }
+
     public static void clearReadingData(Context context) {
         SharedPreferences pref = prefs(context);
         SharedPreferences.Editor editor = pref.edit();
@@ -371,9 +449,10 @@ public final class AppState {
     public static void clearLibrary(Context context) {
         SharedPreferences pref = prefs(context);
         SharedPreferences.Editor editor = pref.edit();
-        for (String name : pref.getAll().keySet()) if (name.startsWith("favorite.")) editor.remove(name);
-        editor.remove(TREE_URI).remove(FAVORITES).apply();
+        for (String name : pref.getAll().keySet()) if (name.startsWith("favorite.") || name.startsWith("directory.")) editor.remove(name);
+        editor.remove(TREE_URI).remove(FAVORITES).remove(DIRECTORIES).apply();
         clearRecents(context);
+        clearCovers(context);
     }
 
     private static String key(Uri uri) {

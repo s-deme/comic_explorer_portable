@@ -68,6 +68,8 @@ public final class SettingsActivity extends Activity {
         LinearLayout section = section("GENERAL");
         addCheck(section, "読書中は画面を消灯しない", AppState.keepScreenOn(this),
                 (button, checked) -> AppState.setKeepScreenOn(this, checked));
+        addCheck(section, "前回の位置から再開する", AppState.resumeLastPosition(this),
+                (button, checked) -> AppState.setResumeLastPosition(this, checked));
         addCheck(section, "作品を開いたら全画面表示にする", AppState.startFullscreen(this),
                 (button, checked) -> AppState.setStartFullscreen(this, checked));
         addCheck(section, "画面上にページ移動ボタンを表示", AppState.pageButtons(this),
@@ -89,6 +91,10 @@ public final class SettingsActivity extends Activity {
                 (button, checked) -> AppState.setGridView(this, checked));
         addChoice(section, "グリッド列数", new String[]{"2列", "3列", "4列"},
                 AppState.gridColumns(this) - 2, index -> AppState.setGridColumns(this, index + 2));
+        addCheck(section, "パスと件数を表示", AppState.showLibraryPath(this),
+                (button, checked) -> AppState.setShowLibraryPath(this, checked));
+        addCheck(section, "スクロールバーを左側に表示", AppState.leftLibraryScrollbar(this),
+                (button, checked) -> AppState.setLeftLibraryScrollbar(this, checked));
     }
 
     private void addImageSettings() {
@@ -97,8 +103,10 @@ public final class SettingsActivity extends Activity {
                 AppState.direction(this), index -> AppState.setDirection(this, index));
         addChoice(section, "ページ移動", new String[]{"横スワイプ", "縦スワイプ"},
                 AppState.readingFlow(this), index -> AppState.setReadingFlow(this, index));
-        addChoice(section, "ページレイアウト", new String[]{"単ページ", "見開き"},
+        addChoice(section, "ページレイアウト", new String[]{"単ページ", "見開き", "自動（横画面は見開き）"},
                 AppState.pageLayout(this), index -> AppState.setPageLayout(this, index));
+        addCheck(section, "見開きの中央に境界線を表示", AppState.dualPageDivider(this),
+                (button, checked) -> AppState.setDualPageDivider(this, checked));
         addChoice(section, "表示方法", new String[]{"画面に合わせる", "幅に合わせる", "高さに合わせる", "画面いっぱいに伸縮"},
                 AppState.fitMode(this), index -> AppState.setFitMode(this, index));
         addChoice(section, "ダブルタップ", new String[]{"無効", "拡大", "フィット", "拡大／フィット切替"},
@@ -111,15 +119,22 @@ public final class SettingsActivity extends Activity {
                 index -> AppState.setDoubleTapScale(this, scaleValues[index]));
         addChoice(section, "画像フィルター", new String[]{"なし", "グレースケール", "自動コントラスト", "セピア", "ブルーライト軽減"},
                 AppState.imageFilter(this), index -> AppState.setImageFilter(this, index));
+        int[] cropValues = {0, 2, 5, 10};
+        int cropIndex = 0;
+        for (int index = 0; index < cropValues.length; index++) if (cropValues[index] == AppState.cropPercent(this)) cropIndex = index;
+        addChoice(section, "ページ余白を切り取る", new String[]{"なし", "2%", "5%", "10%"}, cropIndex,
+                index -> AppState.setCropPercent(this, cropValues[index]));
         addChoice(section, "ZIP文字コード", new String[]{"UTF-8", "Shift_JIS"},
                 AppState.archiveEncoding(this), index -> AppState.setArchiveEncoding(this, index));
     }
 
     private void addDataSettings() {
         LinearLayout section = section("CACHE DATA");
+        addDanger(section, "カスタム表紙を消去", "設定したカスタム表紙をすべて消去しますか？ 作品ファイルは削除されません。", () -> AppState.clearCovers(this));
         addDanger(section, "復帰位置としおりを消去", "復帰位置としおりを消去しますか？", () -> AppState.clearReadingData(this));
         addDanger(section, "最近開いた作品を消去", "最近開いた作品の一覧を消去しますか？", () -> AppState.clearRecents(this));
-        addDanger(section, "ライブラリの選択を解除", "選択したフォルダとお気に入りを解除しますか？ 作品ファイルは削除されません。", () -> {
+        addDanger(section, "登録ディレクトリを解除", "登録したディレクトリの一覧を解除しますか？ フォルダや作品ファイルは削除されません。", () -> AppState.clearDirectories(this));
+        addDanger(section, "ライブラリの選択を解除", "選択したフォルダ・お気に入り・カスタム表紙を解除しますか？ 作品ファイルは削除されません。", () -> {
             AppState.clearLibrary(this);
             finish();
         });

@@ -5,6 +5,7 @@ import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -38,6 +39,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -95,10 +98,12 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     private int maxBitmapPixels;
     private int pageLayout;
     private int filterMode;
+    private int cropPercent;
     private boolean initialized;
     private boolean chromeVisible;
     private boolean fullScreen;
     private boolean inverted;
+    private boolean dualPageDivider;
     private volatile boolean destroyed;
 
     private ZoomImageView imageView;
@@ -307,7 +312,9 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     private void applyReaderPreferences() {
         if (AppState.keepScreenOn(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         pageLayout = AppState.pageLayout(this);
+        dualPageDivider = AppState.dualPageDivider(this);
         filterMode = AppState.imageFilter(this);
+        cropPercent = AppState.cropPercent(this);
         imageView.setFitMode(AppState.fitMode(this));
         imageView.setDoubleTapScale(AppState.doubleTapScale(this) / 100f);
         imageView.setDoubleTapMode(AppState.doubleTapMode(this));
@@ -349,7 +356,8 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
                 if (imageUris != null && !imageUris.isEmpty()) {
                     type = TYPE_IMAGES;
                     totalPages = imageUris.size();
-                    int start = getIntent().getIntExtra(EXTRA_START_INDEX, AppState.getPosition(this, sourceUri));
+                    int start = getIntent().getIntExtra(EXTRA_START_INDEX,
+                            AppState.resumeLastPosition(this) ? AppState.getPosition(this, sourceUri) : 0);
                     page = Math.max(0, Math.min(start, totalPages - 1));
                 } else {
                     String extension = ComicFile.extension(title);
@@ -368,9 +376,10 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
                         throw new IOException("この形式は表示できません。PDF、CBZ/ZIP、画像に対応しています。");
                     }
                     if (totalPages < 1) throw new IOException("表示できるページがありません。");
-                    page = Math.max(0, Math.min(AppState.getPosition(this, sourceUri), totalPages - 1));
+                    int savedPage = AppState.resumeLastPosition(this) ? AppState.getPosition(this, sourceUri) : 0;
+                    page = Math.max(0, Math.min(savedPage, totalPages - 1));
                 }
-                if (pageLayout == AppState.PAGE_DUAL) page -= page % 2;
+                if (usesDualPageLayout()) page -= page % 2;
                 runOnUiThread(() -> {
                     if (destroyed || token != loadToken || isFinishing()) return;
                     initialized = true;
@@ -469,11 +478,11 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
 
     private Bitmap decodePage(int target) throws IOException {
         Bitmap first = decodeSinglePage(target);
-        if (pageLayout != AppState.PAGE_DUAL || target + 1 >= totalPages) return first;
+        if (!usesDualPageLayout() || target + 1 >= totalPages) return cropMargins(first);
         Bitmap second = null;
         try {
             second = decodeSinglePage(target + 1);
-            return combinePages(first, second, AppState.direction(this) == AppState.DIRECTION_RTL);
+            return cropMargins(combinePages(first, second, AppState.direction(this) == AppState.DIRECTION_RTL));
         } finally {
             first.recycle();
             if (second != null) second.recycle();
@@ -506,12 +515,29 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         int rightHeight = Math.max(1, (int) Math.floor(right.getHeight() * scale));
         canvas.drawBitmap(left, null, new Rect(0, (height - leftHeight) / 2, leftWidth, (height + leftHeight) / 2), paint);
         canvas.drawBitmap(right, null, new Rect(leftWidth, (height - rightHeight) / 2, width, (height + rightHeight) / 2), paint);
-        paint.setColor(0xFF424242);
-        canvas.drawRect(Math.max(0, leftWidth - 1), 0, Math.min(width, leftWidth + 1), height, paint);
+        if (dualPageDivider) {
+            paint.setColor(0xFF424242);
+            canvas.drawRect(Math.max(0, leftWidth - 1), 0, Math.min(width, leftWidth + 1), height, paint);
+        }
         return result;
     }
 
-    private String cacheKey(int target) { return type + ":" + pageLayout + ":" + target; }
+    private Bitmap cropMargins(Bitmap source) {
+        int[] bounds = cropBounds(source.getWidth(), source.getHeight(), cropPercent);
+        if (bounds[0] == 0 && bounds[1] == 0) return source;
+        Bitmap cropped = Bitmap.createBitmap(source, bounds[0], bounds[1], bounds[2], bounds[3]);
+        source.recycle();
+        return cropped;
+    }
+
+    static int[] cropBounds(int width, int height, int percent) {
+        int safePercent = Math.max(0, Math.min(10, percent));
+        int insetX = width * safePercent / 100;
+        int insetY = height * safePercent / 100;
+        return new int[]{insetX, insetY, Math.max(1, width - insetX * 2), Math.max(1, height - insetY * 2)};
+    }
+
+    private String cacheKey(int target) { return type + ":" + (usesDualPageLayout() ? AppState.PAGE_DUAL : AppState.PAGE_SINGLE) + ":" + target; }
 
     private Bitmap decodeUri(Uri uri) throws IOException {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
@@ -583,13 +609,13 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private void goToPage(int target) {
-        if (pageLayout == AppState.PAGE_DUAL) target -= target % 2;
+        if (usesDualPageLayout()) target -= target % 2;
         if (target < 0 || target >= totalPages || target == page && imageView.getDrawable() != null) return;
         loadPage(target, false);
     }
 
     private int nextIndex(int index, boolean forward) {
-        int step = pageLayout == AppState.PAGE_DUAL ? 2 : 1;
+        int step = usesDualPageLayout() ? 2 : 1;
         int next = index + (forward ? step : -step);
         return next >= 0 && next < totalPages ? next : -1;
     }
@@ -598,8 +624,9 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     private void back() { int previous = nextIndex(page, false); if (previous >= 0) goToPage(previous); else Toast.makeText(this, "最初のページです", Toast.LENGTH_SHORT).show(); }
 
     private void updateControls() {
-        int shownEnd = pageLayout == AppState.PAGE_DUAL ? Math.min(totalPages, page + 2) : page + 1;
-        pageText.setText(totalPages > 0 ? (pageLayout == AppState.PAGE_DUAL ? (page + 1) + "-" + shownEnd : String.valueOf(page + 1))
+        boolean dualPage = usesDualPageLayout();
+        int shownEnd = dualPage ? Math.min(totalPages, page + 2) : page + 1;
+        pageText.setText(totalPages > 0 ? (dualPage ? (page + 1) + "-" + shownEnd : String.valueOf(page + 1))
                 + " / " + totalPages + "  " + Math.round(shownEnd * 100f / totalPages) + "%" : "読み込み中…");
         pageSlider.setProgress(page);
         refreshQuickBookmark();
@@ -641,11 +668,24 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private void showMoreReaderSettings() {
-        String[] actions = {"しおりメモを編集", inverted ? "色反転を戻す" : "色を反転", "復帰位置を先頭に戻す", "設定"};
-        Ui.show(new AlertDialog.Builder(this).setTitle("その他").setItems(actions, (dialog, which) -> {
-            if (which == 0) showBookmarkMemo();
-            else if (which == 1) { inverted = !inverted; imageView.setInverted(inverted); }
-            else if (which == 2) {
+        ArrayList<String> actions = new ArrayList<>();
+        actions.add("しおりメモを編集");
+        actions.add(inverted ? "色反転を戻す" : "色を反転");
+        actions.add("ページ余白を切り取る");
+        actions.add("現在のページを表紙にする");
+        if (AppState.hasCover(this, sourceUri)) actions.add("表紙を初期状態に戻す");
+        actions.add("復帰位置を先頭に戻す");
+        actions.add("設定");
+        Ui.show(new AlertDialog.Builder(this).setTitle("その他").setItems(actions.toArray(new String[0]), (dialog, which) -> {
+            String action = actions.get(which);
+            if ("しおりメモを編集".equals(action)) showBookmarkMemo();
+            else if (action.contains("色反転")) { inverted = !inverted; imageView.setInverted(inverted); }
+            else if ("ページ余白を切り取る".equals(action)) showCropDialog();
+            else if ("現在のページを表紙にする".equals(action)) saveCurrentPageCover();
+            else if ("表紙を初期状態に戻す".equals(action)) {
+                AppState.removeCover(this, sourceUri);
+                Toast.makeText(this, "表紙を初期状態に戻しました", Toast.LENGTH_SHORT).show();
+            } else if ("復帰位置を先頭に戻す".equals(action)) {
                 AppState.clearPosition(this, sourceUri);
                 goToPage(0);
                 Toast.makeText(this, "復帰位置を先頭に戻しました", Toast.LENGTH_SHORT).show();
@@ -653,13 +693,62 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         }));
     }
 
+    private void saveCurrentPageCover() {
+        Bitmap current = pageCache.get(cacheKey(page));
+        if (!initialized || current == null) {
+            Toast.makeText(this, "ページの読み込み後に設定してください", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int[] size = coverSize(current.getWidth(), current.getHeight());
+        Bitmap cover = Bitmap.createScaledBitmap(current, size[0], size[1], true);
+        worker.execute(() -> {
+            File output = AppState.coverFile(this, sourceUri);
+            File directory = output.getParentFile();
+            File temporary = new File(directory, output.getName() + ".tmp");
+            try {
+                if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new IOException("表紙の保存先を作成できません。");
+                try (FileOutputStream stream = new FileOutputStream(temporary)) {
+                    if (!cover.compress(Bitmap.CompressFormat.JPEG, 90, stream)) throw new IOException("表紙を書き込めません。");
+                }
+                if (output.isFile() && !output.delete()) throw new IOException("既存の表紙を置き換えられません。");
+                if (!temporary.renameTo(output)) throw new IOException("表紙を保存できません。");
+                runOnUiThread(() -> Toast.makeText(this, "現在のページを表紙にしました", Toast.LENGTH_SHORT).show());
+            } catch (IOException error) {
+                temporary.delete();
+                runOnUiThread(() -> Toast.makeText(this, "表紙を保存できませんでした", Toast.LENGTH_SHORT).show());
+            } finally {
+                cover.recycle();
+            }
+        });
+    }
+
+    static int[] coverSize(int width, int height) {
+        float scale = Math.min(1f, Math.min(320f / Math.max(1, width), 480f / Math.max(1, height)));
+        return new int[]{Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale))};
+    }
+
+    private void showCropDialog() {
+        String[] labels = {"なし", "2%", "5%", "10%"};
+        int[] values = {0, 2, 5, 10};
+        int selected = 0;
+        for (int index = 0; index < values.length; index++) if (values[index] == cropPercent) selected = index;
+        Ui.show(new AlertDialog.Builder(this).setTitle("ページ余白を切り取る")
+                .setSingleChoiceItems(labels, selected, (dialog, chosen) -> {
+                    cropPercent = values[chosen];
+                    AppState.setCropPercent(this, cropPercent);
+                    pageCache.evictAll();
+                    dialog.dismiss();
+                    loadPage(page, false);
+                }));
+    }
+
     private void showPageLayoutDialog() {
         Ui.show(new AlertDialog.Builder(this).setTitle("ページレイアウト")
-                .setSingleChoiceItems(new String[]{"単ページ", "見開き"}, pageLayout, (dialog, selected) -> {
+                .setSingleChoiceItems(new String[]{"単ページ", "見開き", "自動（横画面は見開き）"}, pageLayout, (dialog, selected) -> {
                     pageLayout = selected;
                     AppState.setPageLayout(this, selected);
                     pageCache.evictAll();
-                    int target = selected == AppState.PAGE_DUAL ? page - page % 2 : page;
+                    int target = usesDualPageLayout() ? page - page % 2 : page;
                     dialog.dismiss();
                     loadPage(target, false);
                 }));
@@ -764,7 +853,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
                 .setSingleChoiceItems(choices, AppState.direction(this), (dialog, selected) -> {
                     AppState.setDirection(this, selected);
                     updatePageButtons();
-                    if (pageLayout == AppState.PAGE_DUAL) { pageCache.evictAll(); loadPage(page, false); }
+                    if (usesDualPageLayout()) { pageCache.evictAll(); loadPage(page, false); }
                     dialog.dismiss();
                 }));
     }
@@ -928,9 +1017,13 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         super.onResume();
         if (imageView == null) return;
         int savedLayout = AppState.pageLayout(this);
-        boolean reloadLayout = initialized && savedLayout != pageLayout;
+        boolean savedDivider = AppState.dualPageDivider(this);
+        int savedCropPercent = AppState.cropPercent(this);
+        boolean reloadLayout = initialized && (savedLayout != pageLayout || savedDivider != dualPageDivider || savedCropPercent != cropPercent);
         pageLayout = savedLayout;
+        dualPageDivider = savedDivider;
         filterMode = AppState.imageFilter(this);
+        cropPercent = savedCropPercent;
         imageView.setFitMode(AppState.fitMode(this));
         imageView.setDoubleTapScale(AppState.doubleTapScale(this) / 100f);
         imageView.setDoubleTapMode(AppState.doubleTapMode(this));
@@ -940,13 +1033,21 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         applyBrightness(AppState.brightness(this));
         if (AppState.keepScreenOn(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        if (reloadLayout) { pageCache.evictAll(); loadPage(pageLayout == AppState.PAGE_DUAL ? page - page % 2 : page, false); }
+        if (reloadLayout) { pageCache.evictAll(); loadPage(usesDualPageLayout() ? page - page % 2 : page, false); }
         if (autoDelayMs > 0) autoHandler.postDelayed(autoPage, autoDelayMs);
     }
 
     @Override protected void onPause() {
         autoHandler.removeCallbacks(autoPage);
         super.onPause();
+    }
+
+    @Override public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        if (initialized && pageLayout == AppState.PAGE_AUTO) {
+            pageCache.evictAll();
+            loadPage(usesDualPageLayout() ? page - page % 2 : page, false);
+        }
     }
 
     @Override protected void onDestroy() {
@@ -963,6 +1064,14 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     static int adjacentPage(int index, boolean forward, int count) {
         int next = index + (forward ? 1 : -1);
         return next >= 0 && next < count ? next : -1;
+    }
+
+    static boolean usesDualPageLayout(int layout, int orientation) {
+        return layout == AppState.PAGE_DUAL || layout == AppState.PAGE_AUTO && orientation == Configuration.ORIENTATION_LANDSCAPE;
+    }
+
+    private boolean usesDualPageLayout() {
+        return usesDualPageLayout(pageLayout, getResources().getConfiguration().orientation);
     }
 
     static int bitmapSampleSize(int width, int height, int maxPixels) {
@@ -986,6 +1095,12 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     public static void main(String[] arguments) throws IOException {
         assert adjacentPage(0, true, 3) == 1;
         assert adjacentPage(0, false, 3) == -1;
+        assert !usesDualPageLayout(AppState.PAGE_AUTO, Configuration.ORIENTATION_PORTRAIT);
+        assert usesDualPageLayout(AppState.PAGE_AUTO, Configuration.ORIENTATION_LANDSCAPE);
+        int[] crop = cropBounds(1000, 2000, 5);
+        assert crop[0] == 50 && crop[1] == 100 && crop[2] == 900 && crop[3] == 1800;
+        int[] cover = coverSize(2000, 1000);
+        assert cover[0] == 320 && cover[1] == 160;
         assert bitmapSampleSize(4000, 6000, 2_000_000) == 4;
         int[] tallPdf = pdfBitmapSize(1, 100_000, 1080, 2_000_000);
         assert tallPdf[0] <= MAX_PAGE_DIMENSION && tallPdf[1] <= MAX_PAGE_DIMENSION;

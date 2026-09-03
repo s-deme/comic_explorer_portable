@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -48,6 +49,7 @@ public final class MainActivity extends Activity {
     private static final int MODE_FAVORITES = 1;
     private static final int MODE_RECENTS = 2;
     private static final int MODE_BOOKMARKS = 3;
+    private static final int MODE_DIRECTORIES = 4;
     private static final int SORT_NAME = 0;
     private static final int SORT_MODIFIED = 1;
     private static final int SORT_SIZE = 2;
@@ -69,10 +71,11 @@ public final class MainActivity extends Activity {
     private TextView pathText;
     private TextView stateText;
     private TextView screenTitle;
+    private View locationRow;
     private ImageButton upButton;
     private ImageButton searchButton;
     private Button libraryDestination;
-    private Button favoritesDestination;
+    private Button directoriesDestination;
     private Button recentsDestination;
     private Button bookmarksDestination;
     private Button sortButton;
@@ -108,7 +111,8 @@ public final class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         boolean savedGrid = AppState.gridView(this);
-        if (savedGrid != gridMode) { gridMode = savedGrid; updateCollectionView(); }
+        if (savedGrid != gridMode) gridMode = savedGrid;
+        updateCollectionView();
         Uri saved = AppState.getTree(this);
         if (saved == null && treeUri != null) {
             treeUri = null;
@@ -120,6 +124,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onRestart() {
         super.onRestart();
+        thumbnails.evictAll();
         if (mode == MODE_LIBRARY) adapter.notifyDataSetChanged(); else loadSavedItems();
     }
 
@@ -155,11 +160,11 @@ public final class MainActivity extends Activity {
         tabs.setGravity(Gravity.CENTER_VERTICAL);
         tabs.setBackgroundColor(Ui.DARK_SURFACE);
         libraryDestination = tabButton("ストレージ", MODE_LIBRARY, "ストレージを表示");
-        favoritesDestination = tabButton("お気に入り", MODE_FAVORITES, "お気に入りを表示");
+        directoriesDestination = tabButton("ディレクトリ", MODE_DIRECTORIES, "登録したディレクトリを表示");
         recentsDestination = tabButton("履歴", MODE_RECENTS, "読書履歴を表示");
         bookmarksDestination = tabButton("しおり", MODE_BOOKMARKS, "しおりのある作品を表示");
         tabs.addView(libraryDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        tabs.addView(favoritesDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        tabs.addView(directoriesDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         tabs.addView(recentsDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         tabs.addView(bookmarksDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         root.addView(tabs, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
@@ -200,7 +205,8 @@ public final class MainActivity extends Activity {
         stateText.setSingleLine(true);
         stateText.setEllipsize(android.text.TextUtils.TruncateAt.END);
         location.addView(stateText, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(24)));
-        root.addView(location, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(24)));
+        locationRow = location;
+        root.addView(locationRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(24)));
 
         listView = new ListView(this);
         listView.setDivider(new android.graphics.drawable.ColorDrawable(Ui.DARK_OUTLINE));
@@ -386,10 +392,10 @@ public final class MainActivity extends Activity {
 
     private void updateNavigation() {
         Ui.styleTopTab(libraryDestination, mode == MODE_LIBRARY);
-        Ui.styleTopTab(favoritesDestination, mode == MODE_FAVORITES);
+        Ui.styleTopTab(directoriesDestination, mode == MODE_DIRECTORIES);
         Ui.styleTopTab(recentsDestination, mode == MODE_RECENTS);
         Ui.styleTopTab(bookmarksDestination, mode == MODE_BOOKMARKS);
-        if (screenTitle != null) screenTitle.setText(mode == MODE_FAVORITES ? "お気に入り" : mode == MODE_RECENTS ? "履歴" : mode == MODE_BOOKMARKS ? "しおり" : "Comic Explorer");
+        if (screenTitle != null) screenTitle.setText(mode == MODE_DIRECTORIES ? "ディレクトリ" : mode == MODE_FAVORITES ? "お気に入り" : mode == MODE_RECENTS ? "履歴" : mode == MODE_BOOKMARKS ? "しおり" : "Comic Explorer");
         if (upButton != null) upButton.setVisibility(mode == MODE_LIBRARY && treeUri != null && directoryUri != null && !directoryUri.equals(treeUri) ? View.VISIBLE : View.GONE);
     }
 
@@ -411,6 +417,11 @@ public final class MainActivity extends Activity {
         listView.setVisibility(gridMode ? View.GONE : View.VISIBLE);
         gridView.setVisibility(gridMode ? View.VISIBLE : View.GONE);
         gridView.setNumColumns(AppState.gridColumns(this));
+        if (locationRow != null) locationRow.setVisibility(AppState.showLibraryPath(this) ? View.VISIBLE : View.GONE);
+        int scrollPosition = AppState.leftLibraryScrollbar(this)
+                ? View.SCROLLBAR_POSITION_LEFT : View.SCROLLBAR_POSITION_RIGHT;
+        listView.setVerticalScrollbarPosition(scrollPosition);
+        gridView.setVerticalScrollbarPosition(scrollPosition);
         if (viewButton != null) {
             viewButton.setText(gridMode ? "リスト" : "グリッド");
             viewButton.setContentDescription(gridMode ? "リスト表示に切り替え" : "グリッド表示に切り替え");
@@ -423,6 +434,7 @@ public final class MainActivity extends Activity {
         labels.add("ファイルを開く");
         labels.add("フォルダを選び直す");
         if (mode == MODE_RECENTS && !allRows.isEmpty()) labels.add("履歴を期間指定で消去");
+        if (mode == MODE_DIRECTORIES && !allRows.isEmpty()) labels.add("登録ディレクトリをすべて解除");
         if (mode == MODE_FAVORITES && !allRows.isEmpty()) labels.add("お気に入りをすべて解除");
         if (mode == MODE_BOOKMARKS && !allRows.isEmpty()) labels.add("しおりをすべて消去");
         Ui.show(new AlertDialog.Builder(this).setTitle("操作").setItems(labels.toArray(new String[0]), (dialog, which) -> {
@@ -431,7 +443,9 @@ public final class MainActivity extends Activity {
             if (mode == MODE_RECENTS) { showHistoryCleanup(); return; }
             Ui.show(new AlertDialog.Builder(this).setMessage(labels.get(which) + "しますか？")
                     .setNegativeButton("キャンセル", null).setPositiveButton("実行", (ignored, button) -> {
-                        if (mode == MODE_FAVORITES) {
+                        if (mode == MODE_DIRECTORIES) {
+                            AppState.clearDirectories(this);
+                        } else if (mode == MODE_FAVORITES) {
                             for (AppState.SavedItem item : AppState.favorites(this)) AppState.setFavorite(this, item.uri, item.title, item.kind, false);
                         } else if (mode == MODE_BOOKMARKS) {
                             for (AppState.SavedItem item : AppState.bookmarkedItems(this)) AppState.clearBookmarks(this, item.uri);
@@ -458,6 +472,8 @@ public final class MainActivity extends Activity {
         actions.add(0);
         labels.add("ファイルを開く");
         actions.add(4);
+        labels.add("お気に入り");
+        actions.add(5);
         if (mode == MODE_LIBRARY) {
             labels.add("フォルダを選び直す");
             actions.add(1);
@@ -477,6 +493,7 @@ public final class MainActivity extends Activity {
                         case 2: goUp(); break;
                         case 3: startActivity(new Intent(this, SettingsActivity.class)); break;
                         case 4: chooseFile(); break;
+                        case 5: selectMode(MODE_FAVORITES); break;
                         default: break;
                     }
                 }));
@@ -547,11 +564,11 @@ public final class MainActivity extends Activity {
     private void loadSavedItems() {
         directoryLoadToken++;
         updateNavigation();
-        pathText.setText(mode == MODE_FAVORITES ? "お気に入り" : mode == MODE_BOOKMARKS ? "しおりのある作品" : "最近開いた作品");
+        pathText.setText(mode == MODE_DIRECTORIES ? "登録ディレクトリ" : mode == MODE_FAVORITES ? "お気に入り" : mode == MODE_BOOKMARKS ? "しおりのある作品" : "最近開いた作品");
         allRows.clear();
-        List<AppState.SavedItem> items = mode == MODE_FAVORITES ? AppState.favorites(this)
+        List<AppState.SavedItem> items = mode == MODE_DIRECTORIES ? AppState.directories(this) : mode == MODE_FAVORITES ? AppState.favorites(this)
                 : mode == MODE_BOOKMARKS ? AppState.bookmarkedItems(this) : AppState.recents(this);
-        for (AppState.SavedItem item : items) allRows.add(new LibraryEntry(item.uri, item.title, null, item.kind, false, 0, item.timestamp));
+        for (AppState.SavedItem item : items) allRows.add(new LibraryEntry(item.uri, item.title, null, item.kind, mode == MODE_DIRECTORIES, 0, item.timestamp));
         stateText.setText(items.isEmpty() ? "0 件" : items.size() + " 件");
         applyFilters();
     }
@@ -573,7 +590,8 @@ public final class MainActivity extends Activity {
             stateText.setText("0 件");
             showEmptyState("見つかりません", "別の名前で検索してください。", null, false);
         } else if (visibleRows.isEmpty()) {
-            if (mode == MODE_FAVORITES) showEmptyState("お気に入りはありません", "作品を長押しして追加できます。", null, false);
+            if (mode == MODE_DIRECTORIES) showEmptyState("登録ディレクトリはありません", "フォルダを長押しして登録できます。", "フォルダを見る", false);
+            else if (mode == MODE_FAVORITES) showEmptyState("お気に入りはありません", "作品を長押しして追加できます。", null, false);
             else if (mode == MODE_RECENTS) showEmptyState("履歴はありません", "作品を開くとここに表示されます。", "フォルダを見る", false);
             else if (mode == MODE_BOOKMARKS) showEmptyState("しおりはありません", "読書画面でページにしおりを付けると、作品がここに表示されます。", "フォルダを見る", false);
             else if (treeUri != null && emptyProgress.getVisibility() != View.VISIBLE && !pathText.getText().toString().equals("フォルダを開けません"))
@@ -638,7 +656,19 @@ public final class MainActivity extends Activity {
     }
 
     private void showActions(LibraryEntry item) {
-        if (item.directory) { Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setItems(new String[]{"開く"}, (dialog, which) -> open(item))); return; }
+        if (item.directory) {
+            boolean saved = AppState.isDirectory(this, item.uri);
+            Ui.show(new AlertDialog.Builder(this).setTitle(item.name)
+                    .setItems(new String[]{"開く", saved ? "登録ディレクトリから外す" : "ディレクトリに登録"}, (dialog, which) -> {
+                        if (which == 0) open(item);
+                        else {
+                            AppState.setDirectory(this, item.uri, item.name, !saved);
+                            if (mode == MODE_DIRECTORIES && saved) loadSavedItems();
+                            Toast.makeText(this, saved ? "登録ディレクトリから外しました" : "ディレクトリに登録しました", Toast.LENGTH_SHORT).show();
+                        }
+                    }));
+            return;
+        }
         boolean favorite = AppState.isFavorite(this, item.uri);
         ArrayList<String> actions = new ArrayList<>();
         actions.add(favorite ? "お気に入りから外す" : "お気に入りに追加");
@@ -646,6 +676,7 @@ public final class MainActivity extends Activity {
         actions.add("詳細を表示");
         if (mode == MODE_RECENTS) actions.add("履歴から削除");
         if (!AppState.bookmarks(this, item.uri).isEmpty()) actions.add("しおりをすべて消去");
+        if (AppState.hasCover(this, item.uri)) actions.add("表紙を初期状態に戻す");
         Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setItems(actions.toArray(new String[0]), (dialog, which) -> {
             if (which == 0) {
                 setFavorite(item, !favorite);
@@ -656,6 +687,11 @@ public final class MainActivity extends Activity {
                 adapter.notifyDataSetChanged();
             } else if (which == 2) showDetails(item);
             else if ("履歴から削除".equals(actions.get(which))) { AppState.removeRecent(this, item.uri); loadSavedItems(); }
+            else if ("表紙を初期状態に戻す".equals(actions.get(which))) {
+                AppState.removeCover(this, item.uri);
+                thumbnails.evictAll();
+                adapter.notifyDataSetChanged();
+            }
             else { AppState.clearBookmarks(this, item.uri); if (mode == MODE_BOOKMARKS) loadSavedItems(); else adapter.notifyDataSetChanged(); }
         }));
     }
@@ -774,6 +810,26 @@ public final class MainActivity extends Activity {
             if (item.directory) { view.setImageResource(R.drawable.ic_folder); return; }
             formatMark.setText(item.kind);
             formatMark.setVisibility(View.VISIBLE);
+            java.io.File customCover = AppState.coverFile(MainActivity.this, item.uri);
+            if (customCover.isFile()) {
+                view.setImageResource(R.drawable.ic_archive);
+                String key = "cover:" + item.uri;
+                Bitmap cached = thumbnails.get(key);
+                if (cached != null) { view.setScaleType(ImageView.ScaleType.CENTER_CROP); view.setImageBitmap(cached); return; }
+                thumbnailWorker.execute(() -> {
+                    Bitmap bitmap = BitmapFactory.decodeFile(customCover.getAbsolutePath());
+                    if (bitmap == null) return;
+                    runOnUiThread(() -> {
+                        if (isFinishing()) return;
+                        thumbnails.put(key, bitmap);
+                        if (item.uri.toString().equals(view.getTag())) {
+                            view.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                            view.setImageBitmap(bitmap);
+                        }
+                    });
+                });
+                return;
+            }
             if (!ComicFile.isImage(item.name, item.mime)) { view.setImageResource(R.drawable.ic_archive); return; }
             view.setImageResource(R.drawable.ic_image_file);
             String key = item.uri.toString();

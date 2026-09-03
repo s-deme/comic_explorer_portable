@@ -223,6 +223,7 @@ public final class Ui {
     public static void styleTopTab(Button view, boolean selected) {
         view.setAllCaps(false);
         view.setTextSize(12);
+        view.setAutoSizeTextTypeUniformWithConfiguration(10, 12, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         view.setGravity(Gravity.CENTER);
         view.setMinHeight(dp(view.getContext(), 48));
         view.setPadding(dp(view.getContext(), 2), 0, dp(view.getContext(), 2), 0);
