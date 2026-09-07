@@ -60,13 +60,14 @@ public final class ComicFile {
                 int rightStart = rightIndex;
                 while (leftIndex < left.length() && Character.isDigit(left.charAt(leftIndex))) leftIndex++;
                 while (rightIndex < right.length() && Character.isDigit(right.charAt(rightIndex))) rightIndex++;
+                String leftDigits = left.substring(leftStart, leftIndex);
+                String rightDigits = right.substring(rightStart, rightIndex);
                 try {
-                    long leftNumber = Long.parseLong(left.substring(leftStart, leftIndex));
-                    long rightNumber = Long.parseLong(right.substring(rightStart, rightIndex));
+                    long leftNumber = Long.parseLong(leftDigits);
+                    long rightNumber = Long.parseLong(rightDigits);
                     if (leftNumber != rightNumber) return leftNumber < rightNumber ? -1 : 1;
                 } catch (NumberFormatException ignored) {
-                    int difference = left.substring(leftStart, leftIndex)
-                            .compareToIgnoreCase(right.substring(rightStart, rightIndex));
+                    int difference = leftDigits.compareToIgnoreCase(rightDigits);
                     if (difference != 0) return difference;
                 }
             } else {
