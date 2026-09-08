@@ -1,106 +1,52 @@
 # Comic Explorer for Android
 
-広告・課金・アカウント・ネットワーク機能を持たない、Android向けのローカル漫画ビューワです。
+端末に保存した漫画やPDFを読む、Android向けのローカル漫画ビューワです。画像をまとめたZIP / CBZや画像フォルダを開き、続きのページ、しおり、お気に入りを端末内に保存できます。
+
+広告・課金・アカウント登録はなく、アプリ自身のネットワーク通信もありません。
+
+## 対応環境と形式
+
+Android 10（API 29）以降に対応しています。
+
+| 形式 | 読み方・制限 |
+| --- | --- |
+| PDF | ページを切り替えて閲覧 |
+| ZIP / CBZ | アーカイブ内の画像を閲覧。ファイル名の文字コードはUTF-8 / Shift_JISを選択可能 |
+| 画像・画像フォルダ | JPG / JPEG、PNG、GIF、BMP、WebPに対応。フォルダ内の画像を続けて閲覧可能 |
+| AVIF | 端末のAndroid画像デコーダーが対応する場合に表示 |
+
+GIFは静止画像として表示します。AVIFの対応はOSと端末に依存し、特にAndroid 10 / 11では表示を保証しません。
+
+## インストール
+
+1. Android端末で [Releases](https://github.com/s-deme/comic_explorer_portable/releases/latest) を開き、APKをダウンロードします。
+2. ダウンロードしたAPKを開き、Androidの案内に従ってインストールします。
+3. アプリ一覧から「Comic Explorer」を起動します。
 
 このリポジトリはAndroid版です。Windowsデスクトップ版の `comic_explorer` とは、配布物、対応形式、保存方式が異なります。
 
-APKは[Releases](https://github.com/s-deme/comic_explorer_portable/releases/latest)からダウンロードできます。
+## 最初の操作
 
-- SAF（システムのフォルダ選択）で選んだフォルダだけを読む
-- PDF、ZIP / CBZ、画像フォルダを閲覧
-- JPG、PNG、GIF、BMP、WebPを表示。AVIFは端末のAndroid画像デコーダーが対応する場合に表示
-- 単一画像・PDF・CBZのページ位置・しおり・お気に入りを端末内に保存
-- ComicScreen風の暗色UI、ストレージ／ディレクトリ／履歴／しおりタブ、お気に入り、リスト／2〜4列グリッド表示
-- 検索、最大100件の詳細な読書履歴、期間指定消去、並べ替え、画像サムネイル、外部アプリの「開く」連携
-- 単ページ／見開き、横／縦スワイプ、ピンチ／設定可能なダブルタップズーム、ページスライダー、全画面、自動送り
-- 読書方向、4種の表示フィット、明るさ、色反転、5種の画像フィルター、回転、音量キー操作を設定
-- しおり一覧とメモ、サイズ／透明度を変えられる画面上ページボタン、UTF-8／Shift_JISのZIPファイル名
+1. 「フォルダを選ぶ」を押し、Androidのフォルダ選択画面で漫画の入ったフォルダへのアクセスを許可します。
+2. 一覧からPDFやZIP / CBZをタップして開きます。画像フォルダは中へ移動して画像をタップすると、同じ一覧の画像を続けて読めます。
+3. 左右のタップやスワイプでページを移動し、中央をタップして読書メニューを表示します。ページ番号やスライダーからも移動できます。
+4. 読書メニューでページ送り方向や見開きを調整し、残しておきたいページにはしおりを追加します。次回は「履歴」や「しおり」から作品を探せます。
 
-対応OSは Android 10（API 29）以降です。
+作品の長押しでお気に入りに追加できます。よく使うフォルダは長押しして「ディレクトリに登録」すると、「ディレクトリ」タブから開けます。ほかのアプリの「開く」から対応ファイルを渡すこともできます。
 
-AVIFのデコード可否はOSと端末実装に依存し、特にAndroid 10 / 11では対応を保証しません。GIFは静止画像として表示し、アニメーション再生は行いません。
+## 主な機能
 
-RAR / CBR、7z、SMB / FTP、Google Drive同期、ファイル削除・移動、広告、課金、分析・通知SDKは実装していません。
+- **作品を探す**：暗色の画面、ストレージ／ディレクトリ／履歴／しおりタブ、お気に入り、検索、名前・更新日時・サイズでの並べ替え、画像サムネイル、リスト／2〜4列グリッド表示。
+- **続きを読む**：ページ位置の保存、最大100件の読書履歴、履歴の期間指定消去、しおり一覧とメモ。
+- **ページを送る**：単ページ／見開き／横画面で自動見開き、横／縦スワイプ、左右の読書方向、全画面、自動送り、音量キー操作。
+- **拡大して読む**：ピンチ操作、動作と倍率を選べるダブルタップ、画面・幅・高さに合わせる表示と画面いっぱいへの伸縮。
+- **表示を調整する**：明るさ、色反転、グレースケール・自動コントラスト・セピア・ブルーライト軽減（フィルターなしも選択可能）、回転、画面上ページボタンのサイズと透明度。
 
-改善項目と実装状況は [PRODUCT_IMPROVEMENTS.md](PRODUCT_IMPROVEMENTS.md) を参照してください。
+## 利用上の制限
 
-## 実装済みと検証済みの区別
+- 読み取り対象は、Androidの選択画面で許可したフォルダ・ファイル、または外部アプリから渡されたファイルです。アクセス許可が失われた場合はフォルダを選び直してください。
+- RAR / CBR、7z、SMB / FTP接続、Google Drive同期には対応していません。
+- 元の作品ファイルを削除・移動する機能はありません。履歴やお気に入りの解除は作品ファイルの削除ではありません。
+- 読書データは端末内に保存します。端末間の同期機能、分析・通知SDKはありません。
 
-`PRODUCT_IMPROVEMENTS.md` のチェックは、対応する実装がソースに存在することを示します。[`VISUAL_ACCESSIBILITY_AUDIT.md`](VISUAL_ACCESSIBILITY_AUDIT.md) はスタイルと画面構成の設計監査です。どちらも、すべてのAndroid端末での実操作、形式別デコード、TalkBack、画面回転、メモリ負荷を自動的に検証したことまでは意味しません。
-
-`build.ps1` が自動確認する範囲は、Gradleコンパイル、APK署名、不要なAndroid権限がないことです。Release判定では、別途、実端末またはエミュレーターのOS/API、端末名、確認日、対象APKを記録してください。
-
-## Android Studioで動かす
-
-このリポジトリは標準のGradle Androidプロジェクトです。Android Studioでこのフォルダを開き、Gradle同期の完了後に実行構成`app`と起動済みのエミュレーターを選んで、上部の`▶ Run`を押します。ビルド、インストール、起動がまとめて実行されます。
-
-PowerShellから同じDebug版をエミュレーターへ入れる場合は、エミュレーターを起動してから次を実行します。
-
-```powershell
-.\gradlew.bat installDebug
-```
-
-## APKを作る
-
-Android SDK（platforms/android-35 と build-tools/36.0.0）および JDK 21を用意して実行します。Android Studioからの`▶ Run`、またはGradle WrapperでDebug版をビルドできます。配布用APKを既定の`dist`へコピーし、署名と権限も確認する場合は次を実行します。
-
-```powershell
-./build.ps1 -Configuration Debug
-```
-
-出力先は既定で `dist/comic-explorer.apk` です。`-OutputPath`で変更できます。Debugビルドでは、初回だけローカル署名用のデバッグキーストアをプロジェクト直下（Git管理外）に生成します。
-
-Releaseビルドは固定された署名鍵を必要とし、次の環境変数が不足している場合はデバッグ鍵へフォールバックせず失敗します。
-
-- `ANDROID_KEYSTORE_PATH`
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_ALIAS`
-- `ANDROID_KEY_PASSWORD`
-
-ビルド後はAPK署名と、不要なAndroid権限が含まれていないことを自動検証します。
-
-### 手動確認の最小項目
-
-- Android 10と、現在サポートする新しいAndroid版で起動できる
-- SAFで選択した範囲だけを参照し、許可の再起動後保持と失効時表示が正しい
-- JPG、PNG、GIF、BMP、WebP、PDF、ZIP / CBZを開ける
-- AVIF対応端末ではAVIFを開け、非対応端末では復帰可能なエラーになる
-- ページ位置、しおり、お気に入り、最近開いた作品が再起動後も復元される
-- TalkBack、文字拡大、縦横画面、明暗の異なる表示条件で主要操作へ到達できる
-
-## CIと自動Release
-
-GitHub Actionsは用途を分離しています。
-
-- `main`へのpushとPull Request: Debug APKをビルド・検証し、コミットSHAを含むWorkflow Artifactとして14日間保存します。正式Releaseは作成しません。
-- `v*`タグのpush: 固定鍵で署名したAPKをビルドし、APKとSHA-256ファイルを新しい正式Releaseへ添付します。
-
-Release処理は、`gradle.properties` の `comicExplorerVersionName` とタグが一致しない場合、`comicExplorerVersionCode`が正の整数でない場合、同じタグのReleaseが存在する場合、または署名設定が不足している場合に失敗します。既存のReleaseやタグは上書きしません。
-
-### GitHub Secrets
-
-リポジトリの `Settings` → `Secrets and variables` → `Actions` に次を登録します。
-
-- `ANDROID_KEYSTORE_BASE64`: リリース用keystoreをBase64化した内容
-- `ANDROID_KEYSTORE_PASSWORD`: keystoreのパスワード
-- `ANDROID_KEY_ALIAS`: 署名鍵のエイリアス
-- `ANDROID_KEY_PASSWORD`: 署名鍵のパスワード
-
-Base64は暗号化ではありません。値やkeystoreをリポジトリ、Issue、ログへ保存せず、GitHub Secretとして登録してください。GitHub上のSecretとは別に、keystoreと復旧情報を安全なオフライン領域へバックアップしてください。署名鍵を失うと、既に配布したAPKを同じアプリとして更新できません。既存ユーザーへ更新を配布する場合は、現在公開中のAPKと同じ鍵を使用する必要があります。
-
-### v1.1.3を公開する例
-
-まず `gradle.properties` の `comicExplorerVersionName` を `1.1.3`、`comicExplorerVersionCode`を以前より大きい整数へ更新し、通常の変更として検証・commit・pushします。その後にタグを作成します。
-
-```powershell
-git switch main
-git pull --ff-only
-./build.ps1 -Configuration Debug
-git add gradle.properties
-git commit -m "Prepare v1.1.3"
-git push origin main
-git tag -a v1.1.3 -m "Comic Explorer v1.1.3"
-git push origin v1.1.3
-```
-
-最後のタグpushによってReleaseワークフローが起動します。既存の `v1.1.1` / `v1.1.2` タグは移動させません。
+ビルド、署名、CI、リリース、検証範囲については [開発者向け手順](DEVELOPMENT.md) を参照してください。
