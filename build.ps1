@@ -62,7 +62,10 @@ foreach ($tool in @($apksigner, $aapt2)) {
 if ($LASTEXITCODE -ne 0) { throw 'APK署名の検証に失敗しました。' }
 $permissionOutput = & $aapt2 dump permissions $outputApk 2>&1
 if ($LASTEXITCODE -ne 0) { throw 'APK権限の検査に失敗しました。' }
-$unexpectedPermissions = @($permissionOutput | Where-Object { $_ -match '^uses-permission' })
+$allowedPermissions = @('android.permission.INTERNET', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.READ_MEDIA_IMAGES')
+$unexpectedPermissions = @($permissionOutput | Where-Object {
+    $_ -match "^uses-permission: name='([^']+)'" -and $Matches[1] -notin $allowedPermissions
+})
 if ($unexpectedPermissions.Count -gt 0) {
     throw "Unexpected Android permissions were found: $($unexpectedPermissions -join ', ')"
 }

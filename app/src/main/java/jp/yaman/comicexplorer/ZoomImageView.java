@@ -40,7 +40,7 @@ public final class ZoomImageView extends ImageView {
         setScaleType(ScaleType.MATRIX);
         setBackgroundColor(0xFF101114);
         setFocusable(true);
-        setContentDescription("作品ページ。左右へスワイプまたは左右をタップしてページを移動。中央タップでメニューを表示。");
+        setContentDescription(I18n.t(R.string.ui_book_page_swipe_or_tap_the_sides_to_turn_pages));
         scaleDetector = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override public boolean onScale(ScaleGestureDetector detector) {
                 float next = Math.max(1f, Math.min(5f, relativeScale * detector.getScaleFactor()));
@@ -59,10 +59,13 @@ public final class ZoomImageView extends ImageView {
 
             @Override public boolean onDoubleTap(MotionEvent event) {
                 if (doubleTapMode == AppState.DOUBLE_TAP_OFF) return true;
-                if (doubleTapMode == AppState.DOUBLE_TAP_FIT || doubleTapMode == AppState.DOUBLE_TAP_TOGGLE && relativeScale > 1.05f) fitImage();
+                android.graphics.RectF bounds = new android.graphics.RectF();
+                if (getDrawable() != null) { bounds.set(0, 0, getDrawable().getIntrinsicWidth(), getDrawable().getIntrinsicHeight()); matrix.mapRect(bounds); }
+                if (doubleTapMode == AppState.DOUBLE_TAP_FIT || doubleTapMode == AppState.DOUBLE_TAP_TOGGLE && !bounds.contains(event.getX(), event.getY())) fitImage();
                 else if (doubleTapMode == AppState.DOUBLE_TAP_TOGGLE || relativeScale <= 1.05f) {
+                    float factor = doubleTapScale / relativeScale;
                     relativeScale = doubleTapScale;
-                    matrix.postScale(relativeScale, relativeScale, event.getX(), event.getY());
+                    matrix.postScale(factor, factor, event.getX(), event.getY());
                     setImageMatrix(matrix);
                 }
                 return true;
@@ -87,7 +90,7 @@ public final class ZoomImageView extends ImageView {
 
     public void setInteractionListener(InteractionListener value) { listener = value; }
     public void setFitMode(int mode) { fitMode = mode; fitImage(); }
-    public void setDoubleTapScale(float scale) { doubleTapScale = Math.max(1.5f, Math.min(4f, scale)); }
+    public void setDoubleTapScale(float scale) { doubleTapScale = Math.max(1f, Math.min(6f, scale)); }
     public void setDoubleTapMode(int mode) { doubleTapMode = mode; }
     public void setVerticalPaging(boolean enabled) { verticalPaging = enabled; }
     public void setFilterMode(int mode) { filterMode = mode; applyColorFilter(); }

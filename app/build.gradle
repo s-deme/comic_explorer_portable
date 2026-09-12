@@ -2,6 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
+dependencies {
+    implementation 'com.hierynomus:smbj:0.13.0'
+    implementation 'commons-net:commons-net:3.13.0'
+    implementation 'com.google.android.gms:play-services-auth:22.0.0'
+}
+
 def releaseSigning = [
         keystorePath: System.getenv('ANDROID_KEYSTORE_PATH'),
         storePassword: System.getenv('ANDROID_KEYSTORE_PASSWORD'),
@@ -21,6 +27,7 @@ android {
         applicationId 'jp.yaman.comicexplorer'
         minSdk 29
         targetSdk 35
+        testInstrumentationRunner 'jp.yaman.comicexplorer.ParityInstrumentation'
         versionCode providers.gradleProperty('comicExplorerVersionCode').get().toInteger()
         versionName providers.gradleProperty('comicExplorerVersionName').get()
     }
@@ -37,11 +44,19 @@ android {
     }
 
     buildTypes {
+        debug {
+            if (providers.gradleProperty('comicExplorerValidation').orNull == 'true') applicationIdSuffix '.validation'
+        }
         release {
             signingConfig signingConfigs.release
             minifyEnabled false
         }
     }
+    bundle { language { enableSplit = false } }
+    packagingOptions { resources {
+        excludes += ['META-INF/INDEX.LIST', 'META-INF/DEPENDENCIES']
+        merges += ['META-INF/LICENSE*', 'META-INF/NOTICE*']
+    } }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8

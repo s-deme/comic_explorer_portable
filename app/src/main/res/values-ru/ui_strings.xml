@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_opacity" formatted="false">"Прозрачность"</string>
+    <string name="ui_create_folder" formatted="false">"Создать папку"</string>
+    <string name="ui_expands_the_image_area_to_punch_holes" formatted="false">"Expands the image area to punch holes"</string>
+    <string name="ui_double_tap_zoom" formatted="false">"Масштаб по двойному тапу"</string>
+    <string name="ui_language" formatted="false">"Language"</string>
+    <string name="ui_clear_thumbnails" formatted="false">"Очистить миниатюры"</string>
+    <string name="ui_add_to_favorites" formatted="false">"Добавить в избранное"</string>
+    <string name="ui_settings" formatted="false">"НАСТРОЙКИ"</string>
+    <string name="ui_page_dividing_line_dual_pages" formatted="false">"Разделительная линия - двухстраничный режим"</string>
+    <string name="ui_path" formatted="false">"Путь"</string>
+    <string name="ui_gallery_search_type" formatted="false">"Способ поиска медиафайлов"</string>
+    <string name="ui_edit" formatted="false">"Править"</string>
+    <string name="ui_favorites" formatted="false">"Избранное"</string>
+    <string name="ui_left" formatted="false">"Справа налево"</string>
+    <string name="ui_scroll_animation" formatted="false">"анимация прокрутки"</string>
+    <string name="ui_open_the_last_compressed_file" formatted="false">"Открыть последний архив"</string>
+    <string name="ui_background_color" formatted="false">"Цвет фона"</string>
+    <string name="ui_columns" formatted="false">"Столбцы"</string>
+    <string name="ui_right_vertical" formatted="false">"направо + Вниз."</string>
+    <string name="ui_zoom" formatted="false">"Zoom"</string>
+    <string name="ui_name" formatted="false">"Название"</string>
+    <string name="ui_zoom_inside_fit_screen_outside" formatted="false">"Zoom(по изобр.) + Fit Screen(по фону)"</string>
+    <string name="ui_fit_height" formatted="false">"Подогнать по высоте"</string>
+    <string name="ui_delete_item" formatted="false">"Удаление"</string>
+    <string name="ui_scroll_length_vertical" formatted="false">"длина прокрутки(Вниз.)"</string>
+    <string name="ui_right" formatted="false">"Слева направо"</string>
+    <string name="ui_default" formatted="false">"По умолчанию"</string>
+    <string name="ui_reverse" formatted="false">"Поменять\n      местами"</string>
+    <string name="ui_refresh" formatted="false">"Обновить"</string>
+    <string name="ui_thumbnails" formatted="false">"Миниатюры"</string>
+    <string name="ui_square" formatted="false">"Квадратные"</string>
+    <string name="ui_reset_all_settings_2" formatted="false">"Сбросить все настройки"</string>
+    <string name="ui_page_dividing_line_scroll_pages" formatted="false">"Разделительная линия - свиток страницы"</string>
+    <string name="ui_open" formatted="false">"Открыть"</string>
+    <string name="ui_show_folder_path" formatted="false">"Показывать полный путь"</string>
+    <string name="ui_page_spacing" formatted="false">"страница интервал"</string>
+    <string name="ui_file_explorer" formatted="false">"Файловый проводник"</string>
+    <string name="ui_image_fit_to_screen" formatted="false">"Подогнать изображение под экран"</string>
+    <string name="ui_size" formatted="false">"Размер"</string>
+    <string name="ui_delete_all_bookmarks" formatted="false">"Удалить все закладки?"</string>
+    <string name="ui_list_type" formatted="false">"Режим просмотра"</string>
+    <string name="ui_show_statusbar" formatted="false">"Показывать строку состояния"</string>
+    <string name="ui_crop" formatted="false">"Обрезать"</string>
+    <string name="ui_filter" formatted="false">"Фильтры"</string>
+    <string name="ui_show_filename" formatted="false">"Имена файлов"</string>
+    <string name="ui_sync_resume_page_beta" formatted="false">"Синхронизация Продолжить чтение (beta)"</string>
+    <string name="ui_punch_hole_display_portrait" formatted="false">"Punch hole display - portrait"</string>
+    <string name="ui_enable" formatted="false">"Использовать"</string>
+    <string name="ui_ask" formatted="false">"Спросить"</string>
+    <string name="ui_invert_color" formatted="false">"Инвертировать цвета"</string>
+    <string name="ui_hardware_key" formatted="false">"Кнопки устройства"</string>
+    <string name="ui_next_page" formatted="false">"Следующая страница"</string>
+    <string name="ui_quick_view_floating_button" formatted="false">"Показывать плавающую кнопку"</string>
+    <string name="ui_set_zip_file_cache_retention_period" formatted="false">"Установить срок хранения кэша архивов"</string>
+    <string name="ui_reset_settings" formatted="false">"Сброс настроек"</string>
+    <string name="ui_sharpen_filter" formatted="false">"Резкость"</string>
+    <string name="ui_clear_all_cache" formatted="false">"Сброс всего кэша"</string>
+    <string name="ui_previous_page" formatted="false">"Предыдущая страница"</string>
+    <string name="ui_select_whether_to_use_the_resume_page" formatted="false">"Выберите, использовать ли страницу Продолжить чтение"</string>
+    <string name="ui_none" formatted="false">"нет"</string>
+    <string name="ui_brightness" formatted="false">"Яркость"</string>
+    <string name="ui_margin_cropping" formatted="false">"Обрезка полей"</string>
+    <string name="ui_history" formatted="false">"История"</string>
+    <string name="ui_delete_all_histories" formatted="false">"Удалить все История?"</string>
+    <string name="ui_fit_screen_2" formatted="false">"Вписать в экран"</string>
+    <string name="ui_about" formatted="false">"О программе"</string>
+    <string name="ui_display_the_file_list_scrollbar_on_the_left_side" formatted="false">"Отображать полосу прокрутки списка файлов слева"</string>
+    <string name="ui_sync_your_resume_page_using_google_drive" formatted="false">"Ваша страница Продолжить чтение синхронизируется с использованием Google Drive"</string>
+    <string name="ui_clear_bookmarks" formatted="false">"Удалить закладки"</string>
+    <string name="ui_save" formatted="false">"Сохранить"</string>
+    <string name="ui_show_a_dividing_line_between_scroll_pages" formatted="false">"Показывать разделительную линию между страницами в свитке"</string>
+    <string name="ui_encoding" formatted="false">"Кодировка"</string>
+    <string name="ui_clear_all_bookmarks" formatted="false">"Удаление всех закладок"</string>
+    <string name="ui_all" formatted="false">"Всю"</string>
+    <string name="ui_cancel" formatted="false">"Отмена"</string>
+    <string name="ui_storage" formatted="false">"Хранилище"</string>
+    <string name="ui_directory" formatted="false">"Файлы"</string>
+    <string name="ui_keep_screen_on" formatted="false">"Не выключать экран"</string>
+    <string name="ui_full_screen" formatted="false">"Полный экран"</string>
+    <string name="ui_icon" formatted="false">"Иконки"</string>
+    <string name="ui_left_vertical" formatted="false">"налево + Вниз."</string>
+    <string name="ui_open_the_next_file" formatted="false">"открыть следующий файл"</string>
+    <string name="ui_show_a_dividing_line_between_dual_pages" formatted="false">"Показывать разделительную линию между двумя страницами"</string>
+    <string name="ui_upscaling" formatted="false">"Upscaling"</string>
+    <string name="ui_grid" formatted="false">"Таблица"</string>
+    <string name="ui_resume_page" formatted="false">"Продолжить чтение"</string>
+    <string name="ui_fixed" formatted="false">"Фиксировать"</string>
+    <string name="ui_page_button_area" formatted="false">"область кнопки страницы"</string>
+    <string name="ui_passwd" formatted="false">"Пароль"</string>
+    <string name="ui_clear_all_histories" formatted="false">"Удаление всей истории"</string>
+    <string name="ui_userid" formatted="false">"Логин"</string>
+    <string name="ui_gallery" formatted="false">"Галерея"</string>
+    <string name="ui_ok" formatted="false">"OK"</string>
+    <string name="ui_move" formatted="false">"Перемещение"</string>
+    <string name="ui_clear_resume_cache" formatted="false">"Очистить состояние прочтения"</string>
+    <string name="ui_left_scrollbar" formatted="false">"Левая полоса прокрутки"</string>
+    <string name="ui_clear_history_2" formatted="false">"Очистить Историю"</string>
+    <string name="ui_add_bookmark" formatted="false">"Добавить закладку"</string>
+    <string name="ui_theme" formatted="false">"Тема"</string>
+    <string name="ui_delete" formatted="false">"Удалить"</string>
+    <string name="ui_first_page_2" formatted="false">"Первая стр."</string>
+    <string name="ui_punch_hole_display_landscape" formatted="false">"Punch hole display - landscape"</string>
+    <string name="ui_set_thumbnails_storage" formatted="false">"Размер кэша миниатюр"</string>
+    <string name="ui_background" formatted="false">"Фон"</string>
+    <string name="ui_close" formatted="false">"Закрыть"</string>
+    <string name="ui_scale" formatted="false">"Увел."</string>
+    <string name="ui_fit_width" formatted="false">"Подогнать по ширине"</string>
+</resources>

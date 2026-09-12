@@ -42,9 +42,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Product-facing local library: folder browsing, filtering, favorite and recent views. */
-public final class MainActivity extends Activity {
+public final class MainActivity extends BaseActivity {
     private static final int REQUEST_TREE = 41;
     private static final int REQUEST_FILE = 42;
+    private static final int REQUEST_MOVE = 43;
     private static final int MODE_LIBRARY = 0;
     private static final int MODE_FAVORITES = 1;
     private static final int MODE_RECENTS = 2;
@@ -93,6 +94,9 @@ public final class MainActivity extends Activity {
     private ListView listView;
     private GridView gridView;
     private LibraryAdapter adapter;
+    private Button quickView;
+    private LibraryEntry moving;
+    private float swipeX, swipeY;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -110,9 +114,12 @@ public final class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        ReadingSync.authorize(this, false);
         boolean savedGrid = AppState.gridView(this);
         if (savedGrid != gridMode) gridMode = savedGrid;
         updateCollectionView();
+        getWindow().setFlags(AppState.enabled(this, "list_statusbar", true) ? 0 : android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN, android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if (quickView != null) quickView.setVisibility(AppState.enabled(this, "quick_view", true) && !AppState.recents(this).isEmpty() ? View.VISIBLE : View.GONE);
         Uri saved = AppState.getTree(this);
         if (saved == null && treeUri != null) {
             treeUri = null;
@@ -138,7 +145,7 @@ public final class MainActivity extends Activity {
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
         toolbar.setPadding(dp(4), 0, dp(4), 0);
         toolbar.setBackgroundColor(Ui.TOOLBAR);
-        upButton = toolbarButton(R.drawable.ic_arrow_back, "親フォルダへ");
+        upButton = toolbarButton(R.drawable.ic_arrow_back, I18n.t(R.string.ui_parent_folder));
         upButton.setOnClickListener(view -> goUp());
         toolbar.addView(upButton, new LinearLayout.LayoutParams(dp(48), dp(56)));
         screenTitle = text("Comic Explorer", 20, Ui.TOOLBAR_TEXT);
@@ -148,10 +155,10 @@ public final class MainActivity extends Activity {
         screenTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         screenTitle.setPadding(dp(8), 0, dp(8), 0);
         toolbar.addView(screenTitle, new LinearLayout.LayoutParams(0, dp(56), 1f));
-        searchButton = toolbarButton(R.drawable.ic_toolbar_search, "検索を表示");
+        searchButton = toolbarButton(R.drawable.ic_toolbar_search, I18n.t(R.string.ui_show_search));
         searchButton.setOnClickListener(view -> toggleSearchPanel());
         toolbar.addView(searchButton, new LinearLayout.LayoutParams(dp(48), dp(56)));
-        ImageButton menu = toolbarButton(R.drawable.ic_toolbar_more, "メニューを開く");
+        ImageButton menu = toolbarButton(R.drawable.ic_toolbar_more, I18n.t(R.string.ui_open_menu));
         menu.setOnClickListener(view -> showAppMenu());
         toolbar.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(56)));
         root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
@@ -159,10 +166,10 @@ public final class MainActivity extends Activity {
         LinearLayout tabs = new LinearLayout(this);
         tabs.setGravity(Gravity.CENTER_VERTICAL);
         tabs.setBackgroundColor(Ui.DARK_SURFACE);
-        libraryDestination = tabButton("ストレージ", MODE_LIBRARY, "ストレージを表示");
-        directoriesDestination = tabButton("ディレクトリ", MODE_DIRECTORIES, "登録したディレクトリを表示");
-        recentsDestination = tabButton("履歴", MODE_RECENTS, "読書履歴を表示");
-        bookmarksDestination = tabButton("しおり", MODE_BOOKMARKS, "しおりのある作品を表示");
+        libraryDestination = tabButton(I18n.t(R.string.ui_storage), MODE_LIBRARY, I18n.t(R.string.ui_show_storage));
+        directoriesDestination = tabButton(I18n.t(R.string.ui_directory), MODE_DIRECTORIES, I18n.t(R.string.ui_show_saved_directories));
+        recentsDestination = tabButton(I18n.t(R.string.ui_history), MODE_RECENTS, I18n.t(R.string.ui_show_reading_history));
+        bookmarksDestination = tabButton(I18n.t(R.string.ui_add_bookmark), MODE_BOOKMARKS, I18n.t(R.string.ui_show_bookmarked_books));
         tabs.addView(libraryDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         tabs.addView(directoriesDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         tabs.addView(recentsDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
@@ -171,8 +178,8 @@ public final class MainActivity extends Activity {
 
         search = new EditText(this);
         search.setSingleLine(true);
-        search.setHint("ファイル名を検索");
-        search.setContentDescription("ライブラリを検索");
+        search.setHint(I18n.t(R.string.ui_search_file_names));
+        search.setContentDescription(I18n.t(R.string.ui_search_library));
         Ui.styleDarkSearch(search);
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) { }
@@ -212,7 +219,7 @@ public final class MainActivity extends Activity {
         listView.setDivider(new android.graphics.drawable.ColorDrawable(Ui.DARK_OUTLINE));
         listView.setDividerHeight(dp(1));
         listView.setBackgroundColor(Ui.DARK_BACKGROUND);
-        listView.setContentDescription("作品一覧");
+        listView.setContentDescription(I18n.t(R.string.ui_books));
         // Keep row-level tap and long-press handling available when a row has a star control.
         listView.setItemsCanFocus(false);
         adapter = new LibraryAdapter();
@@ -230,7 +237,7 @@ public final class MainActivity extends Activity {
         gridView.setClipToPadding(false);
         gridView.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
         gridView.setBackgroundColor(Ui.DARK_BACKGROUND);
-        gridView.setContentDescription("作品のサムネイル一覧");
+        gridView.setContentDescription(I18n.t(R.string.ui_book_thumbnails));
         gridView.setAdapter(adapter);
         gridView.setOnItemClickListener((parent, view, position, id) -> open(visibleRows.get(position)));
         gridView.setOnItemLongClickListener((parent, view, position, id) -> {
@@ -241,6 +248,14 @@ public final class MainActivity extends Activity {
         content.setBackgroundColor(Ui.DARK_BACKGROUND);
         content.addView(listView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         content.addView(gridView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        quickView = Ui.button(this, "▶", Ui.ButtonStyle.DARK_PRIMARY);
+        quickView.setContentDescription(I18n.t(R.string.ui_open_last_book));
+        quickView.setOnClickListener(v -> {
+            List<AppState.SavedItem> recents = AppState.recents(this);
+            if (!recents.isEmpty()) { AppState.SavedItem last = recents.get(0); open(new LibraryEntry(last.uri, last.title, null, last.kind, false, 0, last.timestamp), false); }
+        });
+        FrameLayout.LayoutParams quickParams = new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.BOTTOM | Gravity.END);
+        quickParams.setMargins(dp(16), dp(16), dp(16), dp(16)); content.addView(quickView, quickParams);
         emptyPanel = createEmptyPanel();
         content.addView(emptyPanel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
         root.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -248,13 +263,13 @@ public final class MainActivity extends Activity {
         LinearLayout navigation = new LinearLayout(this);
         navigation.setGravity(Gravity.CENTER_VERTICAL);
         navigation.setBackgroundColor(Ui.DARK_SURFACE_RAISED);
-        Button actionsButton = navigationAction("操作", "現在の一覧の操作", R.drawable.ic_nav_folder);
+        Button actionsButton = navigationAction(I18n.t(R.string.ui_actions), I18n.t(R.string.ui_actions_for_this_list), R.drawable.ic_nav_folder);
         actionsButton.setOnClickListener(view -> showListActions());
-        Button recentButton = navigationAction("履歴", "読書履歴を表示", R.drawable.ic_nav_history);
+        Button recentButton = navigationAction(I18n.t(R.string.ui_history), I18n.t(R.string.ui_show_reading_history), R.drawable.ic_nav_history);
         recentButton.setOnClickListener(view -> selectMode(MODE_RECENTS));
-        viewButton = navigationAction(gridMode ? "リスト" : "グリッド", "一覧の表示形式を切り替え", R.drawable.ic_image_file);
+        viewButton = navigationAction(gridMode ? I18n.t(R.string.ui_list) : I18n.t(R.string.ui_grid), I18n.t(R.string.ui_change_list_type), R.drawable.ic_image_file);
         viewButton.setOnClickListener(view -> toggleCollectionView());
-        sortButton = navigationAction("並び順", "並び順を変更", R.drawable.ic_nav_sort);
+        sortButton = navigationAction(I18n.t(R.string.ui_sort), I18n.t(R.string.ui_change_sort_order), R.drawable.ic_nav_sort);
         sortButton.setOnClickListener(view -> chooseSort());
         navigation.addView(actionsButton, new LinearLayout.LayoutParams(0, dp(58), 1f));
         navigation.addView(recentButton, new LinearLayout.LayoutParams(0, dp(58), 1f));
@@ -316,7 +331,7 @@ public final class MainActivity extends Activity {
         emptyMessage.setGravity(Gravity.CENTER);
         emptyMessage.setLineSpacing(0, 1.08f);
         panel.addView(emptyMessage);
-        emptyAction = Ui.button(this, "フォルダを選ぶ", Ui.ButtonStyle.PRIMARY);
+        emptyAction = Ui.button(this, I18n.t(R.string.ui_choose_folder), Ui.ButtonStyle.PRIMARY);
         emptyAction.setOnClickListener(view -> chooseFolder());
         LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
         actionParams.setMargins(0, dp(16), 0, 0);
@@ -327,7 +342,7 @@ public final class MainActivity extends Activity {
 
     private void chooseFolder() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(intent, REQUEST_TREE);
     }
 
@@ -343,6 +358,19 @@ public final class MainActivity extends Activity {
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (requestCode == REQUEST_MOVE && moving != null) {
+            Uri target = data.getData(); LibraryEntry item = moving; moving = null;
+            fileOperation(() -> {
+                DocumentsContract.Path documentPath = DocumentsContract.findDocumentPath(getContentResolver(), item.uri);
+                if (documentPath == null || documentPath.getPath().size() < 2) throw new java.io.IOException(I18n.t(R.string.ui_cannot_move));
+                java.util.List<String> ancestors = documentPath.getPath();
+                Uri parent = DocumentsContract.buildDocumentUriUsingTree(item.uri, ancestors.get(ancestors.size() - 2));
+                Uri targetDocument = DocumentsContract.buildDocumentUriUsingTree(target, DocumentsContract.getTreeDocumentId(target));
+                Uri moved = DocumentsContract.moveDocument(getContentResolver(), item.uri, parent, targetDocument);
+                if (moved == null) throw new java.io.IOException(I18n.t(R.string.ui_cannot_move));
+                AppState.relocate(this, item.uri, moved, item.name);
+            }); return;
+        }
         if (requestCode == REQUEST_FILE) {
             Uri uri = data.getData();
             try { getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignored) { }
@@ -351,7 +379,9 @@ public final class MainActivity extends Activity {
         }
         if (requestCode != REQUEST_TREE) return;
         treeUri = data.getData();
-        try { getContentResolver().takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignored) { }
+        int permission = Intent.FLAG_GRANT_READ_URI_PERMISSION;
+        if ((data.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) permission |= Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+        try { getContentResolver().takePersistableUriPermission(treeUri, permission); } catch (SecurityException ignored) { }
         AppState.setTree(this, treeUri);
         directoryUri = treeUri;
         mode = MODE_LIBRARY;
@@ -376,15 +406,15 @@ public final class MainActivity extends Activity {
     }
 
     private void chooseSort() {
-        String[] labels = {"名前順", "更新日時順", "サイズ順"};
+        String[] labels = {I18n.t(R.string.ui_name_2), I18n.t(R.string.ui_modified_date_2), I18n.t(R.string.ui_size_2)};
         Ui.show(new AlertDialog.Builder(this)
-                .setTitle("並び順")
+                .setTitle(I18n.t(R.string.ui_sort))
                 .setSingleChoiceItems(labels, sortMode, (dialog, selected) -> {
                     sortMode = selected;
                     dialog.dismiss();
                     applyFilters();
                 })
-                .setNegativeButton(descending ? "昇順にする" : "降順にする", (dialog, selected) -> {
+                .setNegativeButton(descending ? I18n.t(R.string.ui_ascending_2) : I18n.t(R.string.ui_descending), (dialog, selected) -> {
                     descending = !descending;
                     applyFilters();
                 }));
@@ -395,21 +425,19 @@ public final class MainActivity extends Activity {
         Ui.styleTopTab(directoriesDestination, mode == MODE_DIRECTORIES);
         Ui.styleTopTab(recentsDestination, mode == MODE_RECENTS);
         Ui.styleTopTab(bookmarksDestination, mode == MODE_BOOKMARKS);
-        if (screenTitle != null) screenTitle.setText(mode == MODE_DIRECTORIES ? "ディレクトリ" : mode == MODE_FAVORITES ? "お気に入り" : mode == MODE_RECENTS ? "履歴" : mode == MODE_BOOKMARKS ? "しおり" : "Comic Explorer");
+        if (screenTitle != null) screenTitle.setText(mode == MODE_DIRECTORIES ? I18n.t(R.string.ui_directory) : mode == MODE_FAVORITES ? I18n.t(R.string.ui_favorites) : mode == MODE_RECENTS ? I18n.t(R.string.ui_history) : mode == MODE_BOOKMARKS ? I18n.t(R.string.ui_add_bookmark) : "Comic Explorer");
         if (upButton != null) upButton.setVisibility(mode == MODE_LIBRARY && treeUri != null && directoryUri != null && !directoryUri.equals(treeUri) ? View.VISIBLE : View.GONE);
     }
 
     private void toggleSearchPanel() {
         boolean expanded = searchPanel.getVisibility() != View.VISIBLE;
         searchPanel.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        searchButton.setContentDescription(expanded ? "検索を閉じる" : "検索を表示");
+        searchButton.setContentDescription(expanded ? I18n.t(R.string.ui_close_search) : I18n.t(R.string.ui_show_search));
         if (expanded) search.requestFocus(); else search.clearFocus();
     }
 
     private void toggleCollectionView() {
-        gridMode = !gridMode;
-        AppState.setGridView(this, gridMode);
-        updateCollectionView();
+        ReaderOptions.list(this, () -> { gridMode = AppState.gridView(this); listView.setAdapter(adapter); gridView.setAdapter(adapter); updateCollectionView(); });
     }
 
     private void updateCollectionView() {
@@ -417,48 +445,47 @@ public final class MainActivity extends Activity {
         listView.setVisibility(gridMode ? View.GONE : View.VISIBLE);
         gridView.setVisibility(gridMode ? View.VISIBLE : View.GONE);
         gridView.setNumColumns(AppState.gridColumns(this));
+        gridView.setBackgroundColor(AppState.number(this, "grid_color", Ui.DARK_BACKGROUND));
         if (locationRow != null) locationRow.setVisibility(AppState.showLibraryPath(this) ? View.VISIBLE : View.GONE);
         int scrollPosition = AppState.leftLibraryScrollbar(this)
                 ? View.SCROLLBAR_POSITION_LEFT : View.SCROLLBAR_POSITION_RIGHT;
         listView.setVerticalScrollbarPosition(scrollPosition);
         gridView.setVerticalScrollbarPosition(scrollPosition);
         if (viewButton != null) {
-            viewButton.setText(gridMode ? "リスト" : "グリッド");
-            viewButton.setContentDescription(gridMode ? "リスト表示に切り替え" : "グリッド表示に切り替え");
+            viewButton.setText(I18n.t(R.string.ui_list_type));
+            viewButton.setContentDescription(I18n.t(R.string.ui_choose_icons_thumbnails_or_grid));
         }
         adapter.notifyDataSetChanged();
     }
 
     private void showListActions() {
-        ArrayList<String> labels = new ArrayList<>();
-        labels.add("ファイルを開く");
-        labels.add("フォルダを選び直す");
-        if (mode == MODE_RECENTS && !allRows.isEmpty()) labels.add("履歴を期間指定で消去");
-        if (mode == MODE_DIRECTORIES && !allRows.isEmpty()) labels.add("登録ディレクトリをすべて解除");
-        if (mode == MODE_FAVORITES && !allRows.isEmpty()) labels.add("お気に入りをすべて解除");
-        if (mode == MODE_BOOKMARKS && !allRows.isEmpty()) labels.add("しおりをすべて消去");
-        Ui.show(new AlertDialog.Builder(this).setTitle("操作").setItems(labels.toArray(new String[0]), (dialog, which) -> {
-            if (which == 0) { chooseFile(); return; }
-            if (which == 1) { chooseFolder(); return; }
-            if (mode == MODE_RECENTS) { showHistoryCleanup(); return; }
-            Ui.show(new AlertDialog.Builder(this).setMessage(labels.get(which) + "しますか？")
-                    .setNegativeButton("キャンセル", null).setPositiveButton("実行", (ignored, button) -> {
-                        if (mode == MODE_DIRECTORIES) {
-                            AppState.clearDirectories(this);
-                        } else if (mode == MODE_FAVORITES) {
-                            for (AppState.SavedItem item : AppState.favorites(this)) AppState.setFavorite(this, item.uri, item.title, item.kind, false);
-                        } else if (mode == MODE_BOOKMARKS) {
-                            for (AppState.SavedItem item : AppState.bookmarkedItems(this)) AppState.clearBookmarks(this, item.uri);
-                        }
-                        loadSavedItems();
-                    }));
-        }));
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(R.string.ui_open_file), this::chooseFile);
+        menu.add(I18n.t(R.string.ui_select_folder_again), this::chooseFolder);
+        menu.add(I18n.t(R.string.ui_network_connections), () -> NetworkStorage.show(this));
+        menu.add(I18n.t(R.string.ui_gallery), this::showGallery);
+        if (mode == MODE_LIBRARY && directoryUri != null) menu.add(I18n.t(R.string.ui_create_folder), () -> editFile(null, I18n.t(R.string.ui_create_folder)));
+        if (!allRows.isEmpty()) {
+            if (mode == MODE_RECENTS) menu.add(I18n.t(R.string.ui_delete_history_by_time_range), this::showHistoryCleanup);
+            if (mode == MODE_DIRECTORIES) menu.add(I18n.t(R.string.ui_remove_all_saved_directories), () -> confirmCollectionClear(R.string.ui_remove_all_saved_directories, () -> AppState.clearDirectories(this)));
+            if (mode == MODE_FAVORITES) menu.add(I18n.t(R.string.ui_remove_all_favorites), () -> confirmCollectionClear(R.string.ui_remove_all_favorites, () -> {
+                for (AppState.SavedItem item : AppState.favorites(this)) AppState.setFavorite(this, item.uri, item.title, item.kind, false);
+            }));
+            if (mode == MODE_BOOKMARKS) menu.add(I18n.t(R.string.ui_delete_all_bookmarks_2), () -> confirmCollectionClear(R.string.ui_delete_all_bookmarks_2, () -> AppState.clearAllBookmarks(this)));
+        }
+        menu.show(this, I18n.t(R.string.ui_actions));
+    }
+
+    private void confirmCollectionClear(int message, Runnable action) {
+        Ui.show(new AlertDialog.Builder(this).setMessage(I18n.t(message))
+                .setNegativeButton(I18n.t(R.string.ui_cancel), null)
+                .setPositiveButton(I18n.t(R.string.ui_apply), (dialog, which) -> { action.run(); loadSavedItems(); }));
     }
 
     private void showHistoryCleanup() {
-        String[] choices = {"1時間以内", "24時間以内", "1週間以内", "すべて"};
+        String[] choices = {I18n.t(R.string.ui_past_hour), I18n.t(R.string.ui_past_day), I18n.t(R.string.ui_past_week), I18n.t(R.string.ui_all)};
         long[] ages = {60L * 60 * 1000, 24L * 60 * 60 * 1000, 7L * 24 * 60 * 60 * 1000, Long.MAX_VALUE};
-        Ui.show(new AlertDialog.Builder(this).setTitle("履歴を消去").setItems(choices, (dialog, selected) -> {
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_clear_history)).setItems(choices, (dialog, selected) -> {
             if (selected == choices.length - 1) AppState.clearRecents(this);
             else AppState.clearRecentsSince(this, System.currentTimeMillis() - ages[selected]);
             loadSavedItems();
@@ -468,24 +495,24 @@ public final class MainActivity extends Activity {
     private void showAppMenu() {
         ArrayList<String> labels = new ArrayList<>();
         ArrayList<Integer> actions = new ArrayList<>();
-        labels.add("更新");
+        labels.add(I18n.t(R.string.ui_refresh));
         actions.add(0);
-        labels.add("ファイルを開く");
+        labels.add(I18n.t(R.string.ui_open_file));
         actions.add(4);
-        labels.add("お気に入り");
+        labels.add(I18n.t(R.string.ui_favorites));
         actions.add(5);
         if (mode == MODE_LIBRARY) {
-            labels.add("フォルダを選び直す");
+            labels.add(I18n.t(R.string.ui_select_folder_again));
             actions.add(1);
             if (treeUri != null && directoryUri != null && !directoryUri.equals(treeUri)) {
-                labels.add("親フォルダへ");
+                labels.add(I18n.t(R.string.ui_parent_folder));
                 actions.add(2);
             }
         }
-        labels.add("設定");
+        labels.add(I18n.t(R.string.ui_settings));
         actions.add(3);
         Ui.show(new AlertDialog.Builder(this)
-                .setTitle("メニュー")
+                .setTitle(I18n.t(R.string.ui_menu))
                 .setItems(labels.toArray(new String[0]), (dialog, selected) -> {
                     switch (actions.get(selected)) {
                         case 0: refresh(); break;
@@ -509,10 +536,10 @@ public final class MainActivity extends Activity {
                 if (!cursor.isNull(1)) size = cursor.getLong(1);
             }
         } catch (Exception ignored) { }
-        if (name == null || name.trim().isEmpty()) name = "外部ファイル";
+        if (name == null || name.trim().isEmpty()) name = I18n.t(R.string.ui_external_file);
         String mime = getContentResolver().getType(uri);
         if (!ComicFile.isSupported(name, mime)) {
-            Toast.makeText(this, "PDF、CBZ/ZIP、画像を選択してください", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, I18n.t(R.string.ui_select_a_pdf_cbz_zip_or_image), Toast.LENGTH_LONG).show();
             return;
         }
         open(new LibraryEntry(uri, name, mime, ComicFile.kindFor(name, mime), false, size, 0), false);
@@ -522,9 +549,9 @@ public final class MainActivity extends Activity {
         directoryLoadToken++;
         allRows.clear();
         visibleRows.clear();
-        pathText.setText("フォルダ未選択");
+        pathText.setText(I18n.t(R.string.ui_no_folder_selected));
         stateText.setText("");
-        showEmptyState("フォルダが選択されていません", "漫画の入ったフォルダを選択してください。", "フォルダを選ぶ", false);
+        showEmptyState(I18n.t(R.string.ui_no_folder_selected_2), I18n.t(R.string.ui_choose_the_folder_containing_your_comics), I18n.t(R.string.ui_choose_folder), false);
         updateNavigation();
         if (adapter != null) adapter.notifyDataSetChanged();
     }
@@ -539,9 +566,9 @@ public final class MainActivity extends Activity {
         allRows.clear();
         visibleRows.clear();
         if (adapter != null) adapter.notifyDataSetChanged();
-        pathText.setText("読み込み中…");
+        pathText.setText(I18n.t(R.string.ui_loading));
         stateText.setText("");
-        showEmptyState("読み込み中…", "", null, true);
+        showEmptyState(I18n.t(R.string.ui_loading), "", null, true);
         folderWorker.execute(() -> {
             List<LibraryEntry> loaded = new ArrayList<>();
             String error = null;
@@ -553,9 +580,9 @@ public final class MainActivity extends Activity {
                 if (isFinishing() || token != directoryLoadToken || !requestedDirectory.equals(directoryUri)) return;
                 allRows.clear();
                 if (finalError == null) allRows.addAll(finalLoaded);
-                pathText.setText(finalError == null ? LibraryDirectoryReader.displayName(getContentResolver(), requestedDirectory) : "フォルダを開けません");
-                stateText.setText(finalError == null ? finalLoaded.size() + " 件" : finalError);
-                if (finalError != null) showEmptyState("フォルダを開けません", finalError + " フォルダを選び直してください。", "選び直す", false);
+                pathText.setText(finalError == null ? LibraryDirectoryReader.displayName(getContentResolver(), requestedDirectory) : I18n.t(R.string.ui_cannot_open_folder));
+                stateText.setText(finalError == null ? finalLoaded.size() + I18n.t(R.string.ui_items) : finalError);
+                if (finalError != null) showEmptyState(I18n.t(R.string.ui_cannot_open_folder), finalError + I18n.t(R.string.ui_select_the_folder_again), I18n.t(R.string.ui_choose_again), false);
                 applyFilters();
             });
         });
@@ -564,12 +591,12 @@ public final class MainActivity extends Activity {
     private void loadSavedItems() {
         directoryLoadToken++;
         updateNavigation();
-        pathText.setText(mode == MODE_DIRECTORIES ? "登録ディレクトリ" : mode == MODE_FAVORITES ? "お気に入り" : mode == MODE_BOOKMARKS ? "しおりのある作品" : "最近開いた作品");
+        pathText.setText(mode == MODE_DIRECTORIES ? I18n.t(R.string.ui_saved_directories) : mode == MODE_FAVORITES ? I18n.t(R.string.ui_favorites) : mode == MODE_BOOKMARKS ? I18n.t(R.string.ui_bookmarked_books) : I18n.t(R.string.ui_recently_opened_books));
         allRows.clear();
         List<AppState.SavedItem> items = mode == MODE_DIRECTORIES ? AppState.directories(this) : mode == MODE_FAVORITES ? AppState.favorites(this)
                 : mode == MODE_BOOKMARKS ? AppState.bookmarkedItems(this) : AppState.recents(this);
         for (AppState.SavedItem item : items) allRows.add(new LibraryEntry(item.uri, item.title, null, item.kind, mode == MODE_DIRECTORIES, 0, item.timestamp));
-        stateText.setText(items.isEmpty() ? "0 件" : items.size() + " 件");
+        stateText.setText(items.isEmpty() ? I18n.t(R.string.ui_0_items) : items.size() + I18n.t(R.string.ui_items));
         applyFilters();
     }
 
@@ -584,21 +611,21 @@ public final class MainActivity extends Activity {
                 return descending ? -result : result;
             }
         });
-        sortButton.setText("並び順");
-        sortButton.setContentDescription((sortMode == SORT_MODIFIED ? "更新日時" : sortMode == SORT_SIZE ? "サイズ" : "名前") + (descending ? "の降順" : "の昇順") + "。タップして変更");
+        sortButton.setText(I18n.t(R.string.ui_sort));
+        sortButton.setContentDescription((sortMode == SORT_MODIFIED ? I18n.t(R.string.ui_modified_date) : sortMode == SORT_SIZE ? I18n.t(R.string.ui_size) : I18n.t(R.string.ui_name_3)) + (descending ? I18n.t(R.string.ui_descending_2) : I18n.t(R.string.ui_ascending)) + I18n.t(R.string.ui_tap_to_change));
         if (!allRows.isEmpty() && visibleRows.isEmpty()) {
-            stateText.setText("0 件");
-            showEmptyState("見つかりません", "別の名前で検索してください。", null, false);
+            stateText.setText(I18n.t(R.string.ui_0_items));
+            showEmptyState(I18n.t(R.string.ui_no_results), I18n.t(R.string.ui_try_a_different_name), null, false);
         } else if (visibleRows.isEmpty()) {
-            if (mode == MODE_DIRECTORIES) showEmptyState("登録ディレクトリはありません", "フォルダを長押しして登録できます。", "フォルダを見る", false);
-            else if (mode == MODE_FAVORITES) showEmptyState("お気に入りはありません", "作品を長押しして追加できます。", null, false);
-            else if (mode == MODE_RECENTS) showEmptyState("履歴はありません", "作品を開くとここに表示されます。", "フォルダを見る", false);
-            else if (mode == MODE_BOOKMARKS) showEmptyState("しおりはありません", "読書画面でページにしおりを付けると、作品がここに表示されます。", "フォルダを見る", false);
-            else if (treeUri != null && emptyProgress.getVisibility() != View.VISIBLE && !pathText.getText().toString().equals("フォルダを開けません"))
-                showEmptyState("表示できるファイルがありません", "PDF・CBZ・ZIP・画像に対応しています。", "別のフォルダを選ぶ", false);
+            if (mode == MODE_DIRECTORIES) showEmptyState(I18n.t(R.string.ui_no_saved_directories), I18n.t(R.string.ui_long_press_a_folder_to_save_it), I18n.t(R.string.ui_browse_folders), false);
+            else if (mode == MODE_FAVORITES) showEmptyState(I18n.t(R.string.ui_no_favorites), I18n.t(R.string.ui_long_press_a_book_to_add_it), null, false);
+            else if (mode == MODE_RECENTS) showEmptyState(I18n.t(R.string.ui_no_history), I18n.t(R.string.ui_opened_books_appear_here), I18n.t(R.string.ui_browse_folders), false);
+            else if (mode == MODE_BOOKMARKS) showEmptyState(I18n.t(R.string.ui_no_bookmarks), I18n.t(R.string.ui_bookmark_a_page_while_reading_to_add_its_book_here), I18n.t(R.string.ui_browse_folders), false);
+            else if (treeUri != null && emptyProgress.getVisibility() != View.VISIBLE && !pathText.getText().toString().equals(I18n.t(R.string.ui_cannot_open_folder)))
+                showEmptyState(I18n.t(R.string.ui_no_supported_files), I18n.t(R.string.ui_supports_pdf_cbz_zip_and_images), I18n.t(R.string.ui_choose_another_folder), false);
         } else {
             hideEmptyState();
-            stateText.setText(visibleRows.size() + " 件");
+            stateText.setText(visibleRows.size() + I18n.t(R.string.ui_items));
         }
         if (adapter != null) adapter.notifyDataSetChanged();
     }
@@ -642,6 +669,11 @@ public final class MainActivity extends Activity {
         viewer.setData(item.uri);
         viewer.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         viewer.putExtra(ViewerActivity.EXTRA_TITLE, item.name);
+        if (mode == MODE_LIBRARY && includeSiblingImages) {
+            ArrayList<Uri> books = new ArrayList<>(); ArrayList<String> titles = new ArrayList<>();
+            for (LibraryEntry candidate : visibleRows) if (!candidate.directory && !ComicFile.isImage(candidate.name, candidate.mime)) { books.add(candidate.uri); titles.add(candidate.name); }
+            viewer.putParcelableArrayListExtra(ViewerActivity.EXTRA_BOOK_URIS, books); viewer.putStringArrayListExtra(ViewerActivity.EXTRA_BOOK_TITLES, titles);
+        }
         if (ComicFile.isImage(item.name, item.mime)) {
             ArrayList<Uri> pages = new ArrayList<>();
             if (includeSiblingImages && mode == MODE_LIBRARY) {
@@ -659,35 +691,38 @@ public final class MainActivity extends Activity {
         if (item.directory) {
             boolean saved = AppState.isDirectory(this, item.uri);
             Ui.show(new AlertDialog.Builder(this).setTitle(item.name)
-                    .setItems(new String[]{"開く", saved ? "登録ディレクトリから外す" : "ディレクトリに登録"}, (dialog, which) -> {
+                    .setItems(new String[]{I18n.t(R.string.ui_open), saved ? I18n.t(R.string.ui_remove_saved_directory) : I18n.t(R.string.ui_save_directory), I18n.t(R.string.ui_file_operations)}, (dialog, which) -> {
+                        if (which == 2) { fileMenu(item); return; }
                         if (which == 0) open(item);
                         else {
                             AppState.setDirectory(this, item.uri, item.name, !saved);
                             if (mode == MODE_DIRECTORIES && saved) loadSavedItems();
-                            Toast.makeText(this, saved ? "登録ディレクトリから外しました" : "ディレクトリに登録しました", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, saved ? I18n.t(R.string.ui_directory_removed) : I18n.t(R.string.ui_directory_saved), Toast.LENGTH_SHORT).show();
                         }
                     }));
             return;
         }
         boolean favorite = AppState.isFavorite(this, item.uri);
         ArrayList<String> actions = new ArrayList<>();
-        actions.add(favorite ? "お気に入りから外す" : "お気に入りに追加");
-        actions.add("復帰位置を消去");
-        actions.add("詳細を表示");
-        if (mode == MODE_RECENTS) actions.add("履歴から削除");
-        if (!AppState.bookmarks(this, item.uri).isEmpty()) actions.add("しおりをすべて消去");
-        if (AppState.hasCover(this, item.uri)) actions.add("表紙を初期状態に戻す");
+        actions.add(favorite ? I18n.t(R.string.ui_remove_from_favorites) : I18n.t(R.string.ui_add_to_favorites));
+        actions.add(I18n.t(R.string.ui_clear_reading_position));
+        actions.add(I18n.t(R.string.ui_details));
+        actions.add(I18n.t(R.string.ui_file_operations));
+        if (mode == MODE_RECENTS) actions.add(I18n.t(R.string.ui_remove_from_history));
+        if (!AppState.bookmarks(this, item.uri).isEmpty()) actions.add(I18n.t(R.string.ui_delete_all_bookmarks_2));
+        if (AppState.hasCover(this, item.uri)) actions.add(I18n.t(R.string.ui_restore_default_cover));
         Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setItems(actions.toArray(new String[0]), (dialog, which) -> {
+            if (I18n.t(R.string.ui_file_operations).equals(actions.get(which))) { fileMenu(item); return; }
             if (which == 0) {
                 setFavorite(item, !favorite);
-                Toast.makeText(this, !favorite ? "お気に入りに追加しました" : "お気に入りから外しました", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, !favorite ? I18n.t(R.string.ui_added_to_favorites) : I18n.t(R.string.ui_removed_from_favorites), Toast.LENGTH_SHORT).show();
             } else if (which == 1) {
                 AppState.clearPosition(this, item.uri);
-                Toast.makeText(this, "復帰位置を消去しました", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, I18n.t(R.string.ui_reading_position_cleared), Toast.LENGTH_SHORT).show();
                 adapter.notifyDataSetChanged();
             } else if (which == 2) showDetails(item);
-            else if ("履歴から削除".equals(actions.get(which))) { AppState.removeRecent(this, item.uri); loadSavedItems(); }
-            else if ("表紙を初期状態に戻す".equals(actions.get(which))) {
+            else if (I18n.t(R.string.ui_remove_from_history).equals(actions.get(which))) { AppState.removeRecent(this, item.uri); loadSavedItems(); }
+            else if (I18n.t(R.string.ui_restore_default_cover).equals(actions.get(which))) {
                 AppState.removeCover(this, item.uri);
                 thumbnails.evictAll();
                 adapter.notifyDataSetChanged();
@@ -705,20 +740,111 @@ public final class MainActivity extends Activity {
         int saved = AppState.getPosition(this, item.uri);
         int total = AppState.totalPages(this, item.uri);
         int bookmarkCount = AppState.bookmarks(this, item.uri).size();
-        String message = "形式: " + item.kind + "\n" + (item.size > 0 ? "サイズ: " + ComicFile.formatSize(item.size) + "\n" : "")
-                + (item.modified > 0 ? "更新: " + DateFormat.getMediumDateFormat(this).format(new Date(item.modified)) + "\n" : "")
-                + "復帰位置: " + (saved + 1) + (total > 0 ? " / " + total + " ページ（" + Math.round((saved + 1) * 100f / total) + "%）" : " ページ")
-                + "\nしおり: " + bookmarkCount + " 件";
-        Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setMessage(message).setPositiveButton("閉じる", null));
+        String message = I18n.t(R.string.ui_format) + item.kind + "\n" + (item.size > 0 ? I18n.t(R.string.ui_size_3) + ComicFile.formatSize(item.size) + "\n" : "")
+                + (item.modified > 0 ? I18n.t(R.string.ui_updated) + DateFormat.getMediumDateFormat(this).format(new Date(item.modified)) + "\n" : "")
+                + I18n.t(R.string.ui_reading_position) + (saved + 1) + (total > 0 ? " / " + total + I18n.t(R.string.ui_pages) + Math.round((saved + 1) * 100f / total) + "%）" : I18n.t(R.string.ui_pages_2))
+                + I18n.t(R.string.ui_bookmarks) + bookmarkCount + I18n.t(R.string.ui_items);
+        Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setMessage(message).setPositiveButton(I18n.t(R.string.ui_close), null));
     }
 
     private String readableError(Exception exception) {
-        if (exception instanceof SecurityException) return "フォルダへのアクセス許可が失われました。";
-        return exception.getMessage() == null ? "フォルダを読み取れません。" : exception.getMessage();
+        if (exception instanceof SecurityException) return I18n.t(R.string.ui_folder_access_was_revoked);
+        return exception.getMessage() == null ? I18n.t(R.string.ui_cannot_read_folder) : exception.getMessage();
     }
 
     private TextView text(String value, int size, int color) { return Ui.text(this, value, size, color); }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+
+    @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) { swipeX = event.getX(); swipeY = event.getY(); }
+        if (event.getAction() == android.view.MotionEvent.ACTION_UP && Math.abs(event.getX()-swipeX) > dp(100) && Math.abs(event.getY()-swipeY) < dp(48)) {
+            int[] tabs = {MODE_LIBRARY, MODE_DIRECTORIES, MODE_RECENTS, MODE_BOOKMARKS}; int index = 0;
+            for (int i=0; i<tabs.length; i++) if (tabs[i] == mode) index = i;
+            selectMode(tabs[(index + (event.getX()<swipeX ? 1 : 3)) % 4]);
+            android.view.MotionEvent cancel = android.view.MotionEvent.obtain(event); cancel.setAction(android.view.MotionEvent.ACTION_CANCEL); super.dispatchTouchEvent(cancel); cancel.recycle(); return true;
+        }
+        return super.dispatchTouchEvent(event);
+    }
+    private interface FileAction { void run() throws Exception; }
+    private void fileOperation(FileAction action) {
+        folderWorker.execute(() -> {
+            String failure = null;
+            try { action.run(); } catch (Exception e) { failure = e.getMessage(); }
+            String error = failure;
+            runOnUiThread(() -> { if (isFinishing()) return; Toast.makeText(this, error == null ? I18n.t(R.string.ui_done) : I18n.t(R.string.ui_operation_failed) + error, Toast.LENGTH_LONG).show(); refresh(); });
+        });
+    }
+    private void fileMenu(LibraryEntry item) {
+        Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setItems(new String[]{I18n.t(R.string.ui_rename), I18n.t(R.string.ui_move), I18n.t(R.string.ui_delete)}, (d, i) -> {
+            if (i == 0) editFile(item, I18n.t(R.string.ui_rename));
+            if (i == 1) { moving = item; startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION), REQUEST_MOVE); }
+            if (i == 2) Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_delete_item)).setMessage(item.name + I18n.t(R.string.ui_delete_permanently) + (item.directory ? I18n.t(R.string.ui_files_inside_this_folder_will_also_be_deleted) : ""))
+                    .setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_delete), (a, b) -> fileOperation(() -> {
+                        if (!DocumentsContract.deleteDocument(getContentResolver(), item.uri)) throw new java.io.IOException(I18n.t(R.string.ui_cannot_delete));
+                        AppState.removeRecent(this, item.uri); AppState.clearPosition(this, item.uri); AppState.clearBookmarks(this, item.uri);
+                        AppState.setFavorite(this, item.uri, item.name, item.kind, false); AppState.setDirectory(this, item.uri, item.name, false);
+                    })));
+        }));
+    }
+    private void editFile(LibraryEntry item, String title) {
+        EditText name = new EditText(this); name.setSingleLine(true); name.setText(item == null ? "" : item.name); name.setHint(I18n.t(R.string.ui_name_3));
+        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(title).setView(name).setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_save), null));
+        dialog.getButton(-1).setOnClickListener(v -> {
+            String value = name.getText().toString().trim();
+            if (value.isEmpty() || value.equals(".") || value.equals("..") || value.contains("/") || value.contains("\\") || value.indexOf(0) >= 0) { name.setError(I18n.t(R.string.ui_enter_a_valid_name)); return; }
+            dialog.dismiss(); fileOperation(() -> {
+                if (item == null) {
+                    Uri parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, directoryUri.equals(treeUri) ? DocumentsContract.getTreeDocumentId(treeUri) : DocumentsContract.getDocumentId(directoryUri));
+                    if (DocumentsContract.createDocument(getContentResolver(), parent, DocumentsContract.Document.MIME_TYPE_DIR, value) == null) throw new java.io.IOException(I18n.t(R.string.ui_cannot_create_folder));
+                } else {
+                    Uri renamed = DocumentsContract.renameDocument(getContentResolver(), item.uri, value);
+                    if (renamed == null) throw new java.io.IOException(I18n.t(R.string.ui_cannot_rename));
+                    AppState.relocate(this, item.uri, renamed, LibraryDirectoryReader.displayName(getContentResolver(), renamed));
+                }
+            });
+        });
+    }
+    private void showGallery() {
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_gallery_search_type)).setItems(new String[]{I18n.t(R.string.ui_search_media_store), I18n.t(R.string.ui_search_by_extension_selected_folder_and_subfolders)}, (d, i) -> {
+            if (i == 0) {
+                String permission = android.os.Build.VERSION.SDK_INT >= 33 ? "android.permission.READ_MEDIA_IMAGES" : "android.permission.READ_EXTERNAL_STORAGE";
+                if (checkSelfPermission(permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) { requestPermissions(new String[]{permission}, 71); return; }
+            } else if (treeUri == null) { chooseFolder(); return; }
+            loadGallery(i == 1);
+        }));
+    }
+    @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] grants) {
+        super.onRequestPermissionsResult(code, permissions, grants);
+        if (code == 71 && grants.length > 0 && grants[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) loadGallery(false);
+    }
+    private void loadGallery(boolean folders) {
+        final int token = ++directoryLoadToken;
+        folderWorker.execute(() -> {
+            ArrayList<LibraryEntry> images = new ArrayList<>(); String error = null;
+            try {
+                if (folders) {
+                    java.util.ArrayDeque<Uri> pending = new java.util.ArrayDeque<>(); pending.add(treeUri);
+                    java.util.HashSet<Uri> visited = new java.util.HashSet<>();
+                    while (!pending.isEmpty() && images.size() < 20000 && token == directoryLoadToken) {
+                        Uri folder = pending.remove(); if (!visited.add(folder)) continue;
+                        for (LibraryEntry item : LibraryDirectoryReader.read(getContentResolver(), treeUri, folder)) { if (item.directory) pending.add(item.uri); else if (ComicFile.isImage(item.name, item.mime)) images.add(item); }
+                    }
+                } else {
+                    Uri base = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+                    try (Cursor cursor = getContentResolver().query(base, new String[]{"_id", "_display_name", "mime_type", "_size", "date_modified"}, null, null, "date_modified DESC")) {
+                        if (cursor == null) throw new java.io.IOException(I18n.t(R.string.ui_cannot_read_gallery));
+                        while (cursor.moveToNext()) images.add(new LibraryEntry(android.content.ContentUris.withAppendedId(base, cursor.getLong(0)), cursor.getString(1), cursor.getString(2), "画像", false, cursor.getLong(3), cursor.getLong(4)*1000L));
+                    }
+                }
+            } catch (Exception e) { error = e.getMessage(); }
+            String failure = error;
+            runOnUiThread(() -> {
+                if (token != directoryLoadToken || isFinishing()) return;
+                mode = MODE_LIBRARY; allRows.clear(); allRows.addAll(images); pathText.setText(I18n.t(R.string.ui_gallery)); query=""; search.setText(""); applyFilters();
+                if (failure != null) Toast.makeText(this, failure, Toast.LENGTH_LONG).show();
+            });
+        });
+    }
 
     @Override public void onBackPressed() {
         if (mode != MODE_LIBRARY) { mode = MODE_LIBRARY; if (treeUri == null) showEmptyLibrary(); else loadDirectory(); }
@@ -745,7 +871,7 @@ public final class MainActivity extends Activity {
                 row.setOrientation(gridMode ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
                 row.setGravity(gridMode ? Gravity.TOP | Gravity.CENTER_HORIZONTAL : Gravity.CENTER_VERTICAL);
                 row.setPadding(dp(gridMode ? 4 : 6), dp(6), dp(gridMode ? 4 : 8), dp(6));
-                row.setMinimumHeight(dp(gridMode ? 210 : 88));
+                row.setMinimumHeight(dp(gridMode ? 48 : 88));
                 Ui.styleListRow(row);
                 FrameLayout cover = new FrameLayout(MainActivity.this);
                 ImageView thumbnail = new ImageView(MainActivity.this);
@@ -757,7 +883,7 @@ public final class MainActivity extends Activity {
                 formatMark.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
                 cover.addView(formatMark, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END));
                 row.addView(cover, gridMode
-                        ? new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(150))
+                        ? new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(dp(48), (getResources().getDisplayMetrics().widthPixels - dp(16)) / AppState.gridColumns(MainActivity.this) * (AppState.enabled(MainActivity.this, "grid_square", false) ? 1 : 3) / (AppState.enabled(MainActivity.this, "grid_square", false) ? 1 : 2)))
                         : new LinearLayout.LayoutParams(dp(54), dp(76)));
                 LinearLayout info = new LinearLayout(MainActivity.this);
                 info.setOrientation(LinearLayout.VERTICAL);
@@ -785,7 +911,9 @@ public final class MainActivity extends Activity {
                 convertView = row;
             } else holder = (Holder) convertView.getTag();
             LibraryEntry item = getItem(position);
+            if (gridMode) convertView.setBackgroundColor(AppState.number(MainActivity.this, "grid_color", Ui.DARK_BACKGROUND));
             holder.name.setText(item.name);
+            holder.name.setVisibility(!gridMode || AppState.enabled(MainActivity.this, "grid_name", true) ? View.VISIBLE : View.GONE);
             String detail = item.directory ? "フォルダ" : item.kind + (item.size > 0 ? "  •  " + ComicFile.formatSize(item.size) : "");
             if (!item.directory && mode != MODE_LIBRARY && item.modified > 0)
                 detail += "  •  " + DateFormat.getDateFormat(MainActivity.this).format(new Date(item.modified));
@@ -808,6 +936,7 @@ public final class MainActivity extends Activity {
             view.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             formatMark.setVisibility(View.GONE);
             if (item.directory) { view.setImageResource(R.drawable.ic_folder); return; }
+            if (AppState.number(MainActivity.this, "list_type", 1) == 0) { view.setImageResource(ComicFile.isImage(item.name, item.mime) ? R.drawable.ic_image_file : R.drawable.ic_archive); return; }
             formatMark.setText(item.kind);
             formatMark.setVisibility(View.VISIBLE);
             java.io.File customCover = AppState.coverFile(MainActivity.this, item.uri);
@@ -830,21 +959,26 @@ public final class MainActivity extends Activity {
                 });
                 return;
             }
-            if (!ComicFile.isImage(item.name, item.mime)) { view.setImageResource(R.drawable.ic_archive); return; }
             view.setImageResource(R.drawable.ic_image_file);
-            String key = item.uri.toString();
+            String key = item.uri + "#" + item.modified + ":" + item.size;
             Bitmap cached = thumbnails.get(key);
             if (cached != null) { view.setScaleType(ImageView.ScaleType.CENTER_CROP); view.setImageBitmap(cached); return; }
             thumbnailWorker.execute(() -> {
                 try {
-                    Bitmap bitmap = getContentResolver().loadThumbnail(item.uri, new Size(dp(112), dp(144)), null);
+                    Bitmap bitmap = BookCache.thumbnail(MainActivity.this, key);
+                    if (bitmap == null) {
+                        if (ComicFile.isImage(item.name, item.mime)) bitmap = getContentResolver().loadThumbnail(item.uri, new Size(dp(112), dp(144)), null);
+                        else bitmap = bookThumbnail(item);
+                        if (bitmap != null) BookCache.thumbnail(MainActivity.this, key, bitmap);
+                    }
                     if (bitmap == null) return;
+                    Bitmap result = bitmap;
                     runOnUiThread(() -> {
                         if (isFinishing()) return;
-                        thumbnails.put(key, bitmap);
-                        if (key.equals(view.getTag())) {
+                        thumbnails.put(key, result);
+                        if (item.uri.toString().equals(view.getTag())) {
                             view.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                            view.setImageBitmap(bitmap);
+                            view.setImageBitmap(result);
                         }
                     });
                 } catch (Exception ignored) { }
@@ -852,6 +986,12 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private Bitmap bookThumbnail(LibraryEntry item) throws Exception {
+        try (PageSource source = new PageSource(this, item.uri, item.name, null,
+                java.nio.charset.Charset.forName(ReaderOptions.ENCODINGS[Math.max(0, Math.min(ReaderOptions.ENCODINGS.length-1, AppState.archiveEncoding(this)))]), 240 * 480)) {
+            return source.decode(0, 240);
+        }
+    }
     private static final class Holder {
         final ImageView thumbnail; final TextView formatMark; final TextView name; final TextView detail; final TextView progress;
         final boolean grid;

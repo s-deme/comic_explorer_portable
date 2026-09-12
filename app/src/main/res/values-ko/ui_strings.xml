@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_opacity" formatted="false">"불투명도"</string>
+    <string name="ui_create_folder" formatted="false">"폴더생성"</string>
+    <string name="ui_expands_the_image_area_to_punch_holes" formatted="false">"이미지 영역을 펀치 홀까지 확장 합니다"</string>
+    <string name="ui_double_tap_zoom" formatted="false">"더블 탭 확대모드"</string>
+    <string name="ui_language" formatted="false">"언어(Language)"</string>
+    <string name="ui_clear_thumbnails" formatted="false">"썸네일 삭제"</string>
+    <string name="ui_add_to_favorites" formatted="false">"즐겨찾기 추가"</string>
+    <string name="ui_settings" formatted="false">"설정"</string>
+    <string name="ui_page_dividing_line_dual_pages" formatted="false">"페이지 분할선 - 2 페이지"</string>
+    <string name="ui_path" formatted="false">"경로"</string>
+    <string name="ui_gallery_search_type" formatted="false">"갤러리 검색 유형"</string>
+    <string name="ui_edit" formatted="false">"수정"</string>
+    <string name="ui_favorites" formatted="false">"즐겨찾기"</string>
+    <string name="ui_left" formatted="false">"좌측"</string>
+    <string name="ui_scroll_animation" formatted="false">"스크롤 애니메이션"</string>
+    <string name="ui_open_the_last_compressed_file" formatted="false">"가장 최근에 본 압축 파일을 바로 열음"</string>
+    <string name="ui_background_color" formatted="false">"배경색 설정"</string>
+    <string name="ui_columns" formatted="false">"세로열"</string>
+    <string name="ui_right_vertical" formatted="false">"우측 + 수직"</string>
+    <string name="ui_zoom" formatted="false">"줌인"</string>
+    <string name="ui_name" formatted="false">"이름"</string>
+    <string name="ui_zoom_inside_fit_screen_outside" formatted="false">"줌인 + 화면맞춤(여백)"</string>
+    <string name="ui_fit_height" formatted="false">"높이 맞춤"</string>
+    <string name="ui_delete_item" formatted="false">"항목삭제"</string>
+    <string name="ui_scroll_length_vertical" formatted="false">"스크롤 길이(수직)"</string>
+    <string name="ui_right" formatted="false">"우측"</string>
+    <string name="ui_default" formatted="false">"기본값"</string>
+    <string name="ui_reverse" formatted="false">"반전"</string>
+    <string name="ui_refresh" formatted="false">"업데이트"</string>
+    <string name="ui_thumbnails" formatted="false">"썸네일"</string>
+    <string name="ui_square" formatted="false">"정사각형"</string>
+    <string name="ui_reset_all_settings_2" formatted="false">"모든 설정을 초기화합니다"</string>
+    <string name="ui_page_dividing_line_scroll_pages" formatted="false">"페이지 분할선 - 스크롤 페이지"</string>
+    <string name="ui_open" formatted="false">"열기"</string>
+    <string name="ui_show_folder_path" formatted="false">"폴더 경로표시"</string>
+    <string name="ui_page_spacing" formatted="false">"페이지 간격"</string>
+    <string name="ui_file_explorer" formatted="false">"파일 탐색기"</string>
+    <string name="ui_image_fit_to_screen" formatted="false">"이미지 화면 맞춤"</string>
+    <string name="ui_size" formatted="false">"크기"</string>
+    <string name="ui_delete_all_bookmarks" formatted="false">"전체 책갈피 정보를 삭제 하시겠습니까?"</string>
+    <string name="ui_list_type" formatted="false">"리스트 타입"</string>
+    <string name="ui_show_statusbar" formatted="false">"스테이터스바 표시"</string>
+    <string name="ui_crop" formatted="false">"자르기"</string>
+    <string name="ui_filter" formatted="false">"필터"</string>
+    <string name="ui_show_filename" formatted="false">"파일명 표시"</string>
+    <string name="ui_sync_resume_page_beta" formatted="false">"이어보기 동기화 (beta)"</string>
+    <string name="ui_punch_hole_display_portrait" formatted="false">"홀 디스플레이 - 세로모드"</string>
+    <string name="ui_enable" formatted="false">"사용"</string>
+    <string name="ui_ask" formatted="false">"묻기"</string>
+    <string name="ui_invert_color" formatted="false">"색상반전"</string>
+    <string name="ui_hardware_key" formatted="false">"하드웨어 키"</string>
+    <string name="ui_next_page" formatted="false">"다음 페이지"</string>
+    <string name="ui_quick_view_floating_button" formatted="false">"바로보기 플로팅 버튼"</string>
+    <string name="ui_set_zip_file_cache_retention_period" formatted="false">"압축파일 캐시 저장기간 설정"</string>
+    <string name="ui_reset_settings" formatted="false">"설정 초기화"</string>
+    <string name="ui_sharpen_filter" formatted="false">"샤픈 필터"</string>
+    <string name="ui_clear_all_cache" formatted="false">"전체 캐시 데이터 삭제"</string>
+    <string name="ui_previous_page" formatted="false">"이전 페이지"</string>
+    <string name="ui_select_whether_to_use_the_resume_page" formatted="false">"이어보기 사용여부를 선택합니다"</string>
+    <string name="ui_none" formatted="false">"없음"</string>
+    <string name="ui_brightness" formatted="false">"밝기"</string>
+    <string name="ui_margin_cropping" formatted="false">"이미지 여백제거"</string>
+    <string name="ui_history" formatted="false">"히스토리"</string>
+    <string name="ui_delete_all_histories" formatted="false">"전체 히스토리 정보를 삭제 하시겠습니까?"</string>
+    <string name="ui_fit_screen_2" formatted="false">"화면맞춤"</string>
+    <string name="ui_about" formatted="false">"프로그램 정보"</string>
+    <string name="ui_display_the_file_list_scrollbar_on_the_left_side" formatted="false">"파일리스트 스크롤바를 좌측으로 표시"</string>
+    <string name="ui_sync_your_resume_page_using_google_drive" formatted="false">"Google Drive를 이용하여, 이어보기 내역을 동기화 합니다"</string>
+    <string name="ui_clear_bookmarks" formatted="false">"책갈피 삭제"</string>
+    <string name="ui_save" formatted="false">"저장"</string>
+    <string name="ui_show_a_dividing_line_between_scroll_pages" formatted="false">"스크롤 페이지 보기시 페이지 사이에 분할선 표시"</string>
+    <string name="ui_encoding" formatted="false">"인코딩"</string>
+    <string name="ui_clear_all_bookmarks" formatted="false">"전체 책갈피 정보를 삭제합니다"</string>
+    <string name="ui_all" formatted="false">"전체"</string>
+    <string name="ui_cancel" formatted="false">"취소"</string>
+    <string name="ui_storage" formatted="false">"스토리지"</string>
+    <string name="ui_directory" formatted="false">"디렉토리"</string>
+    <string name="ui_keep_screen_on" formatted="false">"화면켜짐유지"</string>
+    <string name="ui_full_screen" formatted="false">"풀스크린"</string>
+    <string name="ui_icon" formatted="false">"아이콘"</string>
+    <string name="ui_left_vertical" formatted="false">"좌측 + 수직"</string>
+    <string name="ui_open_the_next_file" formatted="false">"다음 파일 열기"</string>
+    <string name="ui_show_a_dividing_line_between_dual_pages" formatted="false">"2페이지씩 보기시 페이지 사이에 분할선 표시"</string>
+    <string name="ui_upscaling" formatted="false">"업스케일링 (선명도 개선)"</string>
+    <string name="ui_grid" formatted="false">"그리드"</string>
+    <string name="ui_resume_page" formatted="false">"이어보기"</string>
+    <string name="ui_fixed" formatted="false">"고정"</string>
+    <string name="ui_page_button_area" formatted="false">"페이지 버튼 영역"</string>
+    <string name="ui_passwd" formatted="false">"암호"</string>
+    <string name="ui_clear_all_histories" formatted="false">"전체 히스토리 정보를 삭제합니다"</string>
+    <string name="ui_userid" formatted="false">"아이디"</string>
+    <string name="ui_gallery" formatted="false">"갤러리"</string>
+    <string name="ui_ok" formatted="false">"확인"</string>
+    <string name="ui_move" formatted="false">"이동"</string>
+    <string name="ui_clear_resume_cache" formatted="false">"이어보기 삭제"</string>
+    <string name="ui_left_scrollbar" formatted="false">"좌측 스크롤바"</string>
+    <string name="ui_clear_history_2" formatted="false">"히스토리 삭제"</string>
+    <string name="ui_add_bookmark" formatted="false">"책갈피"</string>
+    <string name="ui_theme" formatted="false">"테마"</string>
+    <string name="ui_delete" formatted="false">"삭제"</string>
+    <string name="ui_first_page_2" formatted="false">"첫페이지보기"</string>
+    <string name="ui_punch_hole_display_landscape" formatted="false">"홀 디스플레이 - 가로모드"</string>
+    <string name="ui_set_thumbnails_storage" formatted="false">"썸네일 저장소 설정"</string>
+    <string name="ui_background" formatted="false">"배경색"</string>
+    <string name="ui_close" formatted="false">"닫기"</string>
+    <string name="ui_scale" formatted="false">"배율"</string>
+    <string name="ui_fit_width" formatted="false">"너비 맞춤"</string>
+</resources>

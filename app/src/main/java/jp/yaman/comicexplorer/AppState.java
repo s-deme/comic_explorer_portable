@@ -63,8 +63,31 @@ public final class AppState {
         }
     }
 
-    private static SharedPreferences prefs(Context context) {
+    static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    public static int number(Context context, String key, int fallback) { return prefs(context).getInt("setting." + key, fallback); }
+    public static boolean enabled(Context context, String key, boolean fallback) { return prefs(context).getBoolean("setting." + key, fallback); }
+    public static String value(Context context, String key, String fallback) { return prefs(context).getString("setting." + key, fallback); }
+    public static void put(Context context, String key, int value) { prefs(context).edit().putInt("setting." + key, value).apply(); }
+    public static void put(Context context, String key, boolean value) { prefs(context).edit().putBoolean("setting." + key, value).apply(); }
+    public static void put(Context context, String key, String value) { prefs(context).edit().putString("setting." + key, value).apply(); }
+    public static int resumeMode(Context context, boolean next) {
+        return number(context, next ? "resume_next" : "resume_open", resumeLastPosition(context) ? 1 : 2);
+    }
+    public static void resetSettings(Context context) { clearPrefixes(context, "setting."); }
+    public static void clearPositions(Context context) {
+        clearPrefixes(context, "position.", "total.");
+        for (SavedItem item : recents(context)) updateReadingProgress(context, item.uri, 0, 0);
+    }
+    public static void clearAllBookmarks(Context context) {
+        clearPrefixes(context, "bookmark.", "bookmark_meta.", "bookmark_memo.", BOOKMARKED_ITEMS);
+    }
+    private static void clearPrefixes(Context context, String... prefixes) {
+        SharedPreferences.Editor editor = prefs(context).edit();
+        for (String name : prefs(context).getAll().keySet()) for (String prefix : prefixes) if (name.startsWith(prefix)) editor.remove(name);
+        editor.apply();
     }
 
     public static Uri getTree(Context context) {
@@ -106,7 +129,7 @@ public final class AppState {
             Uri uri = Uri.parse(raw);
             String id = key(uri);
             result.add(new SavedItem(uri,
-                    pref.getString("favorite." + id + ".title", "名称なし"),
+                    pref.getString("favorite." + id + ".title", I18n.t(R.string.ui_untitled)),
                     pref.getString("favorite." + id + ".kind", "ファイル"),
                     pref.getLong("favorite." + id + ".time", 0),
                     getPosition(context, uri), totalPages(context, uri)));
@@ -142,7 +165,7 @@ public final class AppState {
         for (String raw : pref.getStringSet(DIRECTORIES, Collections.<String>emptySet())) {
             Uri uri = Uri.parse(raw);
             String id = key(uri);
-            result.add(new SavedItem(uri, pref.getString("directory." + id + ".title", "名称なし"),
+            result.add(new SavedItem(uri, pref.getString("directory." + id + ".title", I18n.t(R.string.ui_untitled)),
                     "フォルダ", pref.getLong("directory." + id + ".time", 0), 0, 0));
         }
         Collections.sort(result, (left, right) -> Long.compare(right.timestamp, left.timestamp));
@@ -172,7 +195,7 @@ public final class AppState {
             String raw = pref.getString(base + "uri", null);
             if (raw == null) continue;
             result.add(new SavedItem(Uri.parse(raw),
-                    pref.getString(base + "title", "名称なし"),
+                    pref.getString(base + "title", I18n.t(R.string.ui_untitled)),
                     pref.getString(base + "kind", "ファイル"),
                     pref.getLong(base + "time", 0),
                     pref.getInt(base + "position", 0),
@@ -213,10 +236,24 @@ public final class AppState {
     }
 
     public static void updateReadingProgress(Context context, Uri uri, int page, int totalPages) {
-        SharedPreferences pref = prefs(context);
-        SharedPreferences.Editor editor = pref.edit()
-                .putInt("position." + key(uri), Math.max(0, page))
-                .putInt("total." + key(uri), Math.max(0, totalPages));
+        synchronized (ReadingSync.class) {
+            String id = syncId(context, uri);
+            if (id != null) {
+                try {
+                    org.json.JSONObject records = syncRecords(context);
+                    records.put(id, new org.json.JSONObject().put("page", Math.max(0, page)).put("total", Math.max(0, totalPages)).put("updated", System.currentTimeMillis()));
+                    prefs(context).edit().putString("sync.records", records.toString()).apply();
+                } catch (org.json.JSONException ignored) { }
+            }
+            SharedPreferences pref = prefs(context);
+            SharedPreferences.Editor editor = pref.edit();
+            writeReadingProgress(pref, editor, uri, page, totalPages);
+            editor.apply();
+        }
+    }
+
+    private static void writeReadingProgress(SharedPreferences pref, SharedPreferences.Editor editor, Uri uri, int page, int totalPages) {
+        editor.putInt("position." + key(uri), Math.max(0, page)).putInt("total." + key(uri), Math.max(0, totalPages));
         for (int index = 0; index < RECENT_LIMIT; index++) {
             String base = "recent." + index + ".";
             if (uri.toString().equals(pref.getString(base + "uri", null))) {
@@ -225,11 +262,72 @@ public final class AppState {
                 break;
             }
         }
+    }
+
+    static String syncId(Context context, Uri uri) { return prefs(context).getString("sync.id." + key(uri), null); }
+    static org.json.JSONObject syncRecords(Context context) throws org.json.JSONException {
+        return new org.json.JSONObject(prefs(context).getString("sync.records", "{}"));
+    }
+    static void identifyForSync(Context context, SavedItem item, String hash) throws org.json.JSONException {
+        org.json.JSONObject records = syncRecords(context);
+        if (!records.has(hash)) records.put(hash, new org.json.JSONObject().put("page", item.position).put("total", item.totalPages).put("updated", item.timestamp));
+        prefs(context).edit().putString("sync.id." + key(item.uri), hash).putString("sync.records", records.toString()).apply();
+    }
+    static String syncDevice(Context context) {
+        String id = prefs(context).getString("sync.device", null);
+        if (id == null) { id = java.util.UUID.randomUUID().toString(); prefs(context).edit().putString("sync.device", id).apply(); }
+        return id;
+    }
+    /** Apply remote timestamps unchanged: importing progress must not create a new local edit. */
+    static void applySyncedProgress(Context context, org.json.JSONObject records) {
+        SharedPreferences pref = prefs(context);
+        SharedPreferences.Editor editor = pref.edit().putString("sync.records", records.toString());
+        for (SavedItem item : recents(context)) {
+            String id = syncId(context, item.uri);
+            org.json.JSONObject value = id == null ? null : records.optJSONObject(id);
+            if (value == null) continue;
+            int page = value.optInt("page", -1), total = value.optInt("total", -1);
+            if (page >= 0 && total >= 0 && (total == 0 || page < total)) writeReadingProgress(pref, editor, item.uri, page, total);
+        }
         editor.apply();
     }
 
     public static void clearPosition(Context context, Uri uri) {
-        prefs(context).edit().remove("position." + key(uri)).apply();
+        updateReadingProgress(context, uri, 0, totalPages(context, uri));
+    }
+
+    public static void relocate(Context context, Uri oldUri, Uri newUri, String title) {
+        if (newUri == null) return;
+        SharedPreferences pref = prefs(context);
+        String oldId = key(oldUri), newId = key(newUri);
+        SharedPreferences.Editor editor = pref.edit();
+        if (!oldUri.equals(newUri)) {
+            String[] prefixes = {"position.", "total.", "bookmark.", "bookmark_meta.", "bookmark_memo.", "favorite.", "directory.", "sync.id."};
+            for (java.util.Map.Entry<String, ?> entry : pref.getAll().entrySet()) for (String prefix : prefixes) {
+                String name = entry.getKey();
+                if (!name.equals(prefix + oldId) && !name.startsWith(prefix + oldId + ".")) continue;
+                String renamed = prefix + newId + name.substring((prefix + oldId).length()); Object value = entry.getValue();
+                if (value instanceof Integer) editor.putInt(renamed, (Integer)value);
+                else if (value instanceof Long) editor.putLong(renamed, (Long)value);
+                else if (value instanceof String) editor.putString(renamed, (String)value);
+                else if (value instanceof Set) { @SuppressWarnings("unchecked") Set<String> values = (Set<String>)value; editor.putStringSet(renamed, new HashSet<>(values)); }
+                editor.remove(name);
+            }
+            for (String catalog : new String[]{FAVORITES, DIRECTORIES, BOOKMARKED_ITEMS}) {
+                Set<String> values = new HashSet<>(pref.getStringSet(catalog, Collections.<String>emptySet()));
+                if (values.remove(oldUri.toString())) { values.add(newUri.toString()); editor.putStringSet(catalog, values); }
+            }
+        }
+        for (int index=0; index<RECENT_LIMIT; index++) if (oldUri.toString().equals(pref.getString("recent."+index+".uri", null)))
+            editor.putString("recent."+index+".uri", newUri.toString()).putString("recent."+index+".title",title);
+        if (isFavorite(context, oldUri)) editor.putString("favorite."+newId+".title",title);
+        if (isDirectory(context, oldUri)) editor.putString("directory."+newId+".title",title);
+        if (!bookmarks(context, oldUri).isEmpty()) editor.putString("bookmark_meta."+newId+".title",title);
+        editor.apply();
+        if (!oldUri.equals(newUri)) {
+            File oldCover=coverFile(context,oldUri), newCover=coverFile(context,newUri);
+            if(oldCover.isFile() && !newCover.exists()) oldCover.renameTo(newCover);
+        }
     }
 
     public static Set<Integer> bookmarks(Context context, Uri uri) {
@@ -244,7 +342,7 @@ public final class AppState {
     }
 
     public static void setBookmark(Context context, Uri uri, int page, boolean bookmarked) {
-        setBookmark(context, uri, page, bookmarked, "名称なし", "ファイル");
+        setBookmark(context, uri, page, bookmarked, I18n.t(R.string.ui_untitled), "ファイル");
     }
 
     public static void setBookmark(Context context, Uri uri, int page, boolean bookmarked, String title, String kind) {
@@ -282,7 +380,7 @@ public final class AppState {
             Uri uri = Uri.parse(raw);
             String id = key(uri);
             if (bookmarks(context, uri).isEmpty()) continue;
-            String fallbackTitle = "名称なし";
+            String fallbackTitle = I18n.t(R.string.ui_untitled);
             String fallbackKind = "ファイル";
             for (SavedItem item : known) if (item.uri.equals(uri)) { fallbackTitle = item.title; fallbackKind = item.kind; break; }
             result.add(new SavedItem(uri,
@@ -372,16 +470,16 @@ public final class AppState {
 
     public static boolean gridView(Context context) { return prefs(context).getBoolean("setting.grid_view", false); }
     public static void setGridView(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.grid_view", enabled).apply(); }
-    public static int gridColumns(Context context) { return Math.max(2, Math.min(4, prefs(context).getInt("setting.grid_columns", 3))); }
-    public static void setGridColumns(Context context, int columns) { prefs(context).edit().putInt("setting.grid_columns", Math.max(2, Math.min(4, columns))).apply(); }
+    public static int gridColumns(Context context) { return Math.max(1, Math.min(10, prefs(context).getInt("setting.grid_columns", 3))); }
+    public static void setGridColumns(Context context, int columns) { prefs(context).edit().putInt("setting.grid_columns", Math.max(1, Math.min(10, columns))).apply(); }
     public static boolean showLibraryPath(Context context) { return prefs(context).getBoolean("setting.show_library_path", true); }
     public static void setShowLibraryPath(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.show_library_path", enabled).apply(); }
     public static boolean leftLibraryScrollbar(Context context) { return prefs(context).getBoolean("setting.left_library_scrollbar", false); }
     public static void setLeftLibraryScrollbar(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.left_library_scrollbar", enabled).apply(); }
     public static boolean pageButtons(Context context) { return prefs(context).getBoolean("setting.page_buttons", true); }
     public static void setPageButtons(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.page_buttons", enabled).apply(); }
-    public static int pageButtonOpacity(Context context) { return Math.max(30, Math.min(100, prefs(context).getInt("setting.page_button_opacity", 70))); }
-    public static void setPageButtonOpacity(Context context, int opacity) { prefs(context).edit().putInt("setting.page_button_opacity", Math.max(30, Math.min(100, opacity))).apply(); }
+    public static int pageButtonOpacity(Context context) { return Math.max(0, Math.min(100, prefs(context).getInt("setting.page_button_opacity", 70))); }
+    public static void setPageButtonOpacity(Context context, int opacity) { prefs(context).edit().putInt("setting.page_button_opacity", Math.max(0, Math.min(100, opacity))).apply(); }
     public static int pageButtonHeight(Context context) { return Math.max(64, Math.min(160, prefs(context).getInt("setting.page_button_height", 96))); }
     public static void setPageButtonHeight(Context context, int height) { prefs(context).edit().putInt("setting.page_button_height", Math.max(64, Math.min(160, height))).apply(); }
     public static int readingFlow(Context context) { return prefs(context).getInt("setting.reading_flow", FLOW_HORIZONTAL); }
@@ -390,8 +488,8 @@ public final class AppState {
     public static void setPageLayout(Context context, int mode) { prefs(context).edit().putInt("setting.page_layout", Math.max(PAGE_SINGLE, Math.min(PAGE_AUTO, mode))).apply(); }
     public static boolean dualPageDivider(Context context) { return prefs(context).getBoolean("setting.dual_page_divider", true); }
     public static void setDualPageDivider(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.dual_page_divider", enabled).apply(); }
-    public static int doubleTapScale(Context context) { return Math.max(150, Math.min(400, prefs(context).getInt("setting.double_tap_scale", 225))); }
-    public static void setDoubleTapScale(Context context, int percent) { prefs(context).edit().putInt("setting.double_tap_scale", Math.max(150, Math.min(400, percent))).apply(); }
+    public static int doubleTapScale(Context context) { return Math.max(100, Math.min(600, prefs(context).getInt("setting.double_tap_scale", 225))); }
+    public static void setDoubleTapScale(Context context, int percent) { prefs(context).edit().putInt("setting.double_tap_scale", Math.max(100, Math.min(600, percent))).apply(); }
     public static int doubleTapMode(Context context) { return prefs(context).getInt("setting.double_tap_mode", DOUBLE_TAP_TOGGLE); }
     public static void setDoubleTapMode(Context context, int mode) { prefs(context).edit().putInt("setting.double_tap_mode", mode).apply(); }
     public static int imageFilter(Context context) { return prefs(context).getInt("setting.image_filter", FILTER_NONE); }
@@ -436,14 +534,17 @@ public final class AppState {
     }
 
     public static void clearReadingData(Context context) {
-        SharedPreferences pref = prefs(context);
-        SharedPreferences.Editor editor = pref.edit();
-        for (String name : pref.getAll().keySet()) {
-            if (name.startsWith("position.") || name.startsWith("total.") || name.startsWith("bookmark.")
-                    || name.startsWith("bookmark_meta.") || name.startsWith("bookmark_memo.")) editor.remove(name);
+        synchronized (ReadingSync.class) {
+            ReadingSync.disable(context);
+            SharedPreferences pref = prefs(context);
+            SharedPreferences.Editor editor = pref.edit();
+            for (String name : pref.getAll().keySet()) {
+                if (name.startsWith("position.") || name.startsWith("total.") || name.startsWith("bookmark.")
+                        || name.startsWith("bookmark_meta.") || name.startsWith("bookmark_memo.") || name.startsWith("sync.")) editor.remove(name);
+            }
+            editor.remove(BOOKMARKED_ITEMS);
+            editor.apply();
         }
-        editor.remove(BOOKMARKED_ITEMS);
-        editor.apply();
     }
 
     public static void clearLibrary(Context context) {
@@ -455,7 +556,7 @@ public final class AppState {
         clearCovers(context);
     }
 
-    private static String key(Uri uri) {
+    static String key(Uri uri) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(uri.toString().getBytes(StandardCharsets.UTF_8));
             StringBuilder value = new StringBuilder();

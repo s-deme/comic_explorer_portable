@@ -31,7 +31,7 @@ public final class LibraryDirectoryReader {
                 : DocumentsContract.getDocumentId(directoryUri);
         Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId);
         try (Cursor cursor = resolver.query(children, CHILD_PROJECTION, null, null, null)) {
-            if (cursor == null) throw new IllegalStateException("フォルダを読み取れません。");
+            if (cursor == null) throw new IllegalStateException(I18n.t(R.string.ui_cannot_read_folder));
             while (cursor.moveToNext()) {
                 String childId = cursor.getString(0);
                 String name = cursor.getString(1);
@@ -58,6 +58,6 @@ public final class LibraryDirectoryReader {
         try (Cursor cursor = resolver.query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
             if (cursor != null && cursor.moveToFirst()) return cursor.getString(0);
         } catch (Exception ignored) { }
-        return "ライブラリ";
+        return I18n.t(R.string.ui_library);
     }
 }

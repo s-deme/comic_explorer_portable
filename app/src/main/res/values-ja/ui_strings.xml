@@ -1,0 +1,404 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_cannot_load_page" formatted="false">"ページを読み込めません"</string>
+    <string name="ui_ascending" formatted="false">"の昇順"</string>
+    <string name="ui_past_week" formatted="false">"1週間以内"</string>
+    <string name="ui_set_current_page_as_cover" formatted="false">"現在のページを表紙にする"</string>
+    <string name="ui_cannot_save_cover" formatted="false">"表紙を保存できません。"</string>
+    <string name="ui_host_name" formatted="false">"ホスト名"</string>
+    <string name="ui_opacity" formatted="false">"不透明度"</string>
+    <string name="ui_create_folder" formatted="false">"フォルダーの作成"</string>
+    <string name="ui_wait_for_the_page_to_load" formatted="false">"ページの読み込み後に設定してください"</string>
+    <string name="ui_expands_the_image_area_to_punch_holes" formatted="false">"画像の表示可能エリアをパンチホール部分まで拡張します"</string>
+    <string name="ui_could_not_save_cover" formatted="false">"表紙を保存できませんでした"</string>
+    <string name="ui_enter_a_share_name" formatted="false">"共有名を入力してください"</string>
+    <string name="ui_search_media_store" formatted="false">"メディアストア 検索"</string>
+    <string name="ui_cannot_delete_cache" formatted="false">"キャッシュを削除できません"</string>
+    <string name="ui_double_tap_zoom" formatted="false">"ダブルタップ拡大"</string>
+    <string name="ui_delete_cache" formatted="false">"キャッシュを削除しますか？"</string>
+    <string name="ui_remove_all_favorites" formatted="false">"お気に入りをすべて解除"</string>
+    <string name="ui_language" formatted="false">"言語(Language)"</string>
+    <string name="ui_could_not_load_page" formatted="false">" ページを読み込めません: "</string>
+    <string name="ui_clear_thumbnails" formatted="false">"サムネイルの削除"</string>
+    <string name="ui_bookmark_this_page" formatted="false">"このページにしおりを追加"</string>
+    <string name="ui_add_to_favorites" formatted="false">"お気に入りに追加"</string>
+    <string name="ui_reset_all_settings" formatted="false">"全ての設定を初期化しますか？"</string>
+    <string name="ui_select_folder_again" formatted="false">"フォルダを選び直す"</string>
+    <string name="ui_show_bookmarked_books" formatted="false">"しおりのある作品を表示"</string>
+    <string name="ui_settings" formatted="false">"設定"</string>
+    <string name="ui_page_dividing_line_dual_pages" formatted="false">"ページ分割線 - 見開"</string>
+    <string name="ui_actions_for_this_list" formatted="false">"現在の一覧の操作"</string>
+    <string name="ui_line_breaks_are_not_allowed" formatted="false">"改行は使用できません"</string>
+    <string name="ui_no_bookmarks_yet" formatted="false">"しおりはまだありません"</string>
+    <string name="ui_invalid_connection" formatted="false">"無効な接続先"</string>
+    <string name="ui_path" formatted="false">"パス"</string>
+    <string name="ui_search_by_extension_selected_folder_and_subfolders" formatted="false">"ファイル拡張子の検索（選択フォルダ以下）"</string>
+    <string name="ui_auto_page_turn" formatted="false">"自動ページ送り"</string>
+    <string name="ui_domain_smb" formatted="false">"ドメイン（SMB）"</string>
+    <string name="ui_gallery_search_type" formatted="false">"ギャラリーの検索タイプ"</string>
+    <string name="ui_edit" formatted="false">"編集"</string>
+    <string name="ui_interpolation" formatted="false">"補間方式"</string>
+    <string name="ui_remove_from_favorites" formatted="false">"お気に入りから外す"</string>
+    <string name="ui_page_number_tap_to_jump" formatted="false">"ページ番号。タップして移動"</string>
+    <string name="ui_single_page" formatted="false">"単ページ"</string>
+    <string name="ui_sync_data_is_too_large" formatted="false">"同期データが大きすぎます"</string>
+    <string name="ui_next_menu_page" formatted="false">"次のメニューページ"</string>
+    <string name="ui_favorites" formatted="false">"お気に入り"</string>
+    <string name="ui_3_tap_for_next" formatted="false">" / 3。タップで次へ"</string>
+    <string name="ui_left" formatted="false">"左へ"</string>
+    <string name="ui_scroll_animation" formatted="false">"スクロールアニメーション"</string>
+    <string name="ui_add_hardware_key" formatted="false">"ハードウェアキーを追加"</string>
+    <string name="ui_delete_reading_data_and_library_registrations_book_files_will_be" formatted="false">"作品ファイルは残し、読書データとライブラリ登録を削除しますか？"</string>
+    <string name="ui_two_pages" formatted="false">"見開き"</string>
+    <string name="ui_open_the_last_compressed_file" formatted="false">"前回に見た圧縮ファイルを直接開きます"</string>
+    <string name="ui_drag_to_select_a_crop_area" formatted="false">"切り抜く範囲をドラッグして選択"</string>
+    <string name="ui_comic_explorer_1_1_2_read_comics_and_pdfs_from" formatted="false">"Comic Explorer 1.1.2\n端末・ネットワーク上の漫画とPDFを読むビューワ\n広告なし"</string>
+    <string name="ui_0_items" formatted="false">"0 件"</string>
+    <string name="ui_background_color" formatted="false">"背景色 設定"</string>
+    <string name="ui_passive_ftp_off_active" formatted="false">"FTP passive（オフでactive）"</string>
+    <string name="ui_columns" formatted="false">"カラム"</string>
+    <string name="ui_auto_two_pages_in_landscape" formatted="false">"自動（横画面は見開き）"</string>
+    <string name="ui_right_vertical" formatted="false">"下へ(右)"</string>
+    <string name="ui_position" formatted="false">"位置"</string>
+    <string name="ui_zoom" formatted="false">"ズーム"</string>
+    <string name="ui_name" formatted="false">"表示名"</string>
+    <string name="ui_add_connection" formatted="false">"接続先を追加"</string>
+    <string name="ui_zoom_inside_fit_screen_outside" formatted="false">"ズーム(inside) + 画面のサイズに合わせる(outside)"</string>
+    <string name="ui_fit_height" formatted="false">"高さに合わせる"</string>
+    <string name="ui_directory_removed" formatted="false">"登録ディレクトリから外しました"</string>
+    <string name="ui_cannot_create_folder" formatted="false">"フォルダを作成できません"</string>
+    <string name="ui_turn_sync_off" formatted="false">"同期をオフ"</string>
+    <string name="ui_delete_item" formatted="false">"アイテムの削除"</string>
+    <string name="ui_reading_positions_synced" formatted="false">"ページ再開の同期が完了しました"</string>
+    <string name="ui_fit_screen" formatted="false">"表示方法"</string>
+    <string name="ui_saved_to_pictures_comic_explorer" formatted="false">"Pictures/Comic Explorer に保存しました"</string>
+    <string name="ui_cannot_list_ftp_directory" formatted="false">"FTP一覧取得に失敗しました"</string>
+    <string name="ui_no_folder_selected" formatted="false">"フォルダ未選択"</string>
+    <string name="ui_cannot_open_file" formatted="false">"ファイルを開けません。"</string>
+    <string name="ui_search_library" formatted="false">"ライブラリを検索"</string>
+    <string name="ui_descending" formatted="false">"降順にする"</string>
+    <string name="ui_continuous_vertical_scrolling" formatted="false">"連続縦スクロール"</string>
+    <string name="ui_scroll_length_vertical" formatted="false">"スクロールの長さ(下へ)"</string>
+    <string name="ui_right" formatted="false">"右へ"</string>
+    <string name="ui_remove_all_saved_directories" formatted="false">"登録ディレクトリをすべて解除"</string>
+    <string name="ui_default" formatted="false">"デフォルト"</string>
+    <string name="ui_left_page_button" formatted="false">"左側のページ操作"</string>
+    <string name="ui_delete_history_by_time_range" formatted="false">"履歴を期間指定で消去"</string>
+    <string name="ui_try_a_different_name" formatted="false">"別の名前で検索してください。"</string>
+    <string name="ui_cannot_replace_the_existing_cover" formatted="false">"既存の表紙を置き換えられません。"</string>
+    <string name="ui_hide_status_and_navigation_bars" formatted="false">"ステータスバー・ナビゲーションバーを隠す"</string>
+    <string name="ui_reverse" formatted="false">"反転"</string>
+    <string name="ui_reader_menu" formatted="false">"読書メニュー "</string>
+    <string name="ui_refresh" formatted="false">"更新"</string>
+    <string name="ui_sync_with_google_drive" formatted="false">"Google Driveと同期"</string>
+    <string name="ui_thumbnails" formatted="false">"サムネイル"</string>
+    <string name="ui_only_folders_can_be_created" formatted="false">"作成できるのはフォルダです"</string>
+    <string name="ui_an_item_with_that_name_already_exists" formatted="false">"同じ名前の項目が存在します"</string>
+    <string name="ui_square" formatted="false">"正方形"</string>
+    <string name="ui_delete_archive_cache" formatted="false">"圧縮ファイルのキャッシュ削除"</string>
+    <string name="ui_reset_all_settings_2" formatted="false">"全ての設定を初期化します"</string>
+    <string name="ui_enter_a_color_as_rrggbb" formatted="false">"#RRGGBB の形式で入力してください"</string>
+    <string name="ui_page_dividing_line_scroll_pages" formatted="false">"ページ分割線 - スクロールページ"</string>
+    <string name="ui_choose_another_folder" formatted="false">"別のフォルダを選ぶ"</string>
+    <string name="ui_cannot_read_folder" formatted="false">"フォルダを読み取れません。"</string>
+    <string name="ui_retention" formatted="false">"保存期間"</string>
+    <string name="ui_cannot_read_cache" formatted="false">"キャッシュを読み取れません"</string>
+    <string name="ui_stretch_to_fill_screen" formatted="false">"画面いっぱいに伸縮"</string>
+    <string name="ui_key_binding_saved" formatted="false">"割り当てを保存しました"</string>
+    <string name="ui_more_reading_settings" formatted="false">"その他の読書設定"</string>
+    <string name="ui_screen_rotation" formatted="false">"画面回転"</string>
+    <string name="ui_disabled" formatted="false">"無効"</string>
+    <string name="ui_open" formatted="false">"開く"</string>
+    <string name="ui_unsupported_format_choose_pdf_cbz_zip_or_images" formatted="false">"この形式は表示できません。PDF、CBZ/ZIP、画像に対応しています。"</string>
+    <string name="ui_show" formatted="false">"を表示"</string>
+    <string name="ui_operation_failed" formatted="false">"操作できません: "</string>
+    <string name="ui_close_settings" formatted="false">"設定を閉じる"</string>
+    <string name="ui_connection" formatted="false">"接続先"</string>
+    <string name="ui_writing_network_files_is_not_supported" formatted="false">"ネットワークファイルへの書き込みは対応していません"</string>
+    <string name="ui_cannot_write_cover" formatted="false">"表紙を書き込めません。"</string>
+    <string name="ui_show_folder_path" formatted="false">"フォルダのパスを表示"</string>
+    <string name="ui_select_the_folder_again" formatted="false">" フォルダを選び直してください。"</string>
+    <string name="ui_items" formatted="false">" 件"</string>
+    <string name="ui_delete_permanently" formatted="false">" を完全に削除しますか？"</string>
+    <string name="ui_page_spacing" formatted="false">"ページ間隔"</string>
+    <string name="ui_file_explorer" formatted="false">"ファイルエクスプローラ"</string>
+    <string name="ui_reading_position_reset" formatted="false">"復帰位置を先頭に戻しました"</string>
+    <string name="ui_google_authorization_failed_check_the_app_oauth_registration_and_google" formatted="false">"Google認証に失敗しました。アプリのOAuth登録とGoogle Play開発者サービスを確認してください。"</string>
+    <string name="ui_cannot_read_image" formatted="false">"画像を読み取れません。"</string>
+    <string name="ui_directory_saved" formatted="false">"ディレクトリに登録しました"</string>
+    <string name="ui_sharpening_strength" formatted="false">"シャープ強度"</string>
+    <string name="ui_no_supported_files" formatted="false">"表示できるファイルがありません"</string>
+    <string name="ui_sort" formatted="false">"並び順"</string>
+    <string name="ui_use_volume_keys" formatted="false">"音量キーを使用"</string>
+    <string name="ui_image_fit_to_screen" formatted="false">"画面に合わせる"</string>
+    <string name="ui_choose_the_folder_containing_your_comics" formatted="false">"漫画の入ったフォルダを選択してください。"</string>
+    <string name="ui_books" formatted="false">"作品一覧"</string>
+    <string name="ui_size" formatted="false">"サイズ"</string>
+    <string name="ui_cannot_move" formatted="false">"移動できません"</string>
+    <string name="ui_days" formatted="false">" 日"</string>
+    <string name="ui_cannot_save" formatted="false">"保存できません"</string>
+    <string name="ui_delete_all_bookmarks" formatted="false">"全てのしおりを削除しますか？"</string>
+    <string name="ui_keep_buttons_visible_with_menus" formatted="false">"メニュー表示中もボタンを表示"</string>
+    <string name="ui_sync_book_identifiers_and_reading_positions_in_private_google_drive" formatted="false">"作品の識別情報と復帰位置をGoogle Driveのアプリ専用領域で同期します。作品ファイルは送信しません。"</string>
+    <string name="ui_cannot_open_folder" formatted="false">"フォルダを開けません"</string>
+    <string name="ui_list_type" formatted="false">"リストタイプ"</string>
+    <string name="ui_long_press_a_book_to_add_it" formatted="false">"作品を長押しして追加できます。"</string>
+    <string name="ui_cache_size" formatted="false">"キャッシュ容量"</string>
+    <string name="ui_untitled" formatted="false">"名称なし"</string>
+    <string name="ui_type" formatted="false">"タイプ"</string>
+    <string name="ui_first_chapter" formatted="false">"最初の章"</string>
+    <string name="ui_ftp_transfer_did_not_complete" formatted="false">"FTP転送が完了しませんでした"</string>
+    <string name="ui_no_history" formatted="false">"履歴はありません"</string>
+    <string name="ui_files_inside_this_folder_will_also_be_deleted" formatted="false">"\nフォルダ内のファイルも削除されます。"</string>
+    <string name="ui_page_layout" formatted="false">"ページレイアウト"</string>
+    <string name="ui_invalid_path" formatted="false">"無効なパス"</string>
+    <string name="ui_show_statusbar" formatted="false">"ステータスバーを表示"</string>
+    <string name="ui_updated" formatted="false">"更新: "</string>
+    <string name="ui_choose_again" formatted="false">"選び直す"</string>
+    <string name="ui_no_folder_selected_2" formatted="false">"フォルダが選択されていません"</string>
+    <string name="ui_recently_opened_books" formatted="false">"最近開いた作品"</string>
+    <string name="ui_tap_to_change" formatted="false">"。タップして変更"</string>
+    <string name="ui_cache_retention" formatted="false">"キャッシュ保存期間"</string>
+    <string name="ui_file_operations" formatted="false">"ファイル操作"</string>
+    <string name="ui_crop" formatted="false">"切り抜き"</string>
+    <string name="ui_the_image_is_invalid_or_unsupported" formatted="false">"画像が壊れているか、未対応の形式です。"</string>
+    <string name="ui_enter_a_page_number" formatted="false">" の番号を入力してください"</string>
+    <string name="ui_enter_the_connection_password_again" formatted="false">"接続パスワードを再設定してください"</string>
+    <string name="ui_filter" formatted="false">"フィルター"</string>
+    <string name="ui_auto_rotate" formatted="false">"自動回転"</string>
+    <string name="ui_show_filename" formatted="false">"ファイル名 表示"</string>
+    <string name="ui_close_book" formatted="false">"作品を閉じる"</string>
+    <string name="ui_remove_this_bookmark" formatted="false">"このページのしおりを削除"</string>
+    <string name="ui_system_settings" formatted="false">"システム設定"</string>
+    <string name="ui_sync_resume_page_beta" formatted="false">"ページ再開同期 (beta)"</string>
+    <string name="ui_list" formatted="false">"リスト"</string>
+    <string name="ui_punch_hole_display_portrait" formatted="false">"ホール・ディスプレイ - 縦向き"</string>
+    <string name="ui_cannot_move_a_folder_into_itself" formatted="false">"フォルダ自身の中には移動できません"</string>
+    <string name="ui_loading" formatted="false">"読み込み中…"</string>
+    <string name="ui_modified_date" formatted="false">"更新日時"</string>
+    <string name="ui_menu" formatted="false">"メニュー"</string>
+    <string name="ui_cannot_continue_transfer" formatted="false">"転送を継続できません"</string>
+    <string name="ui_open_menu" formatted="false">"メニューを開く"</string>
+    <string name="ui_edit_bookmark_note" formatted="false">"しおりメモを編集"</string>
+    <string name="ui_image_filters" formatted="false">"画像フィルター"</string>
+    <string name="ui_file_access_was_revoked_select_the_folder_again_in_the" formatted="false">"ファイルへのアクセス許可が失われました。ライブラリでフォルダを選び直してください。"</string>
+    <string name="ui_enable" formatted="false">"有効にする"</string>
+    <string name="ui_ask" formatted="false">"質問"</string>
+    <string name="ui_bookmark_removed" formatted="false">"しおりを削除しました"</string>
+    <string name="ui_show_saved_directories" formatted="false">"登録したディレクトリを表示"</string>
+    <string name="ui_ascending_2" formatted="false">"昇順にする"</string>
+    <string name="ui_network_connections" formatted="false">"ネットワーク接続"</string>
+    <string name="ui_exit_fullscreen" formatted="false">"全画面を解除"</string>
+    <string name="ui_chapters" formatted="false">"章一覧"</string>
+    <string name="ui_enter_a_valid_name" formatted="false">"有効な名前を入力してください"</string>
+    <string name="ui_name_2" formatted="false">"名前順"</string>
+    <string name="ui_parent_folder" formatted="false">"親フォルダへ"</string>
+    <string name="ui_invert_color" formatted="false">"色反転"</string>
+    <string name="ui_apply" formatted="false">"実行"</string>
+    <string name="ui_hardware_key" formatted="false">"ハードウェアキー"</string>
+    <string name="ui_delete_all_user_data_including_bookmarks_and_thumbnails" formatted="false">"しおり、サムネイル等の全ユーザーデータを削除します"</string>
+    <string name="ui_bookmarks" formatted="false">"\nしおり: "</string>
+    <string name="ui_past_hour" formatted="false">"1時間以内"</string>
+    <string name="ui_choose_folder" formatted="false">"フォルダを選ぶ"</string>
+    <string name="ui_every_15_seconds" formatted="false">"15秒ごと"</string>
+    <string name="ui_show_storage" formatted="false">"ストレージを表示"</string>
+    <string name="ui_next_page" formatted="false">"次のページ"</string>
+    <string name="ui_pages" formatted="false">" ページ（"</string>
+    <string name="ui_canceled" formatted="false">"キャンセルしました"</string>
+    <string name="ui_close_search" formatted="false">"検索を閉じる"</string>
+    <string name="ui_name_3" formatted="false">"名前"</string>
+    <string name="ui_no_favorites" formatted="false">"お気に入りはありません"</string>
+    <string name="ui_search_file_names" formatted="false">"ファイル名を検索"</string>
+    <string name="ui_quick_view_floating_button" formatted="false">"クイックビューボタン"</string>
+    <string name="ui_cannot_delete_folder" formatted="false">"フォルダを削除できません"</string>
+    <string name="ui_set_zip_file_cache_retention_period" formatted="false">"圧縮ファイルのキャッシュ保存期間の設定"</string>
+    <string name="ui_reset_settings" formatted="false">"設定の初期化"</string>
+    <string name="ui_first_menu_page" formatted="false">"最初のメニューページ"</string>
+    <string name="ui_change_list_type" formatted="false">"一覧の表示形式を切り替え"</string>
+    <string name="ui_sharpen_filter" formatted="false">"シャープフィルタ"</string>
+    <string name="ui_both_buttons_move_forward" formatted="false">"両方のボタンで次へ進む"</string>
+    <string name="ui_clear_all_cache" formatted="false">"全キャッシュデータの削除"</string>
+    <string name="ui_cannot_delete_connection_root" formatted="false">"接続ルートは削除できません"</string>
+    <string name="ui_previous_page" formatted="false">"前のページ"</string>
+    <string name="ui_past_day" formatted="false">"24時間以内"</string>
+    <string name="ui_select_whether_to_use_the_resume_page" formatted="false">"前回中断した位置から再開するかどうかを選択します"</string>
+    <string name="ui_every_10_seconds" formatted="false">"10秒ごと"</string>
+    <string name="ui_change" formatted="false">"変更"</string>
+    <string name="ui_clear_history" formatted="false">"履歴を消去"</string>
+    <string name="ui_none" formatted="false">"なし"</string>
+    <string name="ui_page_thumbnails" formatted="false">"ページ一覧"</string>
+    <string name="ui_lock_portrait" formatted="false">"縦向きに固定"</string>
+    <string name="ui_horizontal_swipe" formatted="false">"横スワイプ"</string>
+    <string name="ui_descending_2" formatted="false">"の降順"</string>
+    <string name="ui_clear_reading_position" formatted="false">"復帰位置を消去"</string>
+    <string name="ui_brightness" formatted="false">"明るさ"</string>
+    <string name="ui_every_5_seconds" formatted="false">"5秒ごと"</string>
+    <string name="ui_file_not_found" formatted="false">"ファイルが見つかりません"</string>
+    <string name="ui_cannot_open_image" formatted="false">"画像を開けません。"</string>
+    <string name="ui_bookmarks_2" formatted="false">"しおり一覧"</string>
+    <string name="ui_press_a_key_to_bind" formatted="false">"割り当てるキーを押してください"</string>
+    <string name="ui_margin_cropping" formatted="false">"画像トリミング"</string>
+    <string name="ui_history" formatted="false">"履歴"</string>
+    <string name="ui_book_thumbnails" formatted="false">"作品のサムネイル一覧"</string>
+    <string name="ui_cover_restored" formatted="false">"表紙を初期状態に戻しました"</string>
+    <string name="ui_remove_from_history" formatted="false">"履歴から削除"</string>
+    <string name="ui_cannot_delete_file" formatted="false">"ファイルを削除できません"</string>
+    <string name="ui_delete_all_histories" formatted="false">"全ての履歴を削除しますか？"</string>
+    <string name="ui_image_exceeds_the_48_mb_limit" formatted="false">"画像ページが大きすぎます（上限48MB）。"</string>
+    <string name="ui_fit_screen_2" formatted="false">"画面のサイズに合わせる"</string>
+    <string name="ui_about" formatted="false">"プログラム情報"</string>
+    <string name="ui_selected" formatted="false">"選択中"</string>
+    <string name="ui_remove_saved_directory" formatted="false">"登録ディレクトリから外す"</string>
+    <string name="ui_browse_folders" formatted="false">"フォルダを見る"</string>
+    <string name="ui_wait_for_the_page_to_load_before_saving" formatted="false">"ページの読み込み後に保存してください"</string>
+    <string name="ui_display_the_file_list_scrollbar_on_the_left_side" formatted="false">"ファイルリストのスクロールバーを左側に表示します"</string>
+    <string name="ui_show_next_reader_menu" formatted="false">"次の読書メニューを表示"</string>
+    <string name="ui_enter_a_host_name" formatted="false">"ホスト名を入力してください"</string>
+    <string name="ui_sync_your_resume_page_using_google_drive" formatted="false">"Google Driveを使用して、ページ再開の履歴を同期します"</string>
+    <string name="ui_cannot_open_pdf" formatted="false">"PDFを開けません。"</string>
+    <string name="ui_not_enough_free_space" formatted="false">"保存容量が不足しています"</string>
+    <string name="ui_ftp_authentication_failed" formatted="false">"FTPの認証に失敗しました"</string>
+    <string name="ui_clear_bookmarks" formatted="false">"しおりの削除"</string>
+    <string name="ui_modified_date_2" formatted="false">"更新日時順"</string>
+    <string name="ui_not_selected" formatted="false">"未選択"</string>
+    <string name="ui_no_bookmarks" formatted="false">"しおりはありません"</string>
+    <string name="ui_library" formatted="false">"ライブラリ"</string>
+    <string name="ui_save" formatted="false">"保存"</string>
+    <string name="ui_show_time_and_battery_status" formatted="false">"時間、バッテリーなどを表示する"</string>
+    <string name="ui_details" formatted="false">"詳細を表示"</string>
+    <string name="ui_crop_page_margins" formatted="false">"ページ余白を切り取る"</string>
+    <string name="ui_cannot_open_ftp_file" formatted="false">"FTPファイルを開けません"</string>
+    <string name="ui_show_a_dividing_line_between_scroll_pages" formatted="false">"スクロールページ間の分割線を表示"</string>
+    <string name="ui_enter_fullscreen" formatted="false">"全画面にする"</string>
+    <string name="ui_google_authorization_did_not_complete" formatted="false">"Google認証を完了できませんでした"</string>
+    <string name="ui_removed_from_favorites" formatted="false">"お気に入りから外しました"</string>
+    <string name="ui_long_press_a_folder_to_save_it" formatted="false">"フォルダを長押しして登録できます。"</string>
+    <string name="ui_encoding" formatted="false">"エンコード"</string>
+    <string name="ui_cannot_write_image" formatted="false">"画像を書き込めません。"</string>
+    <string name="ui_bookmark_added" formatted="false">"しおりに追加しました"</string>
+    <string name="ui_added_to_favorites" formatted="false">"お気に入りに追加しました"</string>
+    <string name="ui_system_brightness" formatted="false">"システムの明るさ"</string>
+    <string name="ui_connection_was_removed" formatted="false">"接続先が削除されています"</string>
+    <string name="ui_selected_2" formatted="false">"、選択中"</string>
+    <string name="ui_the_page_does_not_fit_in_memory_close_other_apps" formatted="false">"ページが大きすぎてメモリに収まりません。ほかのアプリを閉じるか、解像度を下げた本を使用してください。"</string>
+    <string name="ui_stop_auto_page_turn" formatted="false">"自動送りを停止"</string>
+    <string name="ui_port_must_be_between_1_and_65535" formatted="false">"ポートは1〜65535です"</string>
+    <string name="ui_external_file" formatted="false">"外部ファイル"</string>
+    <string name="ui_show_reading_history" formatted="false">"読書履歴を表示"</string>
+    <string name="ui_clear_all_bookmarks" formatted="false">"全てのしおりを削除します"</string>
+    <string name="ui_could_not_save_image" formatted="false">"画像を保存できませんでした"</string>
+    <string name="ui_all" formatted="false">"すべて"</string>
+    <string name="ui_open_file" formatted="false">"ファイルを開く"</string>
+    <string name="ui_cannot_read_gallery" formatted="false">"ギャラリーを読み取れません"</string>
+    <string name="ui_cannot_update_thumbnail" formatted="false">"サムネイルを更新できません"</string>
+    <string name="ui_reset_reading_position" formatted="false">"復帰位置を先頭に戻す"</string>
+    <string name="ui_invalid_image_in_archive" formatted="false">"CBZ内の画像が壊れています。"</string>
+    <string name="ui_cancel" formatted="false">"キャンセル"</string>
+    <string name="ui_delete_saved_reading_positions" formatted="false">"ページ再開ためのキャッシュを削除します"</string>
+    <string name="ui_save_directory" formatted="false">"ディレクトリに登録"</string>
+    <string name="ui_storage" formatted="false">"ストレージ"</string>
+    <string name="ui_directory" formatted="false">"ディレクトリ"</string>
+    <string name="ui_bookmark_a_page_while_reading_to_add_its_book_here" formatted="false">"読書画面でページにしおりを付けると、作品がここに表示されます。"</string>
+    <string name="ui_delete_all_bookmarks_2" formatted="false">"しおりをすべて消去"</string>
+    <string name="ui_keep_screen_on" formatted="false">"画面をオフにしない"</string>
+    <string name="ui_change_sort_order" formatted="false">"並び順を変更"</string>
+    <string name="ui_question_mark" formatted="false">"しますか？"</string>
+    <string name="ui_full_screen" formatted="false">"フルスクリーン"</string>
+    <string name="ui_cannot_create_cover_directory" formatted="false">"表紙の保存先を作成できません。"</string>
+    <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">"左右をタップ／スワイプでページ移動、中央タップでメニューを表示します"</string>
+    <string name="ui_no_results" formatted="false">"見つかりません"</string>
+    <string name="ui_double_tap" formatted="false">"ダブルタップ"</string>
+    <string name="ui_icon" formatted="false">"アイコン"</string>
+    <string name="ui_left_vertical" formatted="false">"下へ(左)"</string>
+    <string name="ui_right_page_button" formatted="false">"右側のページ操作"</string>
+    <string name="ui_go_to_page" formatted="false">"ページへ移動"</string>
+    <string name="ui_reading_direction" formatted="false">"ページ送り方向"</string>
+    <string name="ui_open_the_next_file" formatted="false">"次のファイルを開く"</string>
+    <string name="ui_page_navigation" formatted="false">"ページ移動"</string>
+    <string name="ui_lock_landscape" formatted="false">"横向きに固定"</string>
+    <string name="ui_saved_directories" formatted="false">"登録ディレクトリ"</string>
+    <string name="ui_show_a_dividing_line_between_dual_pages" formatted="false">"見開きページ間の分割線を表示"</string>
+    <string name="ui_upscaling" formatted="false">"アップスケーリング"</string>
+    <string name="ui_current_page_set_as_cover" formatted="false">"現在のページを表紙にしました"</string>
+    <string name="ui_no_readable_pages" formatted="false">"表示できるページがありません。"</string>
+    <string name="ui_note_optional" formatted="false">"メモ（省略可）"</string>
+    <string name="ui_grid" formatted="false">"グリッド"</string>
+    <string name="ui_invalid_name" formatted="false">"無効な名前"</string>
+    <string name="ui_delete_all" formatted="false">"すべて削除"</string>
+    <string name="ui_resume_page" formatted="false">"ページ再開"</string>
+    <string name="ui_fixed" formatted="false">"固定"</string>
+    <string name="ui_cannot_create_cache" formatted="false">"キャッシュを作成できません"</string>
+    <string name="ui_page_button_area" formatted="false">"ページボタン領域"</string>
+    <string name="ui_reader_menu_1_3" formatted="false">"読書メニュー 1 / 3"</string>
+    <string name="ui_cannot_modify_connection_root" formatted="false">"接続ルートは変更できません"</string>
+    <string name="ui_passwd" formatted="false">"パスワード"</string>
+    <string name="ui_clear_all_histories" formatted="false">"全ての履歴を削除します"</string>
+    <string name="ui_page_slider" formatted="false">"ページスライダー"</string>
+    <string name="ui_userid" formatted="false">"アカウント名"</string>
+    <string name="ui_gallery" formatted="false">"ギャラリー"</string>
+    <string name="ui_page_not_found_in_archive" formatted="false">"CBZ内のページが見つかりません。"</string>
+    <string name="ui_cannot_create_destination" formatted="false">"保存先を作成できません。"</string>
+    <string name="ui_share_name_smb" formatted="false">"共有名（SMB）"</string>
+    <string name="ui_ok" formatted="false">"確認"</string>
+    <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">"作品ページ。左右へスワイプまたは左右をタップしてページを移動。中央タップでメニューを表示。"</string>
+    <string name="ui_cannot_rename" formatted="false">"名前を変更できません"</string>
+    <string name="ui_move" formatted="false">"移動"</string>
+    <string name="ui_select_a_pdf_cbz_zip_or_image" formatted="false">"PDF、CBZ/ZIP、画像を選択してください"</string>
+    <string name="ui_reading_position_cleared" formatted="false">"復帰位置を消去しました"</string>
+    <string name="ui_clear_resume_cache" formatted="false">"ページ再開ためのキャッシュの削除"</string>
+    <string name="ui_cannot_open_file_2" formatted="false">"ファイルを開けません"</string>
+    <string name="ui_left_scrollbar" formatted="false">"左側スクロールバー"</string>
+    <string name="ui_invalid_pdf_page_size" formatted="false">"PDFのページサイズが不正です。"</string>
+    <string name="ui_clear_history_2" formatted="false">"履歴の削除"</string>
+    <string name="ui_cannot_save_thumbnail" formatted="false">"サムネイルを保存できません"</string>
+    <string name="ui_add_bookmark" formatted="false">"しおり"</string>
+    <string name="ui_size_2" formatted="false">"サイズ順"</string>
+    <string name="ui_first_page" formatted="false">"最初のページです"</string>
+    <string name="ui_theme" formatted="false">"テーマ"</string>
+    <string name="ui_delete" formatted="false">"削除"</string>
+    <string name="ui_invert_colors" formatted="false">"色を反転"</string>
+    <string name="ui_supports_pdf_cbz_zip_and_images" formatted="false">"PDF・CBZ・ZIP・画像に対応しています。"</string>
+    <string name="ui_rename" formatted="false">"名前の変更"</string>
+    <string name="ui_cannot_move_between_connections" formatted="false">"接続先をまたぐ移動はできません"</string>
+    <string name="ui_format" formatted="false">"形式: "</string>
+    <string name="ui_opened_books_appear_here" formatted="false">"作品を開くとここに表示されます。"</string>
+    <string name="ui_actions" formatted="false">"操作"</string>
+    <string name="ui_cannot_connect" formatted="false">"接続できません"</string>
+    <string name="ui_folder_access_was_revoked" formatted="false">"フォルダへのアクセス許可が失われました。"</string>
+    <string name="ui_restore_colors" formatted="false">"色反転を戻す"</string>
+    <string name="ui_reverse_volume_keys" formatted="false">"音量キーを反転"</string>
+    <string name="ui_restore_default_cover" formatted="false">"表紙を初期状態に戻す"</string>
+    <string name="ui_cannot_save_cache" formatted="false">"キャッシュを保存できません"</string>
+    <string name="ui_sync_failed_check_your_connection_and_google_drive_permissions" formatted="false">"同期に失敗しました。接続とGoogle Driveの許可を確認してください。"</string>
+    <string name="ui_delete_all_saved_reading_positions" formatted="false">"復帰位置をすべて削除しますか？"</string>
+    <string name="ui_more" formatted="false">"その他"</string>
+    <string name="ui_done" formatted="false">"完了しました"</string>
+    <string name="ui_the_archive_exceeds_the_limit_of_20_000_pages" formatted="false">"CBZのページ数が多すぎます（上限20,000ページ）。"</string>
+    <string name="ui_first_page_2" formatted="false">"最初のページ"</string>
+    <string name="ui_pages_2" formatted="false">" ページ"</string>
+    <string name="ui_open_last_book" formatted="false">"前回の作品を直接開く"</string>
+    <string name="ui_port_blank_for_default" formatted="false">"ポート（空欄で標準）"</string>
+    <string name="ui_punch_hole_display_landscape" formatted="false">"ホール・ディスプレイ - 横向き"</string>
+    <string name="ui_zoom_2" formatted="false">"拡大固定"</string>
+    <string name="ui_set_thumbnails_storage" formatted="false">"サムネイルのキャッシュ容量の設定"</string>
+    <string name="ui_background" formatted="false">"背景"</string>
+    <string name="ui_resume_from_this_page" formatted="false">" ページから再開しますか？"</string>
+    <string name="ui_reload_file" formatted="false">"ファイルを再度読み込む"</string>
+    <string name="ui_close" formatted="false">"閉じる"</string>
+    <string name="ui_last_page" formatted="false">"最後のページです"</string>
+    <string name="ui_fullscreen" formatted="false">"全画面"</string>
+    <string name="ui_cannot_start_google_authorization" formatted="false">"Google認証を開始できません"</string>
+    <string name="ui_save_screen_as_image" formatted="false">"画面を画像として保存"</string>
+    <string name="ui_retry" formatted="false">"再試行"</string>
+    <string name="ui_scale" formatted="false">"ズーム倍率"</string>
+    <string name="ui_show_search" formatted="false">"検索を表示"</string>
+    <string name="ui_size_3" formatted="false">"サイズ: "</string>
+    <string name="ui_fit_width" formatted="false">"幅に合わせる"</string>
+    <string name="ui_cannot_delete" formatted="false">"削除できません"</string>
+    <string name="ui_choose_icons_thumbnails_or_grid" formatted="false">"アイコン・サムネイル・グリッドを選ぶ"</string>
+    <string name="ui_bookmark_note" formatted="false">" ページのしおりメモ"</string>
+    <string name="ui_no_saved_directories" formatted="false">"登録ディレクトリはありません"</string>
+    <string name="ui_cannot_open_a_folder_as_a_file" formatted="false">"フォルダは開けません"</string>
+    <string name="ui_reading_position" formatted="false">"復帰位置: "</string>
+    <string name="ui_bookmarked_books" formatted="false">"しおりのある作品"</string>
+</resources>

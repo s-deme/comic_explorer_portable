@@ -43,21 +43,37 @@ public final class Ui {
     public static final int SUCCESS = 0xFF2E6B45;
     public static final int INFO = 0xFF355F82;
 
-    public static final int TOOLBAR = 0xFF37474F;
-    public static final int SETTINGS_TOOLBAR = 0xFF689F38;
+    public static int TOOLBAR = 0xFF37474F;
+    public static int SETTINGS_TOOLBAR = 0xFF689F38;
     public static final int TOOLBAR_TEXT = 0xFFEEEEEE;
-    public static final int DARK_BACKGROUND = 0xFF212121;
-    public static final int DARK_SURFACE = 0xFF303030;
-    public static final int DARK_SURFACE_RAISED = 0xFF3C3C3C;
-    public static final int DARK_TEXT = 0xFFFAFAFA;
-    public static final int DARK_MUTED = 0xFFB0BEC5;
-    public static final int DARK_OUTLINE = 0xFF4A4A4A;
-    public static final int READER_ACCENT = 0xFF90CAF9;
-    public static final int LIBRARY_ACCENT = 0xFFB4A7E8;
+    public static int DARK_BACKGROUND = 0xFF212121;
+    public static int DARK_SURFACE = 0xFF303030;
+    public static int DARK_SURFACE_RAISED = 0xFF3C3C3C;
+    public static int DARK_TEXT = 0xFFFAFAFA;
+    public static int DARK_MUTED = 0xFFB0BEC5;
+    public static int DARK_OUTLINE = 0xFF4A4A4A;
+    public static int READER_ACCENT = 0xFF90CAF9;
+    public static int LIBRARY_ACCENT = 0xFFB4A7E8;
 
     public enum ButtonStyle { PRIMARY, SECONDARY, TONAL, GHOST, DANGER, DANGER_TONAL, DARK_PRIMARY, DARK_SECONDARY, DARK_GHOST }
 
     private Ui() { }
+
+    public static boolean light;
+    public static void configure(Context context) {
+        int theme = AppState.number(context, "theme", 0);
+        light = theme == 1 || theme == 0 && (context.getResources().getConfiguration().uiMode & 48) != 32;
+        TOOLBAR = light ? 0xFF455A64 : 0xFF37474F;
+        SETTINGS_TOOLBAR = light ? 0xFF689F38 : 0xFF555555;
+        DARK_BACKGROUND = light ? 0xFFFAFAFA : 0xFF212121;
+        DARK_SURFACE = light ? 0xFFFFFFFF : 0xFF303030;
+        DARK_SURFACE_RAISED = light ? 0xFFEEEEEE : 0xFF3C3C3C;
+        DARK_TEXT = light ? 0xFF212121 : 0xFFFAFAFA;
+        DARK_MUTED = light ? 0xFF616161 : 0xFFB0BEC5;
+        DARK_OUTLINE = light ? 0xFFD0D0D0 : 0xFF4A4A4A;
+        READER_ACCENT = light ? 0xFF1565C0 : 0xFF90CAF9;
+        LIBRARY_ACCENT = light ? 0xFF558B2F : 0xFFB4A7E8;
+    }
 
     public static int dp(Context context, int value) {
         return Math.round(value * context.getResources().getDisplayMetrics().density);
@@ -87,13 +103,15 @@ public final class Ui {
         final int baseRight = root.getPaddingRight();
         final int baseBottom = root.getPaddingBottom();
         root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+            boolean allowCutout = activity instanceof ViewerActivity && AppState.enabled(activity,
+                    activity.getResources().getConfiguration().orientation == 2 ? "cutout_land" : "cutout_port", false);
             int left;
             int top;
             int right;
             int bottom;
             if (Build.VERSION.SDK_INT >= 30) {
                 Insets safe = windowInsets.getInsets(
-                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                        WindowInsets.Type.systemBars() | (allowCutout ? 0 : WindowInsets.Type.displayCutout()));
                 left = safe.left;
                 top = safe.top;
                 right = safe.right;
@@ -104,7 +122,7 @@ public final class Ui {
                 right = windowInsets.getSystemWindowInsetRight();
                 bottom = windowInsets.getSystemWindowInsetBottom();
                 DisplayCutout cutout = windowInsets.getDisplayCutout();
-                if (cutout != null) {
+                if (cutout != null && !allowCutout) {
                     left = Math.max(left, cutout.getSafeInsetLeft());
                     top = Math.max(top, cutout.getSafeInsetTop());
                     right = Math.max(right, cutout.getSafeInsetRight());
@@ -201,8 +219,8 @@ public final class Ui {
         view.setBackground(controlBackground(background, background, 0xFFE0DAD2, 0xFFA19AA4, 18, BRAND));
         view.setMinHeight(dp(view.getContext(), 48));
         view.setSelected(selected);
-        view.setContentDescription(view.getText() + (selected ? "、選択中" : "を表示"));
-        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? "選択中" : "未選択");
+        view.setContentDescription(view.getText() + (selected ? I18n.t(R.string.ui_selected_2) : I18n.t(R.string.ui_show)));
+        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? I18n.t(R.string.ui_selected) : I18n.t(R.string.ui_not_selected));
     }
 
     /** Bottom navigation keeps the library's stable destinations reachable without a top tab row. */
@@ -216,8 +234,8 @@ public final class Ui {
         view.setBackground(controlBackground(selected ? DARK_SURFACE : DARK_SURFACE_RAISED,
                 selected ? DARK_SURFACE : DARK_SURFACE_RAISED, DARK_SURFACE, DARK_SURFACE, 0, LIBRARY_ACCENT));
         view.setSelected(selected);
-        view.setContentDescription(view.getText() + (selected ? "、選択中" : "を表示"));
-        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? "選択中" : "未選択");
+        view.setContentDescription(view.getText() + (selected ? I18n.t(R.string.ui_selected_2) : I18n.t(R.string.ui_show)));
+        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? I18n.t(R.string.ui_selected) : I18n.t(R.string.ui_not_selected));
     }
 
     public static void styleTopTab(Button view, boolean selected) {
@@ -229,11 +247,11 @@ public final class Ui {
         view.setPadding(dp(view.getContext(), 2), 0, dp(view.getContext(), 2), 0);
         view.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         view.setTextColor(selected ? LIBRARY_ACCENT : DARK_MUTED);
-        view.setBackground(controlBackground(selected ? 0xFF34313E : DARK_SURFACE,
+        view.setBackground(controlBackground(selected ? DARK_SURFACE_RAISED : DARK_SURFACE,
                 selected ? LIBRARY_ACCENT : DARK_SURFACE, DARK_SURFACE, DARK_SURFACE, selected ? 1 : 0, LIBRARY_ACCENT));
         view.setStateListAnimator(null);
         view.setSelected(selected);
-        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? "選択中" : "未選択");
+        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? I18n.t(R.string.ui_selected) : I18n.t(R.string.ui_not_selected));
     }
 
     public static void styleSearch(EditText input) {
@@ -365,7 +383,7 @@ public final class Ui {
 
     public static void styleReaderPageButton(Button view) {
         view.setTextSize(28);
-        view.setTextColor(DARK_TEXT);
+        view.setTextColor(0xfffafafa);
         view.setAlpha(.72f);
         view.setPadding(0, 0, 0, 0);
         view.setBackground(controlBackground(0x993C3C3C, 0x99555555,
@@ -376,7 +394,7 @@ public final class Ui {
 
     public static void styleListRow(View view) {
         StateListDrawable states = new StateListDrawable();
-        states.addState(new int[]{android.R.attr.state_focused}, shape(0xFF34313E, LIBRARY_ACCENT, 1, 0));
+        states.addState(new int[]{android.R.attr.state_focused}, shape(light ? 0xffe0e0e0 : 0xFF34313E, LIBRARY_ACCENT, 1, 0));
         states.addState(new int[]{}, shape(DARK_BACKGROUND, DARK_BACKGROUND, 0, 0));
         view.setBackground(new RippleDrawable(ColorStateList.valueOf(0x33B4A7E8), states, null));
         view.setElevation(0);
@@ -437,5 +455,16 @@ public final class Ui {
 
     private static float dpRadius(int value) {
         return value * android.content.res.Resources.getSystem().getDisplayMetrics().density;
+    }
+
+    /** Labels are presentation only; each item carries its own action. */
+    public static final class Actions {
+        private final java.util.ArrayList<String> labels = new java.util.ArrayList<>();
+        private final java.util.ArrayList<Runnable> actions = new java.util.ArrayList<>();
+        public void add(String label, Runnable action) { labels.add(label); actions.add(action); }
+        public AlertDialog show(Activity activity, String title) {
+            return Ui.show(new AlertDialog.Builder(activity).setTitle(title)
+                    .setItems(labels.toArray(new String[0]), (dialog, index) -> actions.get(index).run()));
+        }
     }
 }

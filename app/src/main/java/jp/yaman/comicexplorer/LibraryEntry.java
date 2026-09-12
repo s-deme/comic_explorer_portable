@@ -14,7 +14,7 @@ public final class LibraryEntry {
 
     public LibraryEntry(Uri uri, String name, String mime, String kind, boolean directory, long size, long modified) {
         this.uri = uri;
-        this.name = name == null || name.trim().isEmpty() ? "名称なし" : name;
+        this.name = name == null || name.trim().isEmpty() ? I18n.t(R.string.ui_untitled) : name;
         this.mime = mime;
         this.kind = kind;
         this.directory = directory;

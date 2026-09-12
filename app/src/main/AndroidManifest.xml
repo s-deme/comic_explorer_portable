@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <application
+        android:name=".ComicApplication"
         android:allowBackup="false"
         android:icon="@drawable/ic_comic"
         android:label="@string/app_name"
         android:resizeableActivity="true"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <provider android:name=".NetworkDocumentsProvider" android:authorities="${applicationId}.network"
+            android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
+        </provider>
         <activity
             android:name=".ViewerActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"

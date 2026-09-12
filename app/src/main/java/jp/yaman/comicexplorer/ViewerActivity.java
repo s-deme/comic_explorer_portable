@@ -8,16 +8,16 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.pdf.PdfRenderer;
+
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.ParcelFileDescriptor;
+
 import android.provider.MediaStore;
 import android.text.InputType;
 import android.view.Gravity;
@@ -41,9 +41,9 @@ import android.widget.Toast;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FilterInputStream;
+
 import java.io.IOException;
-import java.io.InputStream;
+
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -52,19 +52,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
-/** Responsive, local-only page reader. Work that touches files or decodes images is off the UI thread. */
-public final class ViewerActivity extends Activity implements ZoomImageView.InteractionListener {
+/** Responsive page reader. Work that touches files or decodes images is off the UI thread. */
+public final class ViewerActivity extends BaseActivity implements ZoomImageView.InteractionListener {
     public static final String EXTRA_IMAGE_URIS = "image_uris";
     public static final String EXTRA_START_INDEX = "start_index";
     public static final String EXTRA_TITLE = "title";
-    private static final int TYPE_IMAGES = 1;
-    private static final int TYPE_PDF = 2;
-    private static final int TYPE_ARCHIVE = 3;
-    private static final int MAX_ARCHIVE_PAGES = 20_000;
-    private static final long MAX_ARCHIVE_ENTRY_BYTES = 48L * 1024 * 1024;
+    public static final String EXTRA_BOOK_URIS = "book_uris";
+    public static final String EXTRA_BOOK_TITLES = "book_titles";
     private static final int MAX_PAGE_DIMENSION = 8192;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -84,25 +79,23 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         }
     };
 
+    private PageSource pageSource;
     private Uri sourceUri;
     private String title;
     private ArrayList<Uri> imageUris;
-    private ArrayList<String> archiveEntries;
-    private PdfRenderer pdf;
-    private ParcelFileDescriptor pdfDescriptor;
-    private int type;
+
     private int page;
     private int totalPages;
     private int loadToken;
     private int autoDelayMs;
     private int maxBitmapPixels;
     private int pageLayout;
-    private int filterMode;
+
     private int cropPercent;
     private boolean initialized;
     private boolean chromeVisible;
     private boolean fullScreen;
-    private boolean inverted;
+
     private boolean dualPageDivider;
     private volatile boolean destroyed;
 
@@ -120,9 +113,17 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     private Button leftPageButton;
     private Button rightPageButton;
     private int readerMenuPage;
+    private ContinuousReader continuous;
+    private FrameLayout pageCanvas;
+
+    private android.graphics.RectF customCrop;
+    private float menuTouchX;
+    private float menuTouchY;
+    private boolean swipingMenu;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (state != null && state.containsKey("current_page")) getIntent().putExtra(EXTRA_START_INDEX, state.getInt("current_page"));
         ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         int maxKb = manager == null ? 20 * 1024 : Math.min(32 * 1024, manager.getMemoryClass() * 1024 / 6);
         pageCache = new BitmapMemoryCache(Math.max(8 * 1024, maxKb));
@@ -153,7 +154,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         top.setBackgroundColor(Ui.DARK_SURFACE);
         ImageButton close = new ImageButton(this);
         close.setImageResource(R.drawable.ic_arrow_back);
-        close.setContentDescription("作品を閉じる");
+        close.setContentDescription(I18n.t(R.string.ui_close_book));
         Ui.styleToolbarButton(close, Ui.DARK_SURFACE);
         close.setOnClickListener(view -> finish());
         top.addView(close, new LinearLayout.LayoutParams(dp(48), dp(56)));
@@ -165,7 +166,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         top.addView(titleText, new LinearLayout.LayoutParams(0, dp(56), 1f));
         ImageButton more = new ImageButton(this);
         more.setImageResource(R.drawable.ic_toolbar_more);
-        more.setContentDescription("次の読書メニューを表示");
+        more.setContentDescription(I18n.t(R.string.ui_show_next_reader_menu));
         Ui.styleToolbarButton(more, Ui.DARK_SURFACE);
         more.setOnClickListener(view -> showReaderMenu());
         top.addView(more, new LinearLayout.LayoutParams(dp(48), dp(56)));
@@ -174,15 +175,22 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         chromeTop = topChrome;
 
         FrameLayout canvas = new FrameLayout(this);
+        pageCanvas = canvas;
         imageView = new ZoomImageView(this);
         imageView.setInteractionListener(this);
         canvas.addView(imageView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        leftPageButton = readerAction("−", "左側のページ操作");
-        rightPageButton = readerAction("＋", "右側のページ操作");
+        continuous = new ContinuousReader(this, worker, this::decodePage, index -> {
+            if (!initialized || !vertical() || page == index) return;
+            page = index; updateControls(); AppState.updateReadingProgress(this, sourceUri, page, totalPages);
+        }, this);
+        continuous.setVisibility(View.GONE);
+        canvas.addView(continuous, new FrameLayout.LayoutParams(-1, -1));
+        leftPageButton = readerAction("−", I18n.t(R.string.ui_left_page_button));
+        rightPageButton = readerAction("＋", I18n.t(R.string.ui_right_page_button));
         Ui.styleReaderPageButton(leftPageButton);
         Ui.styleReaderPageButton(rightPageButton);
-        leftPageButton.setOnClickListener(view -> onTap(0f));
-        rightPageButton.setOnClickListener(view -> onTap(1f));
+        leftPageButton.setOnClickListener(view -> pageButton(false));
+        rightPageButton.setOnClickListener(view -> pageButton(true));
         FrameLayout.LayoutParams leftPageParams = new FrameLayout.LayoutParams(dp(48), dp(96), Gravity.START | Gravity.CENTER_VERTICAL);
         FrameLayout.LayoutParams rightPageParams = new FrameLayout.LayoutParams(dp(48), dp(96), Gravity.END | Gravity.CENTER_VERTICAL);
         canvas.addView(leftPageButton, leftPageParams);
@@ -200,7 +208,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         errorText.setGravity(Gravity.CENTER);
         errorText.setLineSpacing(0, 1.08f);
         error.addView(errorText);
-        Button retry = button("再試行", "ファイルを再度読み込む");
+        Button retry = button(I18n.t(R.string.ui_retry), I18n.t(R.string.ui_reload_file));
         Ui.styleButton(retry, Ui.ButtonStyle.DARK_PRIMARY);
         retry.setOnClickListener(view -> { if (initialized) loadPage(page, false); else initializeSource(); });
         LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
@@ -220,15 +228,15 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         LinearLayout sliderRow = new LinearLayout(this);
         sliderRow.setGravity(Gravity.CENTER_VERTICAL);
         sliderRow.setPadding(dp(8), 0, dp(8), 0);
-        pageText = text("読み込み中…", 13, Ui.DARK_TEXT);
+        pageText = text(I18n.t(R.string.ui_loading), 13, Ui.DARK_TEXT);
         pageText.setGravity(Gravity.CENTER);
         Ui.styleDarkChip(pageText, false);
-        pageText.setContentDescription("ページ番号。タップして移動");
+        pageText.setContentDescription(I18n.t(R.string.ui_page_number_tap_to_jump));
         pageText.setOnClickListener(view -> showPageJump());
         sliderRow.addView(pageText, new LinearLayout.LayoutParams(dp(88), dp(36)));
         pageSlider = new SeekBar(this);
         pageSlider.setMax(0);
-        pageSlider.setContentDescription("ページスライダー");
+        pageSlider.setContentDescription(I18n.t(R.string.ui_page_slider));
         Ui.styleSeekBar(pageSlider, true);
         pageSlider.setMinimumHeight(dp(40));
         pageSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -260,10 +268,17 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         panel.addView(readerMenuRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
         readerMenuIndicator = text("", 9, Ui.READER_ACCENT);
         readerMenuIndicator.setGravity(Gravity.CENTER);
-        readerMenuIndicator.setContentDescription("読書メニュー 1 / 3");
+        readerMenuIndicator.setContentDescription(I18n.t(R.string.ui_reader_menu_1_3));
         readerMenuIndicator.setOnClickListener(view -> showReaderMenu());
         panel.addView(readerMenuIndicator, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(16)));
         showReaderMenuPage(0);
+        panel.setOnTouchListener((view, event) -> {
+            if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) { menuTouchX = event.getX(); return true; }
+            if (event.getAction() == android.view.MotionEvent.ACTION_UP && Math.abs(event.getX() - menuTouchX) > dp(48)) {
+                showReaderMenuPage((readerMenuPage + (event.getX() < menuTouchX ? 1 : 2)) % 3); return true;
+            }
+            return true;
+        });
         return panel;
     }
 
@@ -272,33 +287,33 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         readerMenuRow.removeAllViews();
         quickBookmarkButton = null;
         if (target == 0) {
-            addReaderMenuAction("⇆", "ページ送り方向", view -> showDirectionDialog());
-            addReaderMenuAction("↻", "画面回転", view -> showOrientationDialog());
-            addReaderMenuAction("▥", "ページレイアウト", view -> showPageLayoutDialog());
-            addReaderMenuAction("□", "表示方法", view -> showFitDialog());
-            addReaderMenuAction("◐", "明るさ", view -> showBrightnessDialog());
+            addReaderMenuAction("⇆", I18n.t(R.string.ui_reading_direction), view -> showDirectionDialog());
+            addReaderMenuAction("↻", I18n.t(R.string.ui_screen_rotation), view -> showOrientationDialog());
+            addReaderMenuAction("▥", I18n.t(R.string.ui_page_layout), view -> showPageLayoutDialog());
+            addReaderMenuAction("□", I18n.t(R.string.ui_fit_screen), view -> showFitDialog());
+            addReaderMenuAction("◐", I18n.t(R.string.ui_brightness), view -> showBrightnessDialog());
         } else if (target == 1) {
-            addReaderMenuAction("◎", "拡大固定", view -> showZoomDialog());
-            addReaderMenuAction("◒", "画像フィルター", view -> showFilterDialog());
-            addReaderMenuAction("↕", "ページ移動", view -> showReadingFlowDialog());
-            quickBookmarkButton = addReaderMenuAction("☆", "このページにしおりを追加", view -> toggleBookmark());
-            addReaderMenuAction("☷", "しおり一覧", view -> showBookmarks());
+            addReaderMenuAction("◎", I18n.t(R.string.ui_zoom_2), view -> showZoomDialog());
+            addReaderMenuAction("◒", I18n.t(R.string.ui_image_filters), view -> showFilterDialog());
+            addReaderMenuAction("↕", I18n.t(R.string.ui_page_navigation), view -> showReadingFlowDialog());
+            quickBookmarkButton = addReaderMenuAction("☆", I18n.t(R.string.ui_bookmark_this_page), view -> toggleBookmark());
+            addReaderMenuAction("☷", I18n.t(R.string.ui_bookmarks_2), view -> showBookmarks());
             refreshQuickBookmark();
         } else {
-            addReaderMenuAction("▣", "画面を画像として保存", view -> capturePage());
-            addReaderMenuAction("#", "ページへ移動", view -> showPageJump());
-            addReaderMenuAction("⛶", fullScreen ? "全画面を解除" : "全画面にする", view -> { toggleFullscreen(); showReaderMenuPage(2); });
-            addReaderMenuAction(autoDelayMs > 0 ? "Ⅱ" : "▶", autoDelayMs > 0 ? "自動送りを停止" : "自動ページ送り", view -> {
+            addReaderMenuAction("▣", I18n.t(R.string.ui_save_screen_as_image), view -> capturePage());
+            addReaderMenuAction("#", I18n.t(R.string.ui_go_to_page), view -> showPageJump());
+            addReaderMenuAction("⛶", fullScreen ? I18n.t(R.string.ui_exit_fullscreen) : I18n.t(R.string.ui_enter_fullscreen), view -> { toggleFullscreen(); showReaderMenuPage(2); });
+            addReaderMenuAction(autoDelayMs > 0 ? "Ⅱ" : "▶", autoDelayMs > 0 ? I18n.t(R.string.ui_stop_auto_page_turn) : I18n.t(R.string.ui_auto_page_turn), view -> {
                 if (autoDelayMs > 0) { stopAutoPage(); showReaderMenuPage(2); }
                 else showAutoPageDialog();
             });
-            addReaderMenuAction("⋮", "その他の読書設定", view -> showMoreReaderSettings());
+            addReaderMenuAction("⋮", I18n.t(R.string.ui_more_reading_settings), view -> showMoreReaderSettings());
         }
-        Button next = readerAction(target < 2 ? "›" : "‹", target < 2 ? "次のメニューページ" : "最初のメニューページ");
+        Button next = readerAction(target < 2 ? "›" : "‹", target < 2 ? I18n.t(R.string.ui_next_menu_page) : I18n.t(R.string.ui_first_menu_page));
         next.setOnClickListener(view -> showReaderMenuPage(target < 2 ? target + 1 : 0));
         readerMenuRow.addView(next, new LinearLayout.LayoutParams(dp(48), dp(56)));
         readerMenuIndicator.setText(target == 0 ? "●  ○  ○" : target == 1 ? "○  ●  ○" : "○  ○  ●");
-        readerMenuIndicator.setContentDescription("読書メニュー " + (target + 1) + " / 3。タップで次へ");
+        readerMenuIndicator.setContentDescription(I18n.t(R.string.ui_reader_menu) + (target + 1) + I18n.t(R.string.ui_3_tap_for_next));
     }
 
     private Button addReaderMenuAction(String symbol, String description, View.OnClickListener listener) {
@@ -313,13 +328,13 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         if (AppState.keepScreenOn(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         pageLayout = AppState.pageLayout(this);
         dualPageDivider = AppState.dualPageDivider(this);
-        filterMode = AppState.imageFilter(this);
+
         cropPercent = AppState.cropPercent(this);
         imageView.setFitMode(AppState.fitMode(this));
         imageView.setDoubleTapScale(AppState.doubleTapScale(this) / 100f);
         imageView.setDoubleTapMode(AppState.doubleTapMode(this));
         imageView.setVerticalPaging(AppState.readingFlow(this) == AppState.FLOW_VERTICAL);
-        imageView.setFilterMode(filterMode);
+        imageView.setFilterMode(AppState.FILTER_NONE);
         updatePageButtons();
         applyBrightness(AppState.brightness(this));
         if (AppState.startFullscreen(this)) {
@@ -330,19 +345,32 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
 
     private void updatePageButtons() {
         if (leftPageButton == null) return;
-        boolean visible = AppState.pageButtons(this);
+        boolean visible = AppState.pageButtons(this) && (!chromeVisible || AppState.enabled(this, "page_fixed", true));
         leftPageButton.setVisibility(visible ? View.VISIBLE : View.GONE);
         rightPageButton.setVisibility(visible ? View.VISIBLE : View.GONE);
         float alpha = AppState.pageButtonOpacity(this) / 100f;
         leftPageButton.setAlpha(alpha);
         rightPageButton.setAlpha(alpha);
-        leftPageButton.getLayoutParams().height = dp(AppState.pageButtonHeight(this));
-        rightPageButton.getLayoutParams().height = dp(AppState.pageButtonHeight(this));
+        int size = dp(AppState.number(this, "page_button_height", 96));
+        int position = AppState.number(this, "page_position", 0);
+        int type = AppState.number(this, "page_type", 0);
+        boolean horizontal = position < 2;
+        int edge = position == 0 ? Gravity.BOTTOM : position == 1 ? Gravity.TOP : position == 2 ? Gravity.LEFT : Gravity.RIGHT;
+        int first = edge | (horizontal ? Gravity.LEFT : Gravity.TOP);
+        int second = edge | (horizontal ? Gravity.RIGHT : Gravity.BOTTOM);
+        int width = horizontal ? (type == 1 ? getResources().getDisplayMetrics().widthPixels / 2 : size) : dp(48);
+        int height = horizontal ? dp(48) : (type == 1 ? Math.max(size, pageCanvas.getHeight()/2) : size);
+        if (type == 2) { first = Gravity.LEFT | Gravity.CENTER_VERTICAL; second = Gravity.RIGHT | Gravity.CENTER_VERTICAL; width = dp(48); height = size; }
+        if (type == 3) { first = edge | Gravity.CENTER; second = edge | Gravity.CENTER; }
+        FrameLayout.LayoutParams left = new FrameLayout.LayoutParams(width, height, first);
+        FrameLayout.LayoutParams right = new FrameLayout.LayoutParams(width, height, second);
+        if (type == 3) { if (horizontal) { left.rightMargin = size; right.leftMargin = size; } else { left.bottomMargin = size; right.topMargin = size; } }
+        leftPageButton.setLayoutParams(left); rightPageButton.setLayoutParams(right);
         leftPageButton.requestLayout();
         rightPageButton.requestLayout();
         boolean rtl = AppState.direction(this) == AppState.DIRECTION_RTL;
-        leftPageButton.setContentDescription(rtl ? "次のページ" : "前のページ");
-        rightPageButton.setContentDescription(rtl ? "前のページ" : "次のページ");
+        leftPageButton.setContentDescription(rtl ? I18n.t(R.string.ui_next_page) : I18n.t(R.string.ui_previous_page));
+        rightPageButton.setContentDescription(rtl ? I18n.t(R.string.ui_previous_page) : I18n.t(R.string.ui_next_page));
     }
 
     private void initializeSource() {
@@ -353,41 +381,29 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         worker.execute(() -> {
             if (destroyed) return;
             try {
-                if (imageUris != null && !imageUris.isEmpty()) {
-                    type = TYPE_IMAGES;
-                    totalPages = imageUris.size();
-                    int start = getIntent().getIntExtra(EXTRA_START_INDEX,
-                            AppState.resumeLastPosition(this) ? AppState.getPosition(this, sourceUri) : 0);
-                    page = Math.max(0, Math.min(start, totalPages - 1));
-                } else {
-                    String extension = ComicFile.extension(title);
-                    if ("pdf".equals(extension)) {
-                        closePdf();
-                        pdfDescriptor = getContentResolver().openFileDescriptor(sourceUri, "r");
-                        if (pdfDescriptor == null) throw new IOException("PDFを開けません。");
-                        pdf = new PdfRenderer(pdfDescriptor);
-                        type = TYPE_PDF;
-                        totalPages = pdf.getPageCount();
-                    } else if ("zip".equals(extension) || "cbz".equals(extension)) {
-                        type = TYPE_ARCHIVE;
-                        archiveEntries = readArchiveEntries();
-                        totalPages = archiveEntries.size();
-                    } else {
-                        throw new IOException("この形式は表示できません。PDF、CBZ/ZIP、画像に対応しています。");
-                    }
-                    if (totalPages < 1) throw new IOException("表示できるページがありません。");
-                    int savedPage = AppState.resumeLastPosition(this) ? AppState.getPosition(this, sourceUri) : 0;
-                    page = Math.max(0, Math.min(savedPage, totalPages - 1));
-                }
+                if (pageSource != null) pageSource.close();
+                pageSource = new PageSource(this, sourceUri, title, imageUris,
+                        Charset.forName(ReaderOptions.ENCODINGS[Math.max(0, Math.min(ReaderOptions.ENCODINGS.length-1, AppState.archiveEncoding(this)))]), maxBitmapPixels);
+                totalPages = pageSource.pageCount();
+                int savedPage = getIntent().getIntExtra(EXTRA_START_INDEX, AppState.resumeMode(this, getIntent().getBooleanExtra("next_book", false)) == 2 ? 0 : AppState.getPosition(this, sourceUri));
+                page = Math.max(0, Math.min(savedPage, totalPages - 1));
                 if (usesDualPageLayout()) page -= page % 2;
                 runOnUiThread(() -> {
                     if (destroyed || token != loadToken || isFinishing()) return;
                     initialized = true;
+                    continuous.setVisibility(vertical() ? View.VISIBLE : View.GONE);
+                    imageView.setVisibility(vertical() ? View.GONE : View.VISIBLE);
+                    if (vertical()) continuous.reset(totalPages, page);
                     pageSlider.setMax(Math.max(0, totalPages - 1));
                     updateControls();
                     loadPage(page, false);
+                    if (!getIntent().hasExtra(EXTRA_START_INDEX) && page > 0 && AppState.resumeMode(this, getIntent().getBooleanExtra("next_book", false)) == 0) {
+                        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_resume_page)).setMessage((page + 1) + I18n.t(R.string.ui_resume_from_this_page))
+                                .setPositiveButton(I18n.t(R.string.ui_resume_page), (d, i) -> { })
+                                .setNegativeButton(I18n.t(R.string.ui_first_page_2), (d, i) -> goToPage(0)));
+                    }
                     if (!AppState.hasSeenReaderHint(this)) {
-                        Toast.makeText(this, "左右をタップ／スワイプでページ移動、中央タップでメニューを表示します", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, I18n.t(R.string.ui_tap_or_swipe_to_turn_pages_tap_the_center_for), Toast.LENGTH_LONG).show();
                         AppState.markReaderHintSeen(this);
                     }
                 });
@@ -400,23 +416,6 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
                 });
             }
         });
-    }
-
-    private ArrayList<String> readArchiveEntries() throws IOException {
-        ArrayList<String> entries = new ArrayList<>();
-        InputStream input = getContentResolver().openInputStream(sourceUri);
-        if (input == null) throw new IOException("CBZを開けません。");
-        try (InputStream source = input; ZipInputStream zip = new ZipInputStream(source, archiveCharset())) {
-            ZipEntry entry;
-            while (!destroyed && (entry = zip.getNextEntry()) != null) {
-                if (!entry.isDirectory() && ComicFile.isImage(entry.getName(), null)) {
-                    if (entries.size() >= MAX_ARCHIVE_PAGES) throw new IOException("CBZのページ数が多すぎます（上限20,000ページ）。");
-                    entries.add(entry.getName());
-                }
-            }
-        }
-        Collections.sort(entries, ComicFile.NATURAL_NAME_ORDER);
-        return entries;
     }
 
     private void loadPage(int target, boolean prefetch) {
@@ -443,7 +442,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
             if (destroyed) return;
             Bitmap bitmap = null;
             Throwable failure = null;
-            try { bitmap = decodePage(target); if (bitmap == null) throw new IOException("画像を読み取れません。"); }
+            try { bitmap = decodePage(target); if (bitmap == null) throw new IOException(I18n.t(R.string.ui_cannot_read_image)); }
             catch (Exception | OutOfMemoryError exception) {
                 if (exception instanceof OutOfMemoryError) pageCache.evictAll();
                 failure = exception;
@@ -451,7 +450,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
             Bitmap finalBitmap = bitmap;
             Throwable finalFailure = failure;
             runOnUiThread(() -> {
-                if (destroyed || isFinishing()) return;
+                if (destroyed || isFinishing() || !cacheKey.equals(cacheKey(target))) return;
                 if (finalBitmap != null) pageCache.put(cacheKey, finalBitmap);
                 if (prefetch) return;
                 if (token != loadToken) return;
@@ -477,6 +476,21 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private Bitmap decodePage(int target) throws IOException {
+        Bitmap raw = decodeLayout(target);
+        if (customCrop != null) {
+            int x = Math.min(raw.getWidth()-1, Math.round(raw.getWidth()*customCrop.left));
+            int y = Math.min(raw.getHeight()-1, Math.round(raw.getHeight()*customCrop.top));
+            int width = Math.max(1, Math.min(raw.getWidth()-x, Math.round(raw.getWidth()*customCrop.width())));
+            int height = Math.max(1, Math.min(raw.getHeight()-y, Math.round(raw.getHeight()*customCrop.height())));
+            Bitmap crop = Bitmap.createBitmap(raw, x, y, width, height);
+            if (crop != raw) raw.recycle(); raw = crop;
+        }
+        Bitmap processed = ImageProcessing.apply(this, raw, getResources().getDisplayMetrics().widthPixels, Math.min(maxBitmapPixels, 2_000_000));
+        if (processed != raw) raw.recycle();
+        return processed;
+    }
+
+    private Bitmap decodeLayout(int target) throws IOException {
         Bitmap first = decodeSinglePage(target);
         if (!usesDualPageLayout() || target + 1 >= totalPages) return cropMargins(first);
         Bitmap second = null;
@@ -490,11 +504,8 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private Bitmap decodeSinglePage(int target) throws IOException {
-        if (type == TYPE_IMAGES) return decodeUri(imageUris.get(target));
-        if (type == TYPE_PDF) return renderPdfPage(target);
-        return decodeArchivePage(archiveEntries.get(target));
+        return pageSource.decode(target, getResources().getDisplayMetrics().widthPixels);
     }
-
     private Bitmap combinePages(Bitmap first, Bitmap second, boolean rightToLeft) {
         int sourceWidth = first.getWidth() + second.getWidth();
         int sourceHeight = Math.max(first.getHeight(), second.getHeight());
@@ -537,78 +548,18 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         return new int[]{insetX, insetY, Math.max(1, width - insetX * 2), Math.max(1, height - insetY * 2)};
     }
 
-    private String cacheKey(int target) { return type + ":" + (usesDualPageLayout() ? AppState.PAGE_DUAL : AppState.PAGE_SINGLE) + ":" + target; }
-
-    private Bitmap decodeUri(Uri uri) throws IOException {
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        InputStream first = getContentResolver().openInputStream(uri);
-        if (first == null) throw new IOException("画像を開けません。");
-        try (InputStream stream = first) { BitmapFactory.decodeStream(stream, null, bounds); }
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IOException("画像が壊れているか、未対応の形式です。");
-        InputStream second = getContentResolver().openInputStream(uri);
-        if (second == null) throw new IOException("画像を開けません。");
-        try (InputStream stream = second) { return BitmapFactory.decodeStream(stream, null, decodeOptions(bounds.outWidth, bounds.outHeight)); }
-    }
-
-    private Bitmap decodeArchivePage(String target) throws IOException {
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        decodeArchiveEntry(target, bounds);
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IOException("CBZ内の画像が壊れています。");
-        return decodeArchiveEntry(target, decodeOptions(bounds.outWidth, bounds.outHeight));
-    }
-
-    // ponytail: SAF ZIP streams are rescanned; spool to a temporary ZipFile only if late-page latency is measured.
-    private Bitmap decodeArchiveEntry(String target, BitmapFactory.Options options) throws IOException {
-        InputStream input = getContentResolver().openInputStream(sourceUri);
-        if (input == null) throw new IOException("CBZを開けません。");
-        try (InputStream source = input; ZipInputStream zip = new ZipInputStream(source, archiveCharset())) {
-            ZipEntry entry;
-            while (!destroyed && (entry = zip.getNextEntry()) != null) {
-                if (target.equals(entry.getName())) {
-                    if (entry.getSize() > MAX_ARCHIVE_ENTRY_BYTES) throw new IOException("画像ページが大きすぎます（上限48MB）。");
-                    return BitmapFactory.decodeStream(new BoundedInputStream(zip, MAX_ARCHIVE_ENTRY_BYTES), null, options);
-                }
-            }
-        }
-        throw new IOException("CBZ内のページが見つかりません。");
-    }
-
-    private Charset archiveCharset() {
-        return Charset.forName(AppState.archiveEncoding(this) == 1 ? "Shift_JIS" : "UTF-8");
-    }
-
-    private Bitmap renderPdfPage(int index) throws IOException {
-        if (pdf == null) throw new IOException("PDFを開けません。");
-        PdfRenderer.Page current = pdf.openPage(index);
-        try {
-            if (current.getWidth() <= 0 || current.getHeight() <= 0) throw new IOException("PDFのページサイズが不正です。");
-            int screenWidth = imageView.getWidth() > 0 ? imageView.getWidth() : getResources().getDisplayMetrics().widthPixels;
-            int[] size = pdfBitmapSize(current.getWidth(), current.getHeight(), screenWidth, maxBitmapPixels);
-            Bitmap bitmap = Bitmap.createBitmap(size[0], size[1], Bitmap.Config.ARGB_8888);
-            bitmap.eraseColor(0xFFFFFFFF);
-            current.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
-            return bitmap;
-        } finally {
-            current.close();
-        }
-    }
-
-    private BitmapFactory.Options decodeOptions(int width, int height) {
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = bitmapSampleSize(width, height, maxBitmapPixels);
-        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-        return options;
-    }
+    private int renderGeneration;
+    private void invalidatePages() { renderGeneration++; pageCache.evictAll(); }
+    private String cacheKey(int target) { return renderGeneration + ":" + (usesDualPageLayout() ? AppState.PAGE_DUAL : AppState.PAGE_SINGLE) + ":" + target; }
 
     private void displayBitmap(Bitmap bitmap) {
         imageView.setImageBitmap(bitmap);
-        imageView.setFilterMode(filterMode);
-        imageView.setInverted(inverted);
+        imageView.setFilterMode(AppState.FILTER_NONE);
+
     }
 
     private void goToPage(int target) {
+        if (vertical() && target >= 0 && target < totalPages) continuous.setSelection(target);
         if (usesDualPageLayout()) target -= target % 2;
         if (target < 0 || target >= totalPages || target == page && imageView.getDrawable() != null) return;
         loadPage(target, false);
@@ -620,14 +571,14 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         return next >= 0 && next < totalPages ? next : -1;
     }
 
-    private void forward() { int next = nextIndex(page, true); if (next >= 0) goToPage(next); else Toast.makeText(this, "最後のページです", Toast.LENGTH_SHORT).show(); }
-    private void back() { int previous = nextIndex(page, false); if (previous >= 0) goToPage(previous); else Toast.makeText(this, "最初のページです", Toast.LENGTH_SHORT).show(); }
+    private void forward() { if (vertical() && continuous.canScrollVertically(1)) { continuous.move(true); return; } int next = nextIndex(page, true); if (next >= 0) goToPage(next); else nextBook(true); }
+    private void back() { if (vertical() && continuous.canScrollVertically(-1)) { continuous.move(false); return; } int previous = nextIndex(page, false); if (previous >= 0) goToPage(previous); else nextBook(false); }
 
     private void updateControls() {
         boolean dualPage = usesDualPageLayout();
         int shownEnd = dualPage ? Math.min(totalPages, page + 2) : page + 1;
         pageText.setText(totalPages > 0 ? (dualPage ? (page + 1) + "-" + shownEnd : String.valueOf(page + 1))
-                + " / " + totalPages + "  " + Math.round(shownEnd * 100f / totalPages) + "%" : "読み込み中…");
+                + " / " + totalPages + "  " + Math.round(shownEnd * 100f / totalPages) + "%" : I18n.t(R.string.ui_loading));
         pageSlider.setProgress(page);
         refreshQuickBookmark();
     }
@@ -637,14 +588,14 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         boolean next = !AppState.hasBookmark(this, sourceUri, page);
         AppState.setBookmark(this, sourceUri, page, next, title, ComicFile.kindFor(title, getContentResolver().getType(sourceUri)));
         refreshQuickBookmark();
-        Toast.makeText(this, next ? "しおりに追加しました" : "しおりを削除しました", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, next ? I18n.t(R.string.ui_bookmark_added) : I18n.t(R.string.ui_bookmark_removed), Toast.LENGTH_SHORT).show();
     }
 
     private void refreshQuickBookmark() {
         if (quickBookmarkButton == null) return;
         boolean marked = initialized && AppState.hasBookmark(this, sourceUri, page);
         quickBookmarkButton.setText(marked ? "★" : "☆");
-        quickBookmarkButton.setContentDescription(marked ? "このページのしおりを削除" : "このページにしおりを追加");
+        quickBookmarkButton.setContentDescription(marked ? I18n.t(R.string.ui_remove_this_bookmark) : I18n.t(R.string.ui_bookmark_this_page));
     }
 
     private void showPageJump() {
@@ -654,12 +605,12 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         input.setHint("1〜" + totalPages);
         input.setText(String.valueOf(page + 1));
         Ui.styleSearch(input);
-        Ui.show(new AlertDialog.Builder(this).setTitle("ページへ移動").setView(input).setNegativeButton("キャンセル", null).setPositiveButton("移動", (dialog, which) -> {
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_go_to_page)).setView(input).setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_move), (dialog, which) -> {
             try {
                 int target = Integer.parseInt(input.getText().toString()) - 1;
                 if (target < 0 || target >= totalPages) throw new NumberFormatException();
                 goToPage(target);
-            } catch (NumberFormatException error) { Toast.makeText(this, "1〜" + totalPages + " の番号を入力してください", Toast.LENGTH_SHORT).show(); }
+            } catch (NumberFormatException error) { Toast.makeText(this, "1〜" + totalPages + I18n.t(R.string.ui_enter_a_page_number), Toast.LENGTH_SHORT).show(); }
         }));
     }
 
@@ -668,56 +619,66 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private void showMoreReaderSettings() {
-        ArrayList<String> actions = new ArrayList<>();
-        actions.add("しおりメモを編集");
-        actions.add(inverted ? "色反転を戻す" : "色を反転");
-        actions.add("ページ余白を切り取る");
-        actions.add("現在のページを表紙にする");
-        if (AppState.hasCover(this, sourceUri)) actions.add("表紙を初期状態に戻す");
-        actions.add("復帰位置を先頭に戻す");
-        actions.add("設定");
-        Ui.show(new AlertDialog.Builder(this).setTitle("その他").setItems(actions.toArray(new String[0]), (dialog, which) -> {
-            String action = actions.get(which);
-            if ("しおりメモを編集".equals(action)) showBookmarkMemo();
-            else if (action.contains("色反転")) { inverted = !inverted; imageView.setInverted(inverted); }
-            else if ("ページ余白を切り取る".equals(action)) showCropDialog();
-            else if ("現在のページを表紙にする".equals(action)) saveCurrentPageCover();
-            else if ("表紙を初期状態に戻す".equals(action)) {
-                AppState.removeCover(this, sourceUri);
-                Toast.makeText(this, "表紙を初期状態に戻しました", Toast.LENGTH_SHORT).show();
-            } else if ("復帰位置を先頭に戻す".equals(action)) {
-                AppState.clearPosition(this, sourceUri);
-                goToPage(0);
-                Toast.makeText(this, "復帰位置を先頭に戻しました", Toast.LENGTH_SHORT).show();
-            } else startActivity(new Intent(this, SettingsActivity.class));
-        }));
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(R.string.ui_edit_bookmark_note), this::showBookmarkMemo);
+        menu.add(AppState.enabled(this, "filter_invert", false) ? I18n.t(R.string.ui_restore_colors) : I18n.t(R.string.ui_invert_colors), () -> {
+            AppState.put(this, "filter_invert", !AppState.enabled(this, "filter_invert", false)); refreshReader();
+        });
+        menu.add(I18n.t(R.string.ui_crop_page_margins), this::showCropDialog);
+        menu.add(I18n.t(R.string.ui_set_current_page_as_cover), this::saveCurrentPageCover);
+        if (AppState.hasCover(this, sourceUri)) menu.add(I18n.t(R.string.ui_restore_default_cover), () -> {
+            AppState.removeCover(this, sourceUri);
+            Toast.makeText(this, I18n.t(R.string.ui_cover_restored), Toast.LENGTH_SHORT).show();
+        });
+        menu.add(I18n.t(R.string.ui_reset_reading_position), () -> {
+            AppState.clearPosition(this, sourceUri); goToPage(0);
+            Toast.makeText(this, I18n.t(R.string.ui_reading_position_reset), Toast.LENGTH_SHORT).show();
+        });
+        menu.add(I18n.t(R.string.ui_settings), () -> startActivity(new Intent(this, SettingsActivity.class)));
+        menu.add(I18n.t(R.string.ui_page_button_area), () -> ReaderOptions.pageButtons(this, this::refreshReader));
+        menu.add(I18n.t(R.string.ui_hardware_key), () -> ReaderOptions.hardware(this, () -> { }));
+        menu.add(I18n.t(R.string.ui_page_spacing), () -> {
+            PreferenceRows rows = new PreferenceRows(this);
+            rows.slider(I18n.t(R.string.ui_page_spacing), "page_gap", 0, 0, 100, " dp", this::refreshReader);
+            rows.show(I18n.t(R.string.ui_page_spacing));
+        });
+        menu.add(I18n.t(R.string.ui_page_thumbnails), () -> showPageBrowser(false));
+        menu.add(I18n.t(R.string.ui_chapters), () -> showPageBrowser(true));
+        menu.add(I18n.t(R.string.ui_margin_cropping), this::showCropEditor);
+        menu.add(I18n.t(R.string.ui_open_the_next_file), () -> nextBook(true));
+        menu.show(this, I18n.t(R.string.ui_more));
     }
 
     private void saveCurrentPageCover() {
         Bitmap current = pageCache.get(cacheKey(page));
-        if (!initialized || current == null) {
-            Toast.makeText(this, "ページの読み込み後に設定してください", Toast.LENGTH_SHORT).show();
+        if (!initialized) {
+            Toast.makeText(this, I18n.t(R.string.ui_wait_for_the_page_to_load), Toast.LENGTH_SHORT).show();
             return;
         }
-        int[] size = coverSize(current.getWidth(), current.getHeight());
-        Bitmap cover = Bitmap.createScaledBitmap(current, size[0], size[1], true);
+        int selectedPage = page;
         worker.execute(() -> {
+            Bitmap cover = null;
             File output = AppState.coverFile(this, sourceUri);
             File directory = output.getParentFile();
             File temporary = new File(directory, output.getName() + ".tmp");
             try {
-                if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new IOException("表紙の保存先を作成できません。");
+                Bitmap decoded = current == null ? decodePage(selectedPage) : current;
+                if (decoded == null) throw new IOException("Page unavailable");
+                int[] size = coverSize(decoded.getWidth(), decoded.getHeight());
+                cover = Bitmap.createScaledBitmap(decoded, size[0], size[1], true);
+                if (cover == decoded) cover = decoded.copy(Bitmap.Config.ARGB_8888, false);
+                if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) throw new IOException(I18n.t(R.string.ui_cannot_create_cover_directory));
                 try (FileOutputStream stream = new FileOutputStream(temporary)) {
-                    if (!cover.compress(Bitmap.CompressFormat.JPEG, 90, stream)) throw new IOException("表紙を書き込めません。");
+                    if (!cover.compress(Bitmap.CompressFormat.JPEG, 90, stream)) throw new IOException(I18n.t(R.string.ui_cannot_write_cover));
                 }
-                if (output.isFile() && !output.delete()) throw new IOException("既存の表紙を置き換えられません。");
-                if (!temporary.renameTo(output)) throw new IOException("表紙を保存できません。");
-                runOnUiThread(() -> Toast.makeText(this, "現在のページを表紙にしました", Toast.LENGTH_SHORT).show());
-            } catch (IOException error) {
+                if (output.isFile() && !output.delete()) throw new IOException(I18n.t(R.string.ui_cannot_replace_the_existing_cover));
+                if (!temporary.renameTo(output)) throw new IOException(I18n.t(R.string.ui_cannot_save_cover));
+                runOnUiThread(() -> Toast.makeText(this, I18n.t(R.string.ui_current_page_set_as_cover), Toast.LENGTH_SHORT).show());
+            } catch (Exception | OutOfMemoryError error) {
                 temporary.delete();
-                runOnUiThread(() -> Toast.makeText(this, "表紙を保存できませんでした", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> Toast.makeText(this, I18n.t(R.string.ui_could_not_save_cover), Toast.LENGTH_SHORT).show());
             } finally {
-                cover.recycle();
+                if (cover != null) cover.recycle();
             }
         });
     }
@@ -728,86 +689,60 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private void showCropDialog() {
-        String[] labels = {"なし", "2%", "5%", "10%"};
+        String[] labels = {I18n.t(R.string.ui_none), "2%", "5%", "10%"};
         int[] values = {0, 2, 5, 10};
         int selected = 0;
         for (int index = 0; index < values.length; index++) if (values[index] == cropPercent) selected = index;
-        Ui.show(new AlertDialog.Builder(this).setTitle("ページ余白を切り取る")
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_crop_page_margins))
                 .setSingleChoiceItems(labels, selected, (dialog, chosen) -> {
                     cropPercent = values[chosen];
                     AppState.setCropPercent(this, cropPercent);
-                    pageCache.evictAll();
                     dialog.dismiss();
-                    loadPage(page, false);
+                    refreshReader();
                 }));
     }
 
     private void showPageLayoutDialog() {
-        Ui.show(new AlertDialog.Builder(this).setTitle("ページレイアウト")
-                .setSingleChoiceItems(new String[]{"単ページ", "見開き", "自動（横画面は見開き）"}, pageLayout, (dialog, selected) -> {
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_page_layout))
+                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_single_page), I18n.t(R.string.ui_two_pages), I18n.t(R.string.ui_auto_two_pages_in_landscape)}, pageLayout, (dialog, selected) -> {
                     pageLayout = selected;
                     AppState.setPageLayout(this, selected);
-                    pageCache.evictAll();
-                    int target = usesDualPageLayout() ? page - page % 2 : page;
                     dialog.dismiss();
-                    loadPage(target, false);
+                    refreshReader();
                 }));
     }
 
     private void showReadingFlowDialog() {
-        Ui.show(new AlertDialog.Builder(this).setTitle("ページ移動")
-                .setSingleChoiceItems(new String[]{"横スワイプ", "縦スワイプ"}, AppState.readingFlow(this), (dialog, selected) -> {
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_page_navigation))
+                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_horizontal_swipe), I18n.t(R.string.ui_continuous_vertical_scrolling)}, AppState.readingFlow(this), (dialog, selected) -> {
                     AppState.setReadingFlow(this, selected);
-                    imageView.setVerticalPaging(selected == AppState.FLOW_VERTICAL);
+                    refreshReader();
                     dialog.dismiss();
                 }));
     }
 
-    private void showFilterDialog() {
-        String[] choices = {"なし", "グレースケール", "自動コントラスト", "セピア", "ブルーライト軽減"};
-        Ui.show(new AlertDialog.Builder(this).setTitle("画像フィルター").setSingleChoiceItems(choices, filterMode, (dialog, selected) -> {
-            filterMode = selected;
-            AppState.setImageFilter(this, selected);
-            imageView.setFilterMode(selected);
-            dialog.dismiss();
-        }));
-    }
+    private void showFilterDialog() { ReaderOptions.filters(this, this::refreshReader); }
 
-    private void showZoomDialog() {
-        String[] labels = {"無効", "1.5倍", "2.0倍", "2.25倍", "2.5倍", "3.0倍", "4.0倍"};
-        int[] values = {0, 150, 200, 225, 250, 300, 400};
-        int selected = 0;
-        if (AppState.doubleTapMode(this) != AppState.DOUBLE_TAP_OFF) {
-            int scale = AppState.doubleTapScale(this);
-            for (int index = 1; index < values.length; index++) if (values[index] == scale) selected = index;
-        }
-        Ui.show(new AlertDialog.Builder(this).setTitle("ダブルタップ拡大").setSingleChoiceItems(labels, selected, (dialog, chosen) -> {
-            AppState.setDoubleTapMode(this, chosen == 0 ? AppState.DOUBLE_TAP_OFF : AppState.DOUBLE_TAP_TOGGLE);
-            if (chosen > 0) AppState.setDoubleTapScale(this, values[chosen]);
-            imageView.setDoubleTapMode(AppState.doubleTapMode(this));
-            imageView.setDoubleTapScale(AppState.doubleTapScale(this) / 100f);
-            dialog.dismiss();
-        }));
-    }
+    private void showZoomDialog() { ReaderOptions.zoom(this, this::refreshReader); }
 
     private void showBookmarkMemo() {
         if (!initialized) return;
         if (!AppState.hasBookmark(this, sourceUri, page))
             AppState.setBookmark(this, sourceUri, page, true, title, ComicFile.kindFor(title, getContentResolver().getType(sourceUri)));
         EditText input = new EditText(this);
-        input.setHint("メモ（省略可）");
+        input.setHint(I18n.t(R.string.ui_note_optional));
         input.setText(AppState.bookmarkMemo(this, sourceUri, page));
         Ui.styleSearch(input);
-        Ui.show(new AlertDialog.Builder(this).setTitle((page + 1) + " ページのしおりメモ").setView(input)
-                .setNegativeButton("キャンセル", null).setPositiveButton("保存", (dialog, which) -> {
+        Ui.show(new AlertDialog.Builder(this).setTitle((page + 1) + I18n.t(R.string.ui_bookmark_note)).setView(input)
+                .setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_save), (dialog, which) -> {
                     AppState.setBookmarkMemo(this, sourceUri, page, input.getText().toString());
                     refreshQuickBookmark();
                 }));
     }
 
     private void showFitDialog() {
-        String[] choices = {"画面に合わせる", "幅に合わせる", "高さに合わせる", "画面いっぱいに伸縮"};
-        Ui.show(new AlertDialog.Builder(this).setTitle("表示方法").setSingleChoiceItems(choices, AppState.fitMode(this), (dialog, chosen) -> {
+        String[] choices = {I18n.t(R.string.ui_image_fit_to_screen), I18n.t(R.string.ui_fit_width), I18n.t(R.string.ui_fit_height), I18n.t(R.string.ui_stretch_to_fill_screen)};
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_fit_screen)).setSingleChoiceItems(choices, AppState.fitMode(this), (dialog, chosen) -> {
             AppState.setFitMode(this, chosen);
             imageView.setFitMode(chosen);
             dialog.dismiss();
@@ -820,7 +755,7 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         content.setOrientation(LinearLayout.VERTICAL);
         TextView value = text("", 16, Ui.TEXT_PRIMARY);
         int current = AppState.brightness(this);
-        value.setText(current < 0 ? "システムの明るさ" : current + "%");
+        value.setText(current < 0 ? I18n.t(R.string.ui_system_brightness) : current + "%");
         content.addView(value);
         SeekBar slider = new SeekBar(this);
         slider.setMax(100);
@@ -834,49 +769,54 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
             @Override public void onStopTrackingTouch(SeekBar seekBar) { }
         });
         content.addView(slider);
-        Ui.show(new AlertDialog.Builder(this).setTitle("明るさ").setView(content).setNegativeButton("システム設定", (dialog, which) -> {
+        android.widget.CheckBox keep = new android.widget.CheckBox(this);
+        keep.setText(I18n.t(R.string.ui_keep_screen_on)); Ui.styleDarkCheckable(keep); keep.setChecked(AppState.keepScreenOn(this));
+        keep.setOnCheckedChangeListener((button, checked) -> { AppState.setKeepScreenOn(this, checked); if (checked) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); });
+        content.addView(keep);
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_brightness)).setView(content).setNegativeButton(I18n.t(R.string.ui_system_settings), (dialog, which) -> {
             AppState.setBrightness(this, -1);
             applyBrightness(-1);
-        }).setPositiveButton("保存", (dialog, which) -> AppState.setBrightness(this, slider.getProgress())));
+        }).setPositiveButton(I18n.t(R.string.ui_save), (dialog, which) -> AppState.setBrightness(this, slider.getProgress())));
     }
 
     private void showOrientationDialog() {
-        String[] choices = {"自動回転", "縦向きに固定", "横向きに固定"};
-        Ui.show(new AlertDialog.Builder(this).setTitle("画面回転").setItems(choices, (dialog, selected) -> {
+        String[] choices = {I18n.t(R.string.ui_auto_rotate), I18n.t(R.string.ui_lock_portrait), I18n.t(R.string.ui_lock_landscape)};
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_screen_rotation)).setItems(choices, (dialog, selected) -> {
             setRequestedOrientation(selected == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : selected == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         }));
     }
 
     private void showDirectionDialog() {
-        String[] choices = {"左から右", "右から左（漫画向け）"};
-        Ui.show(new AlertDialog.Builder(this).setTitle("ページ送り方向")
-                .setSingleChoiceItems(choices, AppState.direction(this), (dialog, selected) -> {
-                    AppState.setDirection(this, selected);
+        String[] choices = {I18n.t(R.string.ui_right), I18n.t(R.string.ui_left), I18n.t(R.string.ui_right_vertical), I18n.t(R.string.ui_left_vertical)};
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_reading_direction))
+                .setSingleChoiceItems(choices, AppState.direction(this) + (vertical() ? 2 : 0), (dialog, selected) -> {
+                    AppState.setDirection(this, selected % 2);
+                    AppState.setReadingFlow(this, selected >= 2 ? 1 : 0);
                     updatePageButtons();
-                    if (usesDualPageLayout()) { pageCache.evictAll(); loadPage(page, false); }
                     dialog.dismiss();
+                    refreshReader();
                 }));
     }
 
     private void showBookmarks() {
         Set<Integer> pages = AppState.bookmarks(this, sourceUri);
-        if (pages.isEmpty()) { Toast.makeText(this, "しおりはまだありません", Toast.LENGTH_SHORT).show(); return; }
+        if (pages.isEmpty()) { Toast.makeText(this, I18n.t(R.string.ui_no_bookmarks_yet), Toast.LENGTH_SHORT).show(); return; }
         List<Integer> ordered = new ArrayList<>(pages);
         Collections.sort(ordered);
         String[] labels = new String[ordered.size()];
         for (int index = 0; index < labels.length; index++) {
             int bookmarkedPage = ordered.get(index);
             String memo = AppState.bookmarkMemo(this, sourceUri, bookmarkedPage);
-            labels[index] = (bookmarkedPage + 1) + " ページ" + (memo.isEmpty() ? "" : "  •  " + memo);
+            labels[index] = (bookmarkedPage + 1) + I18n.t(R.string.ui_pages_2) + (memo.isEmpty() ? "" : "  •  " + memo);
         }
-        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle("しおり").setItems(labels, (ignored, selected) -> goToPage(ordered.get(selected)))
-                .setNegativeButton("すべて削除", (ignored, which) -> { AppState.clearBookmarks(this, sourceUri); refreshQuickBookmark(); }));
+        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_add_bookmark)).setItems(labels, (ignored, selected) -> goToPage(ordered.get(selected)))
+                .setNegativeButton(I18n.t(R.string.ui_delete_all), (ignored, which) -> { AppState.clearBookmarks(this, sourceUri); refreshQuickBookmark(); }));
         Ui.styleButton(dialog.getButton(AlertDialog.BUTTON_NEGATIVE), Ui.ButtonStyle.DANGER);
     }
 
     private void showAutoPageDialog() {
-        String[] labels = {"5秒ごと", "10秒ごと", "15秒ごと"};
-        Ui.show(new AlertDialog.Builder(this).setTitle("自動ページ送り").setItems(labels, (dialog, selected) -> {
+        String[] labels = {I18n.t(R.string.ui_every_5_seconds), I18n.t(R.string.ui_every_10_seconds), I18n.t(R.string.ui_every_15_seconds)};
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_auto_page_turn)).setItems(labels, (dialog, selected) -> {
             autoDelayMs = new int[]{5000, 10000, 15000}[selected];
             autoHandler.removeCallbacks(autoPage);
             autoHandler.postDelayed(autoPage, autoDelayMs);
@@ -890,14 +830,15 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private void capturePage() {
-        if (!initialized || imageView.getWidth() == 0 || imageView.getHeight() == 0 || imageView.getDrawable() == null) {
-            Toast.makeText(this, "ページの読み込み後に保存してください", Toast.LENGTH_SHORT).show();
+        View visiblePage = vertical() ? continuous : imageView;
+        if (!initialized || visiblePage.getWidth() == 0 || visiblePage.getHeight() == 0 || (!vertical() && imageView.getDrawable() == null)) {
+            Toast.makeText(this, I18n.t(R.string.ui_wait_for_the_page_to_load_before_saving), Toast.LENGTH_SHORT).show();
             return;
         }
-        Bitmap capture = Bitmap.createBitmap(imageView.getWidth(), imageView.getHeight(), Bitmap.Config.ARGB_8888);
+        Bitmap capture = Bitmap.createBitmap(visiblePage.getWidth(), visiblePage.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(capture);
         canvas.drawColor(Ui.DARK_BACKGROUND);
-        imageView.draw(canvas);
+        visiblePage.draw(canvas);
         worker.execute(() -> {
             Uri output = null;
             try {
@@ -907,17 +848,17 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
                 values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Comic Explorer");
                 values.put(MediaStore.Images.Media.IS_PENDING, 1);
                 output = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
-                if (output == null) throw new IOException("保存先を作成できません。");
+                if (output == null) throw new IOException(I18n.t(R.string.ui_cannot_create_destination));
                 try (OutputStream stream = getContentResolver().openOutputStream(output)) {
-                    if (stream == null || !capture.compress(Bitmap.CompressFormat.PNG, 100, stream)) throw new IOException("画像を書き込めません。");
+                    if (stream == null || !capture.compress(Bitmap.CompressFormat.PNG, 100, stream)) throw new IOException(I18n.t(R.string.ui_cannot_write_image));
                 }
                 ContentValues publish = new ContentValues();
                 publish.put(MediaStore.Images.Media.IS_PENDING, 0);
                 getContentResolver().update(output, publish, null, null);
-                runOnUiThread(() -> Toast.makeText(this, "Pictures/Comic Explorer に保存しました", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> Toast.makeText(this, I18n.t(R.string.ui_saved_to_pictures_comic_explorer), Toast.LENGTH_SHORT).show());
             } catch (Exception error) {
                 if (output != null) getContentResolver().delete(output, null, null);
-                runOnUiThread(() -> Toast.makeText(this, "画像を保存できませんでした", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> Toast.makeText(this, I18n.t(R.string.ui_could_not_save_image), Toast.LENGTH_SHORT).show());
             } finally {
                 capture.recycle();
             }
@@ -934,12 +875,17 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         chromeVisible = !chromeVisible;
         chromeTop.setVisibility(chromeVisible ? View.VISIBLE : View.GONE);
         chromeBottom.setVisibility(chromeVisible ? View.VISIBLE : View.GONE);
+        updatePageButtons();
     }
 
     private void toggleFullscreen() { fullScreen = !fullScreen; applyFullscreen(); }
 
     private void applyFullscreen() {
         Window window = getWindow();
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        boolean cutout = AppState.enabled(this, getResources().getConfiguration().orientation == 2 ? "cutout_land" : "cutout_port", false);
+        attributes.layoutInDisplayCutoutMode = cutout ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
+        window.setAttributes(attributes);
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             WindowInsetsController controller = window.getInsetsController();
             if (controller != null) {
@@ -980,15 +926,28 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     private void showLoading(boolean show) { loading.setVisibility(show ? View.VISIBLE : View.GONE); }
     private void showError(String message) { errorPanel.setVisibility(message == null ? View.GONE : View.VISIBLE); if (message != null) errorText.setText(message); }
     private String readableError(Throwable error) {
-        if (error instanceof SecurityException) return "ファイルへのアクセス許可が失われました。ライブラリでフォルダを選び直してください。";
-        if (error instanceof OutOfMemoryError) return "ページが大きすぎてメモリに収まりません。ほかのアプリを閉じるか、解像度を下げた本を使用してください。";
-        return error.getMessage() == null ? "ファイルを開けません。" : error.getMessage();
+        if (error instanceof SecurityException) return I18n.t(R.string.ui_file_access_was_revoked_select_the_folder_again_in_the);
+        if (error instanceof OutOfMemoryError) return I18n.t(R.string.ui_the_page_does_not_fit_in_memory_close_other_apps);
+        return error.getMessage() == null ? I18n.t(R.string.ui_cannot_open_file) : error.getMessage();
     }
     @Override public void onTap(float normalizedX) {
         if (!initialized) return;
         if (normalizedX < .28f) { if (AppState.direction(this) == AppState.DIRECTION_RTL) forward(); else back(); }
         else if (normalizedX > .72f) { if (AppState.direction(this) == AppState.DIRECTION_RTL) back(); else forward(); }
         else toggleChrome();
+    }
+
+    @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+            int[] location = new int[2]; if (chromeTop != null) chromeTop.getLocationOnScreen(location);
+            menuTouchX = event.getX(); menuTouchY = event.getY();
+            swipingMenu = chromeVisible && chromeTop != null && event.getRawY() >= location[1] && event.getRawY() < location[1]+chromeTop.getHeight();
+        }
+        if (event.getAction() == android.view.MotionEvent.ACTION_UP && swipingMenu && Math.abs(event.getX()-menuTouchX)>dp(48) && Math.abs(event.getY()-menuTouchY)<dp(48)) {
+            showReaderMenuPage((readerMenuPage+(event.getX()<menuTouchX ? 1 : 2))%3);
+            android.view.MotionEvent cancel=android.view.MotionEvent.obtain(event);cancel.setAction(android.view.MotionEvent.ACTION_CANCEL);super.dispatchTouchEvent(cancel);cancel.recycle();return true;
+        }
+        return super.dispatchTouchEvent(event);
     }
 
     @Override public void onSwipe(int direction) {
@@ -999,6 +958,13 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     @Override public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (AppState.prefs(this).contains("setting.key." + keyCode)) {
+            switch (AppState.number(this, "key." + keyCode, 0)) {
+                case 1: back(); break; case 2: forward(); break; case 3: toggleChrome(); break;
+                case 4: toggleBookmark(); break; case 5: toggleFullscreen(); break; default: break;
+            }
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_PAGE_UP) { onSwipe(1); return true; }
         if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_PAGE_DOWN) { onSwipe(-1); return true; }
         if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) { toggleChrome(); return true; }
@@ -1022,18 +988,18 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         boolean reloadLayout = initialized && (savedLayout != pageLayout || savedDivider != dualPageDivider || savedCropPercent != cropPercent);
         pageLayout = savedLayout;
         dualPageDivider = savedDivider;
-        filterMode = AppState.imageFilter(this);
+
         cropPercent = savedCropPercent;
         imageView.setFitMode(AppState.fitMode(this));
         imageView.setDoubleTapScale(AppState.doubleTapScale(this) / 100f);
         imageView.setDoubleTapMode(AppState.doubleTapMode(this));
         imageView.setVerticalPaging(AppState.readingFlow(this) == AppState.FLOW_VERTICAL);
-        imageView.setFilterMode(filterMode);
+        imageView.setFilterMode(AppState.FILTER_NONE);
         updatePageButtons();
         applyBrightness(AppState.brightness(this));
         if (AppState.keepScreenOn(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        if (reloadLayout) { pageCache.evictAll(); loadPage(usesDualPageLayout() ? page - page % 2 : page, false); }
+        if (reloadLayout) refreshReader();
         if (autoDelayMs > 0) autoHandler.postDelayed(autoPage, autoDelayMs);
     }
 
@@ -1044,19 +1010,21 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
 
     @Override public void onConfigurationChanged(Configuration configuration) {
         super.onConfigurationChanged(configuration);
-        if (initialized && pageLayout == AppState.PAGE_AUTO) {
-            pageCache.evictAll();
-            loadPage(usesDualPageLayout() ? page - page % 2 : page, false);
-        }
+        if (initialized) refreshReader();
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state); state.putInt("current_page", page);
     }
 
     @Override protected void onDestroy() {
         destroyed = true;
+        if (continuous != null) continuous.stop();
         loadToken++;
         stopAutoPage();
         if (imageView != null) imageView.setImageDrawable(null);
         pageCache.evictAll();
-        worker.execute(this::closePdf);
+        worker.execute(() -> { if (pageSource != null) try { pageSource.close(); } catch (IOException ignored) { } });
         worker.shutdown();
         super.onDestroy();
     }
@@ -1071,25 +1039,104 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
     }
 
     private boolean usesDualPageLayout() {
-        return usesDualPageLayout(pageLayout, getResources().getConfiguration().orientation);
+        return !vertical() && usesDualPageLayout(pageLayout, getResources().getConfiguration().orientation);
     }
 
-    static int bitmapSampleSize(int width, int height, int maxPixels) {
-        int sample = 1;
-        while ((long) Math.max(1, width / sample) * Math.max(1, height / sample) > maxPixels
-                || Math.max(width / sample, height / sample) > MAX_PAGE_DIMENSION) sample *= 2;
-        return sample;
+    private boolean vertical() { return AppState.readingFlow(this) == AppState.FLOW_VERTICAL; }
+    private void refreshReader() {
+        if (!initialized) return;
+        cropPercent = AppState.cropPercent(this);
+        pageLayout = AppState.pageLayout(this); dualPageDivider = AppState.dualPageDivider(this);
+        imageView.setDoubleTapScale(AppState.doubleTapScale(this)/100f); imageView.setDoubleTapMode(AppState.doubleTapMode(this));
+        imageView.setVisibility(vertical() ? View.GONE : View.VISIBLE); continuous.setVisibility(vertical() ? View.VISIBLE : View.GONE);
+        continuous.setDividerHeight(dp(AppState.number(this, "page_gap", 0)) + (AppState.enabled(this, "scroll_divider", true) ? 1 : 0));
+        if (vertical()) continuous.reset(totalPages, page);
+        invalidatePages(); updatePageButtons(); loadPage(usesDualPageLayout() ? page - page % 2 : page, false); applyFullscreen();
     }
-
-    static int[] pdfBitmapSize(int sourceWidth, int sourceHeight, int screenWidth, int maxPixels) {
-        int width = Math.min(2048, Math.max(1080, Math.max(screenWidth, sourceWidth)));
-        int height = (int) Math.min(Integer.MAX_VALUE, Math.max(1L, Math.round(width * (sourceHeight / (double) sourceWidth))));
-        double scale = Math.min(1d, Math.min(MAX_PAGE_DIMENSION / (double) Math.max(width, height),
-                Math.sqrt(maxPixels / (double) ((long) width * height))));
-        width = Math.max(1, (int) Math.floor(width * scale));
-        height = Math.max(1, (int) Math.floor(height * scale));
-        while ((long) width * height > maxPixels) { if (width >= height) width--; else height--; }
-        return new int[]{width, height};
+    private void pageButton(boolean right) {
+        boolean forward = AppState.enabled(this, "page_both_next", false) || right != (AppState.direction(this) == AppState.DIRECTION_RTL);
+        if (AppState.enabled(this, "page_reverse", false)) forward = !forward;
+        if (forward) forward(); else back();
+    }
+    private void nextBook(boolean forward) {
+        ArrayList<Uri> books = getIntent().getParcelableArrayListExtra(EXTRA_BOOK_URIS);
+        ArrayList<String> titles = getIntent().getStringArrayListExtra(EXTRA_BOOK_TITLES);
+        int next = books == null ? -1 : books.indexOf(sourceUri) + (forward ? 1 : -1);
+        if (books == null || titles == null || next < 0 || next >= books.size() || titles.size() != books.size()) {
+            Toast.makeText(this, forward ? I18n.t(R.string.ui_last_page) : I18n.t(R.string.ui_first_page), Toast.LENGTH_SHORT).show(); return;
+        }
+        Intent intent = new Intent(this, ViewerActivity.class).setData(books.get(next));
+        intent.putExtra(EXTRA_TITLE, titles.get(next)); intent.putParcelableArrayListExtra(EXTRA_BOOK_URIS, books);
+        intent.putStringArrayListExtra(EXTRA_BOOK_TITLES, titles); intent.putExtra("next_book", true);
+        AppState.addRecent(this, books.get(next), titles.get(next), ComicFile.kindFor(titles.get(next), null));
+        startActivity(intent); finish();
+    }
+    private void showPageBrowser(boolean chapters) {
+        if (!initialized) return;
+        ArrayList<Integer> indices = new ArrayList<>(); ArrayList<String> labels = new ArrayList<>();
+        String previous = null;
+        for (int i = 0; i < totalPages; i++) {
+            String name = pageSource.pageName(i);
+            String chapter = name.contains("/") ? name.substring(0, name.lastIndexOf('/')) : I18n.t(R.string.ui_first_chapter);
+            if (!chapters || !chapter.equals(previous)) { indices.add(i); labels.add(chapters ? chapter : (i+1) + " · " + name); }
+            previous = chapter;
+        }
+        android.widget.GridView grid = new android.widget.GridView(this); grid.setNumColumns(chapters ? 1 : 3);
+        final boolean[] closed = {false};
+        grid.setAdapter(new android.widget.BaseAdapter() {
+            @Override public int getCount() { return indices.size(); }
+            @Override public Object getItem(int i) { return indices.get(i); }
+            @Override public long getItemId(int i) { return indices.get(i); }
+            @Override public View getView(int position, View recycled, ViewGroup parent) {
+                LinearLayout cell = new LinearLayout(ViewerActivity.this); cell.setOrientation(LinearLayout.VERTICAL); cell.setPadding(dp(4), dp(4), dp(4), dp(4));
+                android.widget.ImageView thumbnail = new android.widget.ImageView(ViewerActivity.this); thumbnail.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                cell.addView(thumbnail, new LinearLayout.LayoutParams(-1, dp(chapters ? 100 : 130)));
+                cell.addView(text(labels.get(position), 12, Ui.DARK_TEXT)); cell.setContentDescription(labels.get(position));
+                worker.execute(() -> {
+                    if (destroyed || closed[0]) return;
+                    try {
+                        Bitmap page = decodeSinglePage(indices.get(position)); int[] size = coverSize(page.getWidth(), page.getHeight());
+                        Bitmap small = Bitmap.createScaledBitmap(page, size[0], size[1], true); if (small != page) page.recycle();
+                        runOnUiThread(() -> { if (!destroyed && !closed[0]) thumbnail.setImageBitmap(small); });
+                    } catch (Exception | OutOfMemoryError ignored) { }
+                });
+                return cell;
+            }
+        });
+        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(chapters ? I18n.t(R.string.ui_chapters) : I18n.t(R.string.ui_page_thumbnails)).setView(grid).setNegativeButton(I18n.t(R.string.ui_close), null));
+        dialog.setOnDismissListener(d -> closed[0] = true);
+        grid.setOnItemClickListener((parent, view, position, id) -> { goToPage(indices.get(position)); dialog.dismiss(); });
+    }
+    private void showCropEditor() {
+        if (!initialized) return;
+        worker.execute(() -> {
+            try {
+                Bitmap bitmap = decodeLayout(page);
+                runOnUiThread(() -> {
+                    if (destroyed || isFinishing()) return;
+                    CropView crop = new CropView(this, bitmap);
+                    LinearLayout editor = new LinearLayout(this); editor.setOrientation(LinearLayout.VERTICAL);
+                    crop.setMinimumHeight(0);
+                    editor.addView(crop, new LinearLayout.LayoutParams(-1, Math.min(dp(320), Math.round(getResources().getDisplayMetrics().heightPixels * .35f))));
+                    String[] edges={"Left", "Top", "Right", "Bottom"};
+                    for(int edge=0;edge<4;edge++) {
+                        int selectedEdge=edge;
+                        LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
+                        TextView label=text(edges[edge],13,Ui.DARK_TEXT); row.addView(label,new LinearLayout.LayoutParams(dp(64),-2));
+                        SeekBar bar=new SeekBar(this); bar.setMax(100);bar.setProgress(edge<2?0:100);bar.setContentDescription(edges[edge]);Ui.styleSeekBar(bar,true);
+                        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+                            @Override public void onProgressChanged(SeekBar view,int value,boolean user){if(user)crop.setEdge(selectedEdge,value/100f);}
+                            @Override public void onStartTrackingTouch(SeekBar view){} @Override public void onStopTrackingTouch(SeekBar view){}
+                        });row.addView(bar,new LinearLayout.LayoutParams(0,dp(48),1));editor.addView(row);
+                    }
+                    android.widget.ScrollView cropScroll = new android.widget.ScrollView(this); cropScroll.addView(editor);
+                    AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_margin_cropping)).setView(cropScroll)
+                            .setNegativeButton(I18n.t(R.string.ui_cancel), null).setNeutralButton(I18n.t(R.string.ui_default), (d, i) -> { customCrop = null; refreshReader(); })
+                            .setPositiveButton(I18n.t(R.string.ui_crop), (d, i) -> { customCrop = crop.selection(); refreshReader(); }));
+                    dialog.getWindow().setLayout(-1, Math.round(getResources().getDisplayMetrics().heightPixels*.85f));
+                });
+            } catch (Exception | OutOfMemoryError e) { runOnUiThread(() -> Toast.makeText(this, I18n.t(R.string.ui_cannot_load_page), Toast.LENGTH_SHORT).show()); }
+        });
     }
 
     public static void main(String[] arguments) throws IOException {
@@ -1101,47 +1148,13 @@ public final class ViewerActivity extends Activity implements ZoomImageView.Inte
         assert crop[0] == 50 && crop[1] == 100 && crop[2] == 900 && crop[3] == 1800;
         int[] cover = coverSize(2000, 1000);
         assert cover[0] == 320 && cover[1] == 160;
-        assert bitmapSampleSize(4000, 6000, 2_000_000) == 4;
-        int[] tallPdf = pdfBitmapSize(1, 100_000, 1080, 2_000_000);
+        assert PageSource.bitmapSampleSize(4000, 6000, 2_000_000) == 4;
+        int[] tallPdf = PageSource.pdfBitmapSize(1, 100_000, 1080, 2_000_000);
         assert tallPdf[0] <= MAX_PAGE_DIMENSION && tallPdf[1] <= MAX_PAGE_DIMENSION;
         assert (long) tallPdf[0] * tallPdf[1] <= 2_000_000;
-        BoundedInputStream bounded = new BoundedInputStream(new ByteArrayInputStream(new byte[]{1, 2, 3}), 2);
+        PageSource.BoundedInputStream bounded = new PageSource.BoundedInputStream(new ByteArrayInputStream(new byte[]{1, 2, 3}), 2);
         assert bounded.read(new byte[2]) == 2;
         try { bounded.read(); assert false; } catch (IOException expected) { }
-    }
-
-    private static final class BoundedInputStream extends FilterInputStream {
-        private final long maxBytes;
-        private long bytesRead;
-
-        BoundedInputStream(InputStream input, long maxBytes) {
-            super(input);
-            this.maxBytes = maxBytes;
-        }
-
-        @Override public int read() throws IOException {
-            int value = super.read();
-            if (value >= 0 && ++bytesRead > maxBytes) throw new IOException("画像ページが大きすぎます（上限48MB）。");
-            return value;
-        }
-
-        @Override public int read(byte[] buffer, int offset, int length) throws IOException {
-            int allowed = (int) Math.min(length, maxBytes - bytesRead + 1);
-            int count = super.read(buffer, offset, allowed);
-            if (count > 0 && (bytesRead += count) > maxBytes) throw new IOException("画像ページが大きすぎます（上限48MB）。");
-            return count;
-        }
-
-        @Override public long skip(long count) throws IOException {
-            long skipped = super.skip(Math.min(count, maxBytes - bytesRead + 1));
-            if (skipped > 0 && (bytesRead += skipped) > maxBytes) throw new IOException("画像ページが大きすぎます（上限48MB）。");
-            return skipped;
-        }
-    }
-
-    private void closePdf() {
-        if (pdf != null) { pdf.close(); pdf = null; }
-        if (pdfDescriptor != null) try { pdfDescriptor.close(); } catch (IOException ignored) { } finally { pdfDescriptor = null; }
     }
 
     private Button button(String label, String description) {
