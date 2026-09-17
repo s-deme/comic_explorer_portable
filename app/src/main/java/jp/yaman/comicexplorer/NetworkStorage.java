@@ -173,6 +173,14 @@ public final class NetworkStorage {
                 }
             }
         }
+        void upload(String relative, java.io.File file) throws Exception {
+            try (InputStream input = new java.io.FileInputStream(file)) {
+                if (share != null) {
+                    try (com.hierynomus.smbj.share.File remote = share.openFile(path(relative), EnumSet.of(AccessMask.FILE_WRITE_DATA), null, SMB2ShareAccess.ALL, SMB2CreateDisposition.FILE_OVERWRITE_IF, null);
+                         java.io.OutputStream output = remote.getOutputStream()) { DocumentTransfer.copyAndHash(input, output, null); }
+                } else if (!ftp.storeFile(path(relative), input)) throw new IOException(I18n.t(R.string.ui_ftp_transfer_did_not_complete));
+            }
+        }
         private void copy(InputStream input, FileOutputStream output, java.io.File file) throws IOException {
             byte[] buffer=new byte[65536]; int count;
             while ((count=input.read(buffer))!=-1) { if (Thread.currentThread().isInterrupted() || file.getParentFile().getUsableSpace()<count+16*1024*1024L) throw new IOException(I18n.t(R.string.ui_cannot_continue_transfer)); output.write(buffer,0,count); }

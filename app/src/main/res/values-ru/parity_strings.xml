@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_blue_light">Уменьшение синего света</string>
+    <string name="ui_light_theme">Светлая</string>
+    <string name="ui_dark_theme">Тёмная</string>
+    <string name="ui_archive_error">Не удалось прочитать архив (RAR5, шифрование или многотомные архивы могут не поддерживаться).</string>
+    <string name="ui_top">Сверху</string>
+    <string name="ui_bottom">Снизу</string>
+    <string name="ui_grayscale">Оттенки серого</string>
+    <string name="ui_auto_contrast">Автоконтраст</string>
+    <string name="ui_same_destination">Источник и назначение совпадают.</string>
+    <string name="ui_source_retained">Копия проверена, но источник не удалён. Обе копии сохранены.</string>
+    <string name="ui_transfer_limit">Передача отменена или превышен лимит папок.</string>
+    <string name="ui_verification_failed">Проверка копии не пройдена. Источник сохранён.</string>
+    <string name="ui_cannot_verify_destination">Невозможно проверить папку назначения.</string>
+    <string name="ui_copy">Копировать</string>
+    <string name="ui_select_items">Выбрать элементы</string>
+    <string name="ui_select_all">Выбрать всё</string>
+    <string name="ui_conflict">При совпадении имён</string>
+    <string name="ui_keep_both">Сохранить оба</string>
+    <string name="ui_replace">Заменить после проверки</string>
+    <string name="ui_skip">Пропустить</string>
+    <string name="ui_transfer_running">Передача…</string>
+    <string name="ui_bulk_rename">Переименовать выбранное</string>
+    <string name="ui_name_prefix">Префикс имени (автонумерация)</string>
+    <string name="ui_albums">Альбомы</string>
+    <string name="ui_create_album">Создать альбом</string>
+    <string name="ui_add_to_album">Добавить в альбом</string>
+    <string name="ui_remove_from_album">Убрать из альбома</string>
+    <string name="ui_album_delete_notice">Удалить альбом? Исходные изображения останутся.</string>
+    <string name="ui_album_empty">Добавьте изображения из галереи или файлов.</string>
+    <string name="ui_add_images">Добавить изображения</string>
+    <string name="ui_page_strip">Лента страниц</string>
+</resources>

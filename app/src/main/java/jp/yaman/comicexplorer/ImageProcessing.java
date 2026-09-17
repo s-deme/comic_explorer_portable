@@ -26,7 +26,9 @@ public final class ImageProcessing {
         if (sharp) sharpen(pixels, width, height, AppState.number(context, "sharp_strength", 5) / 10f);
         int strength = blue ? Math.max(0, Math.min(100, AppState.number(context, "blue_strength", 30))) : 0;
         for (int i = 0; i < pixels.length; i++) pixels[i] = color(pixels[i], gray, invert, strength);
-        return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
+        Bitmap result = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
+        if (bitmap != source) bitmap.recycle();
+        return result;
     }
     static int color(int pixel, boolean gray, boolean invert, int blue) {
         int r = pixel >> 16 & 255, g = pixel >> 8 & 255, b = pixel & 255;

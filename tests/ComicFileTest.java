@@ -20,6 +20,10 @@ public final class ComicFileTest {
         assert ComicFile.NATURAL_NAME_ORDER.compare("PAGE2.jpg", "page2.jpg") == 0;
         assert ComicFile.NATURAL_NAME_ORDER.compare("page9223372036854775808.jpg",
                 "page9223372036854775808.jpg") == 0;
-        System.out.println("ComicFile natural ordering: 14 checks passed.");
+        for (String extension : new String[]{"rar", "cbr", "7z", "cb7", "cbz", "zip", "pdf"}) assert ComicFile.isSupported("book." + extension, null) : extension;
+        assert ComicFile.kindFor("download", "application/vnd.rar").equals("RAR");
+        assert ComicFile.kindFor("download", "application/x-7z-compressed").equals("7Z");
+        assert !ComicFile.isSupported("book.exe", null);
+        System.out.println("ComicFile: 24 checks passed.");
     }
 }

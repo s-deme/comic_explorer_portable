@@ -22,13 +22,15 @@ public final class LibraryDirectoryReader {
     private LibraryDirectoryReader() { }
 
     public static List<LibraryEntry> read(ContentResolver resolver, Uri treeUri, Uri directoryUri) {
+        return read(resolver, treeUri, directoryUri, true);
+    }
+    static List<LibraryEntry> read(ContentResolver resolver, Uri treeUri, Uri directoryUri, boolean supportedOnly) {
         ArrayList<LibraryEntry> entries = new ArrayList<>();
         // ACTION_OPEN_DOCUMENT_TREE returns a tree URI for the folder the user chose.
         // It does not have a /document/ segment, so getDocumentId(treeUri) throws
         // "Invalid URI". Descendant folders use document URIs and need the other API.
-        String documentId = treeUri.equals(directoryUri)
-                ? DocumentsContract.getTreeDocumentId(treeUri)
-                : DocumentsContract.getDocumentId(directoryUri);
+        String documentId = directoryUri.getPathSegments().contains("document")
+                ? DocumentsContract.getDocumentId(directoryUri) : DocumentsContract.getTreeDocumentId(directoryUri);
         Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId);
         try (Cursor cursor = resolver.query(children, CHILD_PROJECTION, null, null, null)) {
             if (cursor == null) throw new IllegalStateException(I18n.t(R.string.ui_cannot_read_folder));
@@ -39,7 +41,7 @@ public final class LibraryDirectoryReader {
                 long size = cursor.isNull(3) ? 0 : cursor.getLong(3);
                 long modified = cursor.isNull(4) ? 0 : cursor.getLong(4);
                 boolean directory = DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
-                if (directory || ComicFile.isSupported(name, mime)) {
+                if (!supportedOnly || directory || ComicFile.isSupported(name, mime)) {
                     entries.add(new LibraryEntry(
                             DocumentsContract.buildDocumentUriUsingTree(treeUri, childId),
                             name,

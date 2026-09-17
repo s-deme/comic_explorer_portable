@@ -28,13 +28,13 @@ public final class SettingsActivity extends BaseActivity {
         Runnable unchanged = () -> { };
         rows.section("GENERAL");
         String language = AppState.value(this, "language", "system");
-        String languageName = language.equals("system") ? "System" : new java.util.Locale(language).getDisplayLanguage(new java.util.Locale(language));
+        String languageName = language.equals("system") ? I18n.t(R.string.ui_system_settings) : new java.util.Locale(language).getDisplayLanguage(new java.util.Locale(language));
         rows.action(I18n.t(R.string.ui_language), languageName, () -> {
-            String[] labels = {"System", "日本語", "English", "한국어", "Русский"}; String[] codes = {"system", "ja", "en", "ko", "ru"};
+            String[] labels = {I18n.t(R.string.ui_system_settings), "日本語", "English", "한국어", "Русский"}; String[] codes = {"system", "ja", "en", "ko", "ru"};
             Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_language)).setItems(labels, (d, i) -> { AppState.put(this, "language", codes[i]); recreate(); }));
         });
         rows.choice(I18n.t(R.string.ui_encoding), ReaderOptions.ENCODINGS, "archive_encoding", 0, unchanged);
-        rows.choice(I18n.t(R.string.ui_theme), new String[]{"System", "Light", "Dark"}, "theme", 0, this::recreate);
+        rows.choice(I18n.t(R.string.ui_theme), new String[]{I18n.t(R.string.ui_system_settings), I18n.t(R.string.ui_light_theme), I18n.t(R.string.ui_dark_theme)}, "theme", 0, this::recreate);
         rows.action(I18n.t(R.string.ui_reset_settings), I18n.t(R.string.ui_reset_all_settings_2), () -> confirm(I18n.t(R.string.ui_reset_all_settings), () -> { AppState.resetSettings(this); recreate(); }));
         rows.section("LIST VIEW");
         rows.check(I18n.t(R.string.ui_show_statusbar), I18n.t(R.string.ui_show_time_and_battery_status), "list_statusbar", true, unchanged);

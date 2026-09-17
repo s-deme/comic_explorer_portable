@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Korean/Russian additions intentionally fall back to these English strings. -->
-<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="ui_cannot_load_page" formatted="false">"Cannot load page"</string>
     <string name="ui_ascending" formatted="false">", ascending"</string>
     <string name="ui_past_week" formatted="false">"Past week"</string>
@@ -110,7 +109,7 @@
     <string name="ui_screen_rotation" formatted="false">"Screen rotation"</string>
     <string name="ui_disabled" formatted="false">"Disabled"</string>
     <string name="ui_open" formatted="false">"Open"</string>
-    <string name="ui_unsupported_format_choose_pdf_cbz_zip_or_images" formatted="false">"Unsupported format. Choose PDF, CBZ/ZIP or images."</string>
+    <string name="ui_unsupported_format_choose_pdf_cbz_zip_or_images" formatted="false">"Unsupported format. Choose PDF, ZIP/CBZ, RAR/CBR, 7z or images."</string>
     <string name="ui_show" formatted="false">"Show"</string>
     <string name="ui_operation_failed" formatted="false">"Operation failed: "</string>
     <string name="ui_close_settings" formatted="false">"Close settings"</string>
@@ -344,7 +343,7 @@
     <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">"Book page. Swipe or tap the sides to turn pages. Tap the center for menus."</string>
     <string name="ui_cannot_rename" formatted="false">"Cannot rename"</string>
     <string name="ui_move" formatted="false">"Move"</string>
-    <string name="ui_select_a_pdf_cbz_zip_or_image" formatted="false">"Select a PDF, CBZ/ZIP or image"</string>
+    <string name="ui_select_a_pdf_cbz_zip_or_image" formatted="false">"Select a PDF, ZIP/CBZ, RAR/CBR, 7z or image"</string>
     <string name="ui_reading_position_cleared" formatted="false">"Reading position cleared"</string>
     <string name="ui_clear_resume_cache" formatted="false">"Clear resume cache"</string>
     <string name="ui_cannot_open_file_2" formatted="false">"Cannot open file"</string>
@@ -358,7 +357,7 @@
     <string name="ui_theme" formatted="false">"Theme"</string>
     <string name="ui_delete" formatted="false">"Delete"</string>
     <string name="ui_invert_colors" formatted="false">"Invert colors"</string>
-    <string name="ui_supports_pdf_cbz_zip_and_images" formatted="false">"Supports PDF, CBZ, ZIP and images."</string>
+    <string name="ui_supports_pdf_cbz_zip_and_images" formatted="false">"Supports PDF, ZIP/CBZ, RAR/CBR, 7z and images."</string>
     <string name="ui_rename" formatted="false">"Rename"</string>
     <string name="ui_cannot_move_between_connections" formatted="false">"Cannot move between connections"</string>
     <string name="ui_format" formatted="false">"Format: "</string>

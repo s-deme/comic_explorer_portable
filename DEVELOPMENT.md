@@ -6,6 +6,14 @@ Comic Explorer for Android の開発者向け情報です。アプリの使い�
 
 ComicScreen対応の最新範囲と未検証箇所は [COMICSCREEN_IMPLEMENTATION.md](COMICSCREEN_IMPLEMENTATION.md) に記載しています。
 
+## 2026-09-17 ComicScreenとの差分対応
+
+追加実装と制限は [対応記録](COMICSCREEN_IMPLEMENTATION.md) を参照。形式判定・ソート24チェック、Android Instrumentation97チェックが成功。Lintは0 errors / 33 warnings。追加依存のライセンスは [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) に記載し、APKにも同梱しています。
+
+Instrumentatonの追加テストは、アプリとは別のテストAPK内に保存先を用意し、コピー／移動・置換・失敗時の原本保持・フォルダ配下の読書情報移行を実行します。テスト用保存先にだけMANAGE_DOCUMENTSのshell権限を使用し、終了後に解除します。RAR4のフィクスチャは `python tests/create_rar_fixture.py` で再生成可能です。7zはテスト中にLZMA2アーカイブを生成します。
+
+この環境ではJDK 21を使用します。Android Studio同梱のJDK 25はGradle 8.9と互換性がありません。サンドボックスでホームディレクトリが解決できない場合は、プロセスの `ANDROID_USER_HOME` と `GRADLE_USER_HOME` を明示してください。通常APKの更新互換性を維持するため、既存の署名鍵を使い、証明書を比較します。
+
 ## 2026-09-12 リファクタリング
 
 計画した5点を、再描画 → メニュー → 保存 → 読み込み → 翻訳の順に実施しました。
@@ -123,3 +131,9 @@ git push origin v1.1.3
 ```
 
 最後のタグpushによってReleaseワークフローが起動します。既存の `v1.1.1` / `v1.1.2` タグは移動させません。
+
+## 2026-09-18 読書操作の追加検証
+
+`ParityInstrumentation` に幅合わせ時のドラッグ、画像端の移動制限、誤ページ送り防止、6倍ダブルタップ、ページ単位の補正による見開き中央線の保持を追加。ダブルタップ／フィルターのダイアログは通常文字と1.5倍文字で撮影する。文字倍率は検証ActivityのResourcesへ一時的に適用し、finallyで戻す。OS全体の文字サイズ設定・TalkBack操作の検証ではない。
+
+実行ログ: `build/reader-parity-test.txt`、ビルド: `build/reader-parity-build.txt`。参考APKの内部画像処理アルゴリズムは特定できていないため、画素一致や操作速度一致を合否条件にはしていない。

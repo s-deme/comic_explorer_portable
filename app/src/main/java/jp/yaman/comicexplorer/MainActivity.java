@@ -46,6 +46,8 @@ public final class MainActivity extends BaseActivity {
     private static final int REQUEST_TREE = 41;
     private static final int REQUEST_FILE = 42;
     private static final int REQUEST_MOVE = 43;
+    private static final int REQUEST_ALBUM_IMAGES = 44;
+    private static final int MODE_ALBUMS = 5, MODE_ALBUM = 6, MODE_GALLERY = 7;
     private static final int MODE_LIBRARY = 0;
     private static final int MODE_FAVORITES = 1;
     private static final int MODE_RECENTS = 2;
@@ -95,13 +97,27 @@ public final class MainActivity extends BaseActivity {
     private GridView gridView;
     private LibraryAdapter adapter;
     private Button quickView;
-    private LibraryEntry moving;
+    private ArrayList<LibraryEntry> transferring;
+    private boolean movingFiles;
+    private int transferConflict;
+    private Uri albumUri;
+    private boolean galleryFolders;
     private float swipeX, swipeY;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         treeUri = AppState.getTree(this);
         directoryUri = treeUri;
+        if (state != null) {
+            mode = state.getInt("mode", MODE_LIBRARY); albumUri = state.getParcelable("album");
+            directoryUri = state.getParcelable("directory"); galleryFolders = state.getBoolean("gallery_folders");
+            movingFiles = state.getBoolean("moving_files"); transferConflict = state.getInt("transfer_conflict");
+            ArrayList<Bundle> savedItems = state.getParcelableArrayList("transfer_items");
+            if (savedItems != null) {
+                transferring = new ArrayList<>();
+                for (Bundle item : savedItems) transferring.add(new LibraryEntry(item.getParcelable("uri"), item.getString("name"), item.getString("mime"), item.getString("kind"), item.getBoolean("directory"), item.getLong("size"), item.getLong("modified")));
+            }
+        }
         gridMode = AppState.gridView(this);
         buildUi();
         Uri opened = getIntent().getData();
@@ -109,7 +125,7 @@ public final class MainActivity extends BaseActivity {
             openExternal(opened);
             getIntent().setAction(null);
         }
-        if (treeUri == null) showEmptyLibrary(); else loadDirectory();
+        if (mode != MODE_LIBRARY) refresh(); else if (treeUri == null) showEmptyLibrary(); else loadDirectory();
     }
 
     @Override protected void onResume() {
@@ -132,7 +148,7 @@ public final class MainActivity extends BaseActivity {
     @Override protected void onRestart() {
         super.onRestart();
         thumbnails.evictAll();
-        if (mode == MODE_LIBRARY) adapter.notifyDataSetChanged(); else loadSavedItems();
+        if (mode == MODE_LIBRARY || mode == MODE_GALLERY) adapter.notifyDataSetChanged(); else loadSavedItems();
     }
 
     private void buildUi() {
@@ -350,26 +366,34 @@ public final class MainActivity extends BaseActivity {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf", "application/zip", "application/x-cbz", "image/*"});
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf", "application/zip", "application/x-cbz", "application/vnd.rar", "application/x-rar-compressed", "application/x-cbr", "application/vnd.comicbook-rar", "application/x-7z-compressed", "image/*"});
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(intent, REQUEST_FILE);
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
-        if (requestCode == REQUEST_MOVE && moving != null) {
-            Uri target = data.getData(); LibraryEntry item = moving; moving = null;
-            fileOperation(() -> {
-                DocumentsContract.Path documentPath = DocumentsContract.findDocumentPath(getContentResolver(), item.uri);
-                if (documentPath == null || documentPath.getPath().size() < 2) throw new java.io.IOException(I18n.t(R.string.ui_cannot_move));
-                java.util.List<String> ancestors = documentPath.getPath();
-                Uri parent = DocumentsContract.buildDocumentUriUsingTree(item.uri, ancestors.get(ancestors.size() - 2));
-                Uri targetDocument = DocumentsContract.buildDocumentUriUsingTree(target, DocumentsContract.getTreeDocumentId(target));
-                Uri moved = DocumentsContract.moveDocument(getContentResolver(), item.uri, parent, targetDocument);
-                if (moved == null) throw new java.io.IOException(I18n.t(R.string.ui_cannot_move));
-                AppState.relocate(this, item.uri, moved, item.name);
-            }); return;
+        if (resultCode != RESULT_OK || data == null) { transferring = null; return; }
+        if (requestCode == REQUEST_ALBUM_IMAGES && albumUri != null) {
+            ArrayList<LibraryEntry> images = new ArrayList<>(); ArrayList<Uri> uris = new ArrayList<>();
+            if (data.getClipData() != null) for (int i=0;i<data.getClipData().getItemCount();i++) uris.add(data.getClipData().getItemAt(i).getUri());
+            else if (data.getData() != null) uris.add(data.getData());
+            for (Uri uri : uris) {
+                try { getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignored) { }
+                String name = LibraryDirectoryReader.displayName(getContentResolver(), uri), mime = getContentResolver().getType(uri);
+                if (ComicFile.isImage(name, mime)) images.add(new LibraryEntry(uri, name, mime, "画像", false, 0, 0));
+            }
+            Albums.update(this, albumUri, images, true); loadSavedItems(); return;
+        }
+        if (data.getData() == null) return;
+        if (requestCode == REQUEST_MOVE && transferring != null) {
+            Uri target = data.getData(); ArrayList<LibraryEntry> items = transferring; transferring = null;
+            int grants = Intent.FLAG_GRANT_READ_URI_PERMISSION;
+            if ((data.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) grants |= Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+            try { getContentResolver().takePersistableUriPermission(target, grants); } catch (SecurityException ignored) { }
+            Uri destination = DocumentsContract.buildDocumentUriUsingTree(target, DocumentsContract.getTreeDocumentId(target));
+            final boolean move = movingFiles; final int conflict = transferConflict;
+            fileOperation(() -> { for (LibraryEntry item : items) new DocumentTransfer(this).transfer(item, destination, move, conflict); }); return;
         }
         if (requestCode == REQUEST_FILE) {
             Uri uri = data.getData();
@@ -390,7 +414,7 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void refresh() {
-        if (mode == MODE_LIBRARY) loadDirectory(); else loadSavedItems();
+        if (mode == MODE_GALLERY) loadGallery(galleryFolders); else if (mode == MODE_LIBRARY) loadDirectory(); else loadSavedItems();
     }
 
     private void selectMode(int selected) {
@@ -460,6 +484,10 @@ public final class MainActivity extends BaseActivity {
 
     private void showListActions() {
         Ui.Actions menu = new Ui.Actions();
+        if (!visibleRows.isEmpty() && mode != MODE_ALBUMS) menu.add(I18n.t(R.string.ui_select_items), this::selectItems);
+        if (mode == MODE_ALBUMS) menu.add(I18n.t(R.string.ui_create_album), () -> editAlbum(null));
+        if (mode == MODE_ALBUM) menu.add(I18n.t(R.string.ui_add_images), this::addAlbumImages);
+        menu.add(I18n.t(R.string.ui_albums), () -> selectMode(MODE_ALBUMS));
         menu.add(I18n.t(R.string.ui_open_file), this::chooseFile);
         menu.add(I18n.t(R.string.ui_select_folder_again), this::chooseFolder);
         menu.add(I18n.t(R.string.ui_network_connections), () -> NetworkStorage.show(this));
@@ -591,6 +619,13 @@ public final class MainActivity extends BaseActivity {
     private void loadSavedItems() {
         directoryLoadToken++;
         updateNavigation();
+        if (mode == MODE_ALBUMS || mode == MODE_ALBUM) {
+            allRows.clear(); allRows.addAll(Albums.list(this, mode == MODE_ALBUM ? albumUri : null));
+            screenTitle.setText(I18n.t(R.string.ui_albums)); pathText.setText(I18n.t(R.string.ui_gallery));
+            applyFilters();
+            if (allRows.isEmpty()) showEmptyState(I18n.t(R.string.ui_albums), I18n.t(R.string.ui_album_empty), null, false);
+            return;
+        }
         pathText.setText(mode == MODE_DIRECTORIES ? I18n.t(R.string.ui_saved_directories) : mode == MODE_FAVORITES ? I18n.t(R.string.ui_favorites) : mode == MODE_BOOKMARKS ? I18n.t(R.string.ui_bookmarked_books) : I18n.t(R.string.ui_recently_opened_books));
         allRows.clear();
         List<AppState.SavedItem> items = mode == MODE_DIRECTORIES ? AppState.directories(this) : mode == MODE_FAVORITES ? AppState.favorites(this)
@@ -617,7 +652,9 @@ public final class MainActivity extends BaseActivity {
             stateText.setText(I18n.t(R.string.ui_0_items));
             showEmptyState(I18n.t(R.string.ui_no_results), I18n.t(R.string.ui_try_a_different_name), null, false);
         } else if (visibleRows.isEmpty()) {
-            if (mode == MODE_DIRECTORIES) showEmptyState(I18n.t(R.string.ui_no_saved_directories), I18n.t(R.string.ui_long_press_a_folder_to_save_it), I18n.t(R.string.ui_browse_folders), false);
+            if (mode == MODE_ALBUM || mode == MODE_ALBUMS) showEmptyState(I18n.t(R.string.ui_albums), I18n.t(R.string.ui_album_empty), null, false);
+            else if (mode == MODE_GALLERY) showEmptyState(I18n.t(R.string.ui_no_results), I18n.t(R.string.ui_choose_the_folder_containing_your_comics), null, false);
+            else if (mode == MODE_DIRECTORIES) showEmptyState(I18n.t(R.string.ui_no_saved_directories), I18n.t(R.string.ui_long_press_a_folder_to_save_it), I18n.t(R.string.ui_browse_folders), false);
             else if (mode == MODE_FAVORITES) showEmptyState(I18n.t(R.string.ui_no_favorites), I18n.t(R.string.ui_long_press_a_book_to_add_it), null, false);
             else if (mode == MODE_RECENTS) showEmptyState(I18n.t(R.string.ui_no_history), I18n.t(R.string.ui_opened_books_appear_here), I18n.t(R.string.ui_browse_folders), false);
             else if (mode == MODE_BOOKMARKS) showEmptyState(I18n.t(R.string.ui_no_bookmarks), I18n.t(R.string.ui_bookmark_a_page_while_reading_to_add_its_book_here), I18n.t(R.string.ui_browse_folders), false);
@@ -663,6 +700,7 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void open(LibraryEntry item, boolean includeSiblingImages) {
+        if ("album".equals(item.uri.getScheme())) { albumUri = item.uri; selectMode(MODE_ALBUM); return; }
         if (item.directory) { directoryUri = item.uri; loadDirectory(); return; }
         AppState.addRecent(this, item.uri, item.name, item.kind);
         Intent viewer = new Intent(this, ViewerActivity.class);
@@ -676,7 +714,7 @@ public final class MainActivity extends BaseActivity {
         }
         if (ComicFile.isImage(item.name, item.mime)) {
             ArrayList<Uri> pages = new ArrayList<>();
-            if (includeSiblingImages && mode == MODE_LIBRARY) {
+            if (includeSiblingImages && (mode == MODE_LIBRARY || mode == MODE_ALBUM || mode == MODE_GALLERY)) {
                 for (LibraryEntry candidate : visibleRows) if (!candidate.directory && ComicFile.isImage(candidate.name, candidate.mime)) pages.add(candidate.uri);
             } else {
                 pages.add(item.uri);
@@ -688,6 +726,17 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void showActions(LibraryEntry item) {
+        if ("album".equals(item.uri.getScheme())) {
+            Ui.Actions menu = new Ui.Actions(); menu.add(I18n.t(R.string.ui_open), () -> open(item));
+            menu.add(I18n.t(R.string.ui_rename), () -> editAlbum(item));
+            menu.add(I18n.t(R.string.ui_delete), () -> Ui.show(new AlertDialog.Builder(this).setMessage(I18n.t(R.string.ui_album_delete_notice)).setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_delete), (d,i) -> { Albums.delete(this,item.uri); loadSavedItems(); })));
+            menu.show(this, item.name); return;
+        }
+        if (mode == MODE_ALBUM) {
+            Ui.Actions menu = new Ui.Actions(); menu.add(I18n.t(R.string.ui_open), () -> open(item));
+            menu.add(I18n.t(R.string.ui_remove_from_album), () -> { Albums.update(this, albumUri, java.util.Collections.singletonList(item), false); loadSavedItems(); });
+            menu.show(this, item.name); return;
+        }
         if (item.directory) {
             boolean saved = AppState.isDirectory(this, item.uri);
             Ui.show(new AlertDialog.Builder(this).setTitle(item.name)
@@ -767,17 +816,19 @@ public final class MainActivity extends BaseActivity {
     }
     private interface FileAction { void run() throws Exception; }
     private void fileOperation(FileAction action) {
+        AlertDialog progress = Ui.show(new AlertDialog.Builder(this).setMessage(I18n.t(R.string.ui_transfer_running)).setCancelable(false));
         folderWorker.execute(() -> {
             String failure = null;
-            try { action.run(); } catch (Exception e) { failure = e.getMessage(); }
+            try { action.run(); } catch (Exception e) { failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(); }
             String error = failure;
-            runOnUiThread(() -> { if (isFinishing()) return; Toast.makeText(this, error == null ? I18n.t(R.string.ui_done) : I18n.t(R.string.ui_operation_failed) + error, Toast.LENGTH_LONG).show(); refresh(); });
+            runOnUiThread(() -> { if (isFinishing() || isDestroyed()) return; progress.dismiss(); Toast.makeText(this, error == null ? I18n.t(R.string.ui_done) : I18n.t(R.string.ui_operation_failed) + error, Toast.LENGTH_LONG).show(); refresh(); });
         });
     }
     private void fileMenu(LibraryEntry item) {
-        Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setItems(new String[]{I18n.t(R.string.ui_rename), I18n.t(R.string.ui_move), I18n.t(R.string.ui_delete)}, (d, i) -> {
+        if (!DocumentsContract.isDocumentUri(this, item.uri)) { Toast.makeText(this, I18n.t(R.string.ui_select_folder_again), Toast.LENGTH_LONG).show(); return; }
+        Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setItems(new String[]{I18n.t(R.string.ui_rename), I18n.t(R.string.ui_move), I18n.t(R.string.ui_delete), I18n.t(R.string.ui_copy)}, (d, i) -> {
             if (i == 0) editFile(item, I18n.t(R.string.ui_rename));
-            if (i == 1) { moving = item; startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION), REQUEST_MOVE); }
+            if (i == 1 || i == 3) beginTransfer(java.util.Collections.singletonList(item), i == 1);
             if (i == 2) Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_delete_item)).setMessage(item.name + I18n.t(R.string.ui_delete_permanently) + (item.directory ? I18n.t(R.string.ui_files_inside_this_folder_will_also_be_deleted) : ""))
                     .setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_delete), (a, b) -> fileOperation(() -> {
                         if (!DocumentsContract.deleteDocument(getContentResolver(), item.uri)) throw new java.io.IOException(I18n.t(R.string.ui_cannot_delete));
@@ -797,15 +848,14 @@ public final class MainActivity extends BaseActivity {
                     Uri parent = DocumentsContract.buildDocumentUriUsingTree(treeUri, directoryUri.equals(treeUri) ? DocumentsContract.getTreeDocumentId(treeUri) : DocumentsContract.getDocumentId(directoryUri));
                     if (DocumentsContract.createDocument(getContentResolver(), parent, DocumentsContract.Document.MIME_TYPE_DIR, value) == null) throw new java.io.IOException(I18n.t(R.string.ui_cannot_create_folder));
                 } else {
-                    Uri renamed = DocumentsContract.renameDocument(getContentResolver(), item.uri, value);
-                    if (renamed == null) throw new java.io.IOException(I18n.t(R.string.ui_cannot_rename));
-                    AppState.relocate(this, item.uri, renamed, LibraryDirectoryReader.displayName(getContentResolver(), renamed));
+                    DocumentTransfer.rename(this, item, value);
                 }
             });
         });
     }
     private void showGallery() {
-        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_gallery_search_type)).setItems(new String[]{I18n.t(R.string.ui_search_media_store), I18n.t(R.string.ui_search_by_extension_selected_folder_and_subfolders)}, (d, i) -> {
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_gallery_search_type)).setItems(new String[]{I18n.t(R.string.ui_search_media_store), I18n.t(R.string.ui_search_by_extension_selected_folder_and_subfolders), I18n.t(R.string.ui_albums)}, (d, i) -> {
+            if (i == 2) { selectMode(MODE_ALBUMS); return; }
             if (i == 0) {
                 String permission = android.os.Build.VERSION.SDK_INT >= 33 ? "android.permission.READ_MEDIA_IMAGES" : "android.permission.READ_EXTERNAL_STORAGE";
                 if (checkSelfPermission(permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) { requestPermissions(new String[]{permission}, 71); return; }
@@ -813,11 +863,90 @@ public final class MainActivity extends BaseActivity {
             loadGallery(i == 1);
         }));
     }
+    private void beginTransfer(List<LibraryEntry> items, boolean move) {
+        for (LibraryEntry item : items) if (!DocumentsContract.isDocumentUri(this, item.uri)) { Toast.makeText(this, I18n.t(R.string.ui_select_folder_again), Toast.LENGTH_LONG).show(); return; }
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_conflict)).setItems(new String[]{I18n.t(R.string.ui_keep_both), I18n.t(R.string.ui_replace), I18n.t(R.string.ui_skip)}, (d, i) -> {
+            transferring = new ArrayList<>(items); movingFiles = move; transferConflict = i;
+            startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION), REQUEST_MOVE);
+        }));
+    }
+    private void selectItems() {
+        ArrayList<LibraryEntry> items = new ArrayList<>(visibleRows); boolean[] selected = new boolean[items.size()];
+        String[] names = new String[items.size()]; for (int i = 0; i < items.size(); i++) names[i] = items.get(i).name;
+        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_select_items)).setMultiChoiceItems(names, selected, (d, i, checked) -> selected[i] = checked)
+                .setNegativeButton(I18n.t(R.string.ui_cancel), null).setNeutralButton(I18n.t(R.string.ui_select_all), null).setPositiveButton(I18n.t(R.string.ui_actions), null));
+        dialog.getButton(-3).setOnClickListener(v -> { for (int i = 0; i < selected.length; i++) { selected[i] = true; dialog.getListView().setItemChecked(i, true); } });
+        dialog.getButton(-1).setOnClickListener(v -> {
+            ArrayList<LibraryEntry> chosen = new ArrayList<>(); for (int i = 0; i < selected.length; i++) if (selected[i]) chosen.add(items.get(i));
+            if (chosen.isEmpty()) return; dialog.dismiss();
+            Ui.Actions actions = new Ui.Actions();
+            actions.add(I18n.t(R.string.ui_copy), () -> beginTransfer(chosen, false)); actions.add(I18n.t(R.string.ui_move), () -> beginTransfer(chosen, true));
+            boolean hasImages = false; for (LibraryEntry item : chosen) if (!item.directory && ComicFile.isImage(item.name, item.mime)) hasImages = true;
+            if (hasImages) actions.add(I18n.t(R.string.ui_add_to_album), () -> chooseAlbum(chosen));
+            if (mode == MODE_ALBUM) actions.add(I18n.t(R.string.ui_remove_from_album), () -> { Albums.update(this, albumUri, chosen, false); loadSavedItems(); });
+            boolean documents = true; for (LibraryEntry item : chosen) if (!DocumentsContract.isDocumentUri(this, item.uri)) documents = false;
+            if (documents) {
+                actions.add(I18n.t(R.string.ui_bulk_rename), () -> bulkRename(chosen));
+                actions.add(I18n.t(R.string.ui_delete), () -> {
+                    StringBuilder message = new StringBuilder(); for (LibraryEntry item : chosen) message.append(item.name).append('\n');
+                    message.append(I18n.t(R.string.ui_delete_permanently)).append(I18n.t(R.string.ui_files_inside_this_folder_will_also_be_deleted));
+                    Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_delete)).setMessage(message).setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_delete), (d,i) -> fileOperation(() -> {
+                        for (LibraryEntry item : chosen) {
+                            if (!DocumentsContract.deleteDocument(getContentResolver(), item.uri)) throw new java.io.IOException(I18n.t(R.string.ui_cannot_delete));
+                            AppState.removeRecent(this,item.uri); AppState.clearPosition(this,item.uri); AppState.clearBookmarks(this,item.uri); AppState.setFavorite(this,item.uri,item.name,item.kind,false); AppState.setDirectory(this,item.uri,item.name,false);
+                        }
+                    })));
+                });
+            }
+            actions.show(this, chosen.size() + I18n.t(R.string.ui_items));
+        });
+    }
+    private void bulkRename(List<LibraryEntry> items) {
+        EditText input = new EditText(this); input.setSingleLine(true); input.setHint(I18n.t(R.string.ui_name_prefix));
+        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_bulk_rename)).setView(input).setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_save), null));
+        dialog.getButton(-1).setOnClickListener(v -> {
+            String prefix = input.getText().toString().trim();
+            if (prefix.isEmpty() || prefix.contains("/") || prefix.contains("\\") || prefix.indexOf(0)>=0) { input.setError(I18n.t(R.string.ui_enter_a_valid_name)); return; }
+            dialog.dismiss(); fileOperation(() -> {
+                for (int i = 0; i < items.size(); i++) {
+                    LibraryEntry item = items.get(i); String extension = item.directory ? "" : ComicFile.extension(item.name);
+                    String name = prefix + String.format(Locale.ROOT, "%03d", i + 1) + (extension.isEmpty() ? "" : "." + extension);
+                    DocumentTransfer.rename(this, item, name);
+                }
+            });
+        });
+    }
+    private void editAlbum(LibraryEntry album) {
+        editAlbum(album, java.util.Collections.emptyList());
+    }
+    private void editAlbum(LibraryEntry album, List<LibraryEntry> images) {
+        EditText input = new EditText(this); input.setSingleLine(true); input.setHint(I18n.t(R.string.ui_name_3)); if (album != null) input.setText(album.name);
+        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(album == null ? R.string.ui_create_album : R.string.ui_rename)).setView(input).setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_save), null));
+        dialog.getButton(-1).setOnClickListener(v -> {
+            String name = input.getText().toString().trim(); if (name.isEmpty()) { input.setError(I18n.t(R.string.ui_enter_a_valid_name)); return; }
+            Uri saved = Albums.rename(this, album == null ? null : album.uri, name);
+            if (!images.isEmpty()) Albums.update(this, saved, images, true);
+            dialog.dismiss(); selectMode(MODE_ALBUMS); loadSavedItems();
+        });
+    }
+    private void chooseAlbum(List<LibraryEntry> images) {
+        ArrayList<LibraryEntry> albums = Albums.list(this,null);
+        if (albums.isEmpty()) { editAlbum(null, images); return; }
+        String[] names = new String[albums.size()]; for (int i=0;i<names.length;i++) names[i]=albums.get(i).name;
+        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_add_to_album)).setItems(names,(d,i) -> { Albums.update(this,albums.get(i).uri,images,true); Toast.makeText(this,I18n.t(R.string.ui_done),Toast.LENGTH_SHORT).show(); }));
+    }
+    private void addAlbumImages() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION); startActivityForResult(intent, REQUEST_ALBUM_IMAGES);
+    }
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] grants) {
         super.onRequestPermissionsResult(code, permissions, grants);
         if (code == 71 && grants.length > 0 && grants[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) loadGallery(false);
     }
     private void loadGallery(boolean folders) {
+        galleryFolders = folders; mode = MODE_GALLERY;
+        updateNavigation(); screenTitle.setText(I18n.t(R.string.ui_gallery));
+        showEmptyState(I18n.t(R.string.ui_loading), "", null, true);
         final int token = ++directoryLoadToken;
         folderWorker.execute(() -> {
             ArrayList<LibraryEntry> images = new ArrayList<>(); String error = null;
@@ -840,13 +969,14 @@ public final class MainActivity extends BaseActivity {
             String failure = error;
             runOnUiThread(() -> {
                 if (token != directoryLoadToken || isFinishing()) return;
-                mode = MODE_LIBRARY; allRows.clear(); allRows.addAll(images); pathText.setText(I18n.t(R.string.ui_gallery)); query=""; search.setText(""); applyFilters();
+                mode = MODE_GALLERY; allRows.clear(); allRows.addAll(images); pathText.setText(I18n.t(R.string.ui_gallery)); query=""; search.setText(""); applyFilters();
                 if (failure != null) Toast.makeText(this, failure, Toast.LENGTH_LONG).show();
             });
         });
     }
 
     @Override public void onBackPressed() {
+        if (mode == MODE_ALBUM) { selectMode(MODE_ALBUMS); return; }
         if (mode != MODE_LIBRARY) { mode = MODE_LIBRARY; if (treeUri == null) showEmptyLibrary(); else loadDirectory(); }
         else if (directoryUri != null && !directoryUri.equals(treeUri)) goUp(); else super.onBackPressed();
     }
@@ -857,6 +987,15 @@ public final class MainActivity extends BaseActivity {
         thumbnailWorker.shutdownNow();
         thumbnails.evictAll();
         super.onDestroy();
+    }
+    @Override protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state); state.putInt("mode", mode); state.putParcelable("album", albumUri); state.putParcelable("directory", directoryUri);
+        state.putBoolean("gallery_folders",galleryFolders); state.putBoolean("moving_files",movingFiles); state.putInt("transfer_conflict",transferConflict);
+        if (transferring != null) {
+            ArrayList<Bundle> saved = new ArrayList<>();
+            for (LibraryEntry item : transferring) { Bundle value = new Bundle(); value.putParcelable("uri",item.uri);value.putString("name",item.name);value.putString("mime",item.mime);value.putString("kind",item.kind);value.putBoolean("directory",item.directory);value.putLong("size",item.size);value.putLong("modified",item.modified);saved.add(value); }
+            state.putParcelableArrayList("transfer_items",saved);
+        }
     }
 
     private final class LibraryAdapter extends BaseAdapter {
@@ -914,7 +1053,7 @@ public final class MainActivity extends BaseActivity {
             if (gridMode) convertView.setBackgroundColor(AppState.number(MainActivity.this, "grid_color", Ui.DARK_BACKGROUND));
             holder.name.setText(item.name);
             holder.name.setVisibility(!gridMode || AppState.enabled(MainActivity.this, "grid_name", true) ? View.VISIBLE : View.GONE);
-            String detail = item.directory ? "フォルダ" : item.kind + (item.size > 0 ? "  •  " + ComicFile.formatSize(item.size) : "");
+            String detail = item.directory ? I18n.t("album".equals(item.uri.getScheme()) ? R.string.ui_albums : R.string.ui_directory) : item.kind + (item.size > 0 ? "  •  " + ComicFile.formatSize(item.size) : "");
             if (!item.directory && mode != MODE_LIBRARY && item.modified > 0)
                 detail += "  •  " + DateFormat.getDateFormat(MainActivity.this).format(new Date(item.modified));
             holder.detail.setText(detail);

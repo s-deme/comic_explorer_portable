@@ -101,8 +101,27 @@ public final class NetworkDocumentsProvider extends DocumentsProvider {
         checkName(name); for(NetworkStorage.Entry item:remote.list(parent)) if(item.name.equalsIgnoreCase(name)) throw new java.io.IOException(I18n.t(R.string.ui_an_item_with_that_name_already_exists));
     }
     @Override public String createDocument(String parent,String mime,String name) throws FileNotFoundException {
-        if(!mime.equals(DocumentsContract.Document.MIME_TYPE_DIR)) throw new FileNotFoundException(I18n.t(R.string.ui_only_folders_can_be_created));
-        try(NetworkStorage.Remote remote=remote(parent)) { checkAvailable(remote,relative(parent),name); String id=child(parent,name); remote.mkdir(relative(id)); return id; } catch(Exception e) { throw failure(e); }
+        try(NetworkStorage.Remote remote=remote(parent)) {
+            checkAvailable(remote,relative(parent),name); String id=child(parent,name);
+            if (mime.equals(DocumentsContract.Document.MIME_TYPE_DIR)) remote.mkdir(relative(id));
+            else {
+                File empty = File.createTempFile("remote-empty-", ".part", getContext().getCacheDir());
+                try { remote.upload(relative(id), empty); } finally { empty.delete(); }
+            }
+            return id;
+        } catch(Exception e) { throw failure(e); }
+    }
+    static void upload(android.content.Context context, android.net.Uri destination, File file) throws Exception {
+        String id = DocumentsContract.getDocumentId(destination); int colon = id.indexOf(':');
+        try (NetworkStorage.Remote remote = new NetworkStorage.Remote(NetworkStorage.hosts(context).getJSONObject(id.substring(0, colon)))) {
+            remote.upload(id.substring(colon + 1), file);
+        }
+    }
+    static void download(android.content.Context context, android.net.Uri source, File file) throws Exception {
+        String id = DocumentsContract.getDocumentId(source); int colon = id.indexOf(':');
+        try (NetworkStorage.Remote remote = new NetworkStorage.Remote(NetworkStorage.hosts(context).getJSONObject(id.substring(0, colon)))) {
+            remote.download(id.substring(colon + 1), file);
+        }
     }
     @Override public void deleteDocument(String id) throws FileNotFoundException {
         try(NetworkStorage.Remote remote=remote(id)) { remote.delete(relative(id),stat(id,remote).directory); } catch(Exception e) { throw failure(e); }

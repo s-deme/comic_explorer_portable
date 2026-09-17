@@ -24,6 +24,11 @@ public final class BookCache {
         File dir = directory(context, "books");
         trim(dir, Long.MAX_VALUE, System.currentTimeMillis() - AppState.number(context, "cache_days", 7) * 86400000L);
         String revision = "";
+        if ("file".equals(uri.getScheme())) {
+            File source = new File(uri.getPath());
+            if (!source.isFile()) throw new IOException(I18n.t(R.string.ui_file_not_found));
+            revision = source.length() + ":" + source.lastModified();
+        }
         try (android.database.Cursor cursor = context.getContentResolver().query(uri,
                 new String[]{android.provider.OpenableColumns.SIZE, android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED}, null, null, null)) {
             if (cursor != null && cursor.moveToFirst()) revision = cursor.getString(0) + ":" + cursor.getString(1);

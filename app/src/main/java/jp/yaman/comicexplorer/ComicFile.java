@@ -29,17 +29,28 @@ public final class ComicFile {
 
     public static String kindFor(String name, String mime) {
         if (isImage(name, mime)) return "画像";
-        String extension = extension(name);
+        String extension = formatExtension(name, mime);
         if (isPdf(extension, mime)) return "PDF";
-        return "cbz".equals(extension) ? "CBZ" : "ZIP";
+        return extension.toUpperCase(Locale.ROOT);
+    }
+    static String formatExtension(String name, String mime) {
+        String extension = extension(name);
+        if (isArchive(extension, null) || "pdf".equals(extension)) return extension;
+        if ("application/pdf".equals(mime)) return "pdf";
+        if ("application/zip".equals(mime) || "application/x-cbz".equals(mime) || "application/vnd.comicbook+zip".equals(mime)) return "zip";
+        if ("application/x-7z-compressed".equals(mime)) return "7z";
+        return isArchive("", mime) ? "rar" : extension;
     }
 
     private static boolean isPdf(String extension, String mime) {
         return "pdf".equals(extension) || "application/pdf".equals(mime);
     }
 
-    private static boolean isArchive(String extension, String mime) {
+    static boolean isArchive(String extension, String mime) {
         return "zip".equals(extension) || "cbz".equals(extension) || "application/zip".equals(mime)
+                || "rar".equals(extension) || "cbr".equals(extension) || "7z".equals(extension) || "cb7".equals(extension)
+                || "application/vnd.rar".equals(mime) || "application/x-rar-compressed".equals(mime)
+                || "application/x-cbr".equals(mime) || "application/vnd.comicbook-rar".equals(mime) || "application/x-7z-compressed".equals(mime)
                 || "application/x-cbz".equals(mime) || "application/vnd.comicbook+zip".equals(mime);
     }
 

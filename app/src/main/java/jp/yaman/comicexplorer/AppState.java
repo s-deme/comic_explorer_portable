@@ -231,6 +231,28 @@ public final class AppState {
         prefs(context).edit().putInt("position." + key(uri), Math.max(0, page)).apply();
     }
 
+    static android.graphics.RectF crop(Context context, Uri uri) {
+        String raw = prefs(context).getString("crop." + key(uri), null);
+        if (raw == null) return null;
+        try {
+            org.json.JSONArray values = new org.json.JSONArray(raw);
+            android.graphics.RectF crop = new android.graphics.RectF((float) values.getDouble(0), (float) values.getDouble(1), (float) values.getDouble(2), (float) values.getDouble(3));
+            return validCrop(crop) ? crop : null;
+        } catch (org.json.JSONException e) { return null; }
+    }
+    private static boolean validCrop(android.graphics.RectF crop) {
+        return crop.left >= 0 && crop.top >= 0 && crop.right <= 1 && crop.bottom <= 1 && crop.width() >= .009f && crop.height() >= .009f;
+    }
+    static void setCrop(Context context, Uri uri, android.graphics.RectF crop) {
+        SharedPreferences.Editor editor = prefs(context).edit(); String key = "crop." + key(uri);
+        if (crop == null) editor.remove(key);
+        else {
+            if (!validCrop(crop)) throw new IllegalArgumentException("Invalid crop");
+            editor.putString(key, new org.json.JSONArray(java.util.Arrays.asList(crop.left, crop.top, crop.right, crop.bottom)).toString());
+        }
+        editor.apply();
+    }
+
     public static int totalPages(Context context, Uri uri) {
         return Math.max(0, prefs(context).getInt("total." + key(uri), 0));
     }
@@ -297,12 +319,13 @@ public final class AppState {
     }
 
     public static void relocate(Context context, Uri oldUri, Uri newUri, String title) {
+        Albums.relocate(context, oldUri, newUri, title);
         if (newUri == null) return;
         SharedPreferences pref = prefs(context);
         String oldId = key(oldUri), newId = key(newUri);
         SharedPreferences.Editor editor = pref.edit();
         if (!oldUri.equals(newUri)) {
-            String[] prefixes = {"position.", "total.", "bookmark.", "bookmark_meta.", "bookmark_memo.", "favorite.", "directory.", "sync.id."};
+            String[] prefixes = {"position.", "total.", "bookmark.", "bookmark_meta.", "bookmark_memo.", "favorite.", "directory.", "sync.id.", "crop."};
             for (java.util.Map.Entry<String, ?> entry : pref.getAll().entrySet()) for (String prefix : prefixes) {
                 String name = entry.getKey();
                 if (!name.equals(prefix + oldId) && !name.startsWith(prefix + oldId + ".")) continue;
@@ -540,7 +563,7 @@ public final class AppState {
             SharedPreferences.Editor editor = pref.edit();
             for (String name : pref.getAll().keySet()) {
                 if (name.startsWith("position.") || name.startsWith("total.") || name.startsWith("bookmark.")
-                        || name.startsWith("bookmark_meta.") || name.startsWith("bookmark_memo.") || name.startsWith("sync.")) editor.remove(name);
+                        || name.startsWith("bookmark_meta.") || name.startsWith("bookmark_memo.") || name.startsWith("sync.") || name.startsWith("crop.")) editor.remove(name);
             }
             editor.remove(BOOKMARKED_ITEMS);
             editor.apply();
@@ -551,7 +574,7 @@ public final class AppState {
         SharedPreferences pref = prefs(context);
         SharedPreferences.Editor editor = pref.edit();
         for (String name : pref.getAll().keySet()) if (name.startsWith("favorite.") || name.startsWith("directory.")) editor.remove(name);
-        editor.remove(TREE_URI).remove(FAVORITES).remove(DIRECTORIES).apply();
+        editor.remove(TREE_URI).remove(FAVORITES).remove(DIRECTORIES).remove("albums").apply();
         clearRecents(context);
         clearCovers(context);
     }

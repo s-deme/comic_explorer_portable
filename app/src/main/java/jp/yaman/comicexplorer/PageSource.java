@@ -27,6 +27,7 @@ final class PageSource implements AutoCloseable {
     private PdfRenderer pdf;
     private ParcelFileDescriptor pdfDescriptor;
     private ZipFile archive;
+    private ArchivePages extraArchive;
     private boolean closed;
     private final int count;
 
@@ -34,14 +35,18 @@ final class PageSource implements AutoCloseable {
         this.context = context.getApplicationContext(); this.maxBitmapPixels = maxBitmapPixels;
         this.images = images == null ? new ArrayList<>() : new ArrayList<>(images);
         try {
+            String format = ComicFile.formatExtension(title, this.context.getContentResolver().getType(uri));
             if (!this.images.isEmpty()) count = this.images.size();
-            else if (ComicFile.extension(title).equals("pdf")) {
+            else if (format.equals("pdf")) {
                 pdfDescriptor = this.context.getContentResolver().openFileDescriptor(uri, "r");
                 if (pdfDescriptor == null) throw new IOException(I18n.t(R.string.ui_cannot_open_pdf));
                 pdf = new PdfRenderer(pdfDescriptor); count = pdf.getPageCount();
-            } else if (ComicFile.extension(title).equals("zip") || ComicFile.extension(title).equals("cbz")) {
+            } else if (format.equals("zip") || format.equals("cbz")) {
                 archive = new ZipFile(BookCache.book(this.context, uri), charset);
                 archiveEntries = readArchiveEntries(); count = archiveEntries.size();
+            } else if (ComicFile.isArchive(format, null)) {
+                extraArchive = new ArchivePages(BookCache.book(this.context, uri), format.equals("rar") || format.equals("cbr"));
+                archiveEntries = extraArchive.names; count = archiveEntries.size();
             } else throw new IOException(I18n.t(R.string.ui_unsupported_format_choose_pdf_cbz_zip_or_images));
             if (count < 1) throw new IOException(I18n.t(R.string.ui_no_readable_pages));
         } catch (IOException | RuntimeException | Error error) {
@@ -60,6 +65,11 @@ final class PageSource implements AutoCloseable {
         if (index < 0 || index >= count) throw new IOException("Page index out of range");
         if (!images.isEmpty()) return decodeUri(images.get(index));
         if (pdf != null) return renderPdfPage(index, screenWidth);
+        if (extraArchive != null) {
+            java.io.File temporary = java.io.File.createTempFile("archive-page-", ".image", context.getCacheDir());
+            try { extraArchive.extract(archiveEntries.get(index), temporary); return decodeUri(Uri.fromFile(temporary)); }
+            finally { temporary.delete(); }
+        }
         return decodeArchivePage(archiveEntries.get(index));
     }
     @Override public void close() throws IOException {

@@ -19,6 +19,7 @@ public final class CropView extends View {
         setContentDescription(I18n.t(R.string.ui_drag_to_select_a_crop_area));
     }
     public RectF selection() { return new RectF(selected); }
+    public void setSelection(RectF crop) { if (crop != null) selected.set(crop); invalidate(); }
     public void setEdge(int edge, float value) {
         value=Math.max(0,Math.min(1,value));
         if(edge==0)selected.left=Math.min(value,selected.right-.01f);

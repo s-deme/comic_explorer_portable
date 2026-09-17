@@ -77,7 +77,9 @@ public final class ParityInstrumentation extends Instrumentation {
             AppState.put(context,"theme",1); Ui.configure(context); check(Ui.light && Ui.DARK_BACKGROUND==0xfffafafa,"Light theme");
             AppState.put(context,"theme",2); Ui.configure(context); check(!Ui.light && Ui.DARK_BACKGROUND==0xff212121,"Dark theme");
             File fixtures=new File(context.getFilesDir(),"parity-fixtures"); check(fixtures.isDirectory() || fixtures.mkdirs(),"Fixture directory");
+            checkReaderGestures(context);
             checkFtp(fixtures);
+            checkParityAdditions(context, fixtures);
             Bitmap cropBitmap=Bitmap.createBitmap(20,20,Bitmap.Config.ARGB_8888);
             runOnMainSync(() -> {
                 CropView crop=new CropView(context,cropBitmap); crop.setEdge(0,.25f);crop.setEdge(2,.1f);
@@ -113,7 +115,33 @@ public final class ParityInstrumentation extends Instrumentation {
             await(() -> (Boolean)field(viewer,"initialized"),"ZIP reader initialized");
             check((Integer)field(viewer,"totalPages")==6,"ZIP page count");
             await(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"ZIP first page decoded");
+            runOnMainSync(() -> { AppState.setPageLayout(context,AppState.PAGE_DUAL); AppState.put(context,"filter_contrast",true); invoke(viewer,"refreshReader"); });
+            await(() -> {
+                android.graphics.drawable.Drawable drawable = ((ZoomImageView)field(viewer,"imageView")).getDrawable();
+                if (!(drawable instanceof android.graphics.drawable.BitmapDrawable)) return false;
+                Bitmap spread = ((android.graphics.drawable.BitmapDrawable)drawable).getBitmap();
+                return spread.getWidth()>spread.getHeight() && spread.getPixel(0,0)==0xffffffff
+                        && spread.getPixel(spread.getWidth()/2,0)==0xff424242;
+            }, "Per-page contrast leaves the spread divider unchanged");
+            runOnMainSync(() -> { AppState.setPageLayout(context,AppState.PAGE_SINGLE); AppState.put(context,"filter_contrast",false); invoke(viewer,"refreshReader"); });
             runOnMainSync(() -> invoke(viewer,"toggleChrome")); screenshot(context,"reader-horizontal.png");
+            runOnMainSync(() -> browser(viewer,false,false)); screenshot(context,"page-drawer.png");
+            check(clickText(I18n.t(R.string.ui_chapters)),"Drawer switches to chapters"); screenshot(context,"chapter-drawer.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            runOnMainSync(() -> browser(viewer,false,true)); screenshot(context,"page-strip.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            runOnMainSync(() -> ReaderOptions.zoom(viewer,() -> {})); screenshot(context,"double-tap-options.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            runOnMainSync(() -> ReaderOptions.filters(viewer,() -> {})); screenshot(context,"filter-options.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            android.content.res.Configuration normalType = new android.content.res.Configuration(viewer.getResources().getConfiguration());
+            try {
+                runOnMainSync(() -> {
+                    android.content.res.Configuration largeType = new android.content.res.Configuration(normalType); largeType.fontScale=1.5f;
+                    viewer.getResources().updateConfiguration(largeType,viewer.getResources().getDisplayMetrics());
+                    ReaderOptions.zoom(viewer,() -> {});
+                });
+                screenshot(context,"double-tap-large-type.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+                runOnMainSync(() -> ReaderOptions.filters(viewer,() -> {})); screenshot(context,"filter-large-type.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            } finally { runOnMainSync(() -> viewer.getResources().updateConfiguration(normalType,viewer.getResources().getDisplayMetrics())); }
+
+            runOnMainSync(() -> ReaderOptions.color(viewer,"grid_color",() -> {})); screenshot(context,"color-palette.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
             runOnMainSync(() -> { AppState.setReadingFlow(context,1); invoke(viewer,"refreshReader"); });
             await(() -> ((ContinuousReader)field(viewer,"continuous")).getChildCount()>0,"Continuous pages rendered");
             runOnMainSync(() -> ((ContinuousReader)field(viewer,"continuous")).setSelection(3));
@@ -158,7 +186,11 @@ public final class ParityInstrumentation extends Instrumentation {
             MainActivity library=(MainActivity)startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             runOnMainSync(() -> {try {java.lang.reflect.Method mode=MainActivity.class.getDeclaredMethod("selectMode",int.class);mode.setAccessible(true);mode.invoke(library,2);}catch(Exception e){throw new RuntimeException(e);}});
             await(() -> ((android.widget.GridView)field(library,"gridView")).getChildCount()>0,"History grid displays books");
-            screenshot(context,"library-grid.png");runOnMainSync(library::finish);waitForIdleSync();
+            screenshot(context,"library-grid.png");
+            runOnMainSync(() -> invoke(library,"selectItems")); screenshot(context,"bulk-selection.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            Albums.rename(context,null,"サンプルアルバム");
+            runOnMainSync(() -> {try {java.lang.reflect.Method mode=MainActivity.class.getDeclaredMethod("selectMode",int.class);mode.setAccessible(true);mode.invoke(library,5);}catch(Exception e){throw new RuntimeException(e);}});
+            screenshot(context,"albums.png"); runOnMainSync(library::finish);waitForIdleSync();
             SettingsActivity settings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             java.util.concurrent.atomic.AtomicInteger selected=new java.util.concurrent.atomic.AtomicInteger();
             SettingsActivity menuActivity=settings;
@@ -175,6 +207,11 @@ public final class ParityInstrumentation extends Instrumentation {
             AppState.put(context,"language","en");
             settings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             screenshot(context,"settings-english.png"); runOnMainSync(settings::finish); waitForIdleSync();
+            for (String locale : new String[]{"ko","ru"}) {
+                AppState.put(context,"language",locale);
+                settings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                screenshot(context,"settings-"+locale+".png"); runOnMainSync(settings::finish);waitForIdleSync();
+            }
             AppState.put(context,"language","ja"); AppState.put(context,"theme",2);
             AppState.put(context,"sync_enabled",true);AppState.prefs(context).edit().putString("sync.records","{}").apply();
             AppState.clearReadingData(context);
@@ -182,10 +219,124 @@ public final class ParityInstrumentation extends Instrumentation {
             result.putString("stream","PASS: "+checks+" checks\n"); finish(Activity.RESULT_OK,result);
         } catch(Throwable error) { result.putString("stream","FAIL: "+error+"\n"+android.util.Log.getStackTraceString(error));finish(Activity.RESULT_CANCELED,result); }
     }
+    private void checkReaderGestures(Context context) {
+        runOnMainSync(() -> {
+            ZoomImageView image = new ZoomImageView(context);
+            image.layout(0, 0, 200, 200);
+            Bitmap bitmap = Bitmap.createBitmap(100, 300, Bitmap.Config.ARGB_8888);
+            image.setImageBitmap(bitmap); image.setFitMode(AppState.FIT_WIDTH);
+            android.graphics.RectF bounds = new android.graphics.RectF(0, 0, 100, 300);
+            image.getImageMatrix().mapRect(bounds);
+            check(Math.abs(bounds.height()-600)<1, "Width fit retains tall page content");
+            final int[] swipes = {0};
+            image.setInteractionListener(new ZoomImageView.InteractionListener() {
+                public void onTap(float x) { }
+                public void onSwipe(int direction) { swipes[0]++; }
+            });
+            image.setVerticalPaging(true);
+            long now = android.os.SystemClock.uptimeMillis();
+            touch(image, now, now, 0, 100, 100);
+            touch(image, now, now+30, 2, 100, 1000);
+            touch(image, now, now+50, 1, 100, 1000);
+            bounds.set(0,0,100,300); image.getImageMatrix().mapRect(bounds);
+            check(Math.abs(bounds.top)<1 && Math.abs(bounds.left)<1, "Pan clamps at top and centers the fitted axis");
+            check(swipes[0]==0, "Panning an oversized fitted page cannot turn the page");
+            touch(image, now+100, now+100, 0, 100, 100);
+            touch(image, now+100, now+140, 2, 100, -1000);
+            touch(image, now+100, now+160, 1, 100, -1000);
+            bounds.set(0,0,100,300); image.getImageMatrix().mapRect(bounds);
+            check(Math.abs(bounds.bottom-200)<1, "Pan clamps at bottom without losing the image");
+            image.setFitMode(AppState.FIT_SCREEN);
+            bounds.set(0,0,100,300); image.getImageMatrix().mapRect(bounds);
+            check(Math.abs(bounds.height()-200)<1 && bounds.left>0, "Screen fit restores centered image");
+            image.setDoubleTapMode(AppState.DOUBLE_TAP_ZOOM); image.setDoubleTapScale(6f);
+            touch(image,now+1000,now+1000,0,100,100); touch(image,now+1000,now+1020,1,100,100);
+            touch(image,now+1080,now+1080,0,100,100); touch(image,now+1080,now+1100,1,100,100);
+            bounds.set(0,0,100,300); image.getImageMatrix().mapRect(bounds);
+            check(Math.abs(bounds.height()-1200)<2, "Double tap honors the configured six-times zoom");
+            image.setFitMode(AppState.FIT_SCREEN);
+            image.setImageDrawable(null); bitmap.recycle();
+        });
+    }
+    private static void touch(ZoomImageView view, long down, long time, int action, float x, float y) {
+        android.view.MotionEvent event = android.view.MotionEvent.obtain(down,time,action,x,y,0);
+        view.onTouchEvent(event); event.recycle();
+    }
+
+    private void checkParityAdditions(Context context, File fixtures) throws Exception {
+        File rar = new File(fixtures, "stored.cbr");
+        try (java.io.InputStream in = getContext().getAssets().open("stored.rar"); FileOutputStream out = new FileOutputStream(rar)) { DocumentTransfer.copyAndHash(in, out, null); }
+        try (PageSource source = new PageSource(context, Uri.fromFile(rar), rar.getName(), null, java.nio.charset.StandardCharsets.UTF_8, 2_000_000)) {
+            check(source.pageCount() == 2 && source.pageName(0).equals("chapter/page2.png"), "RAR4 pages sorted naturally");
+            Bitmap image = source.decode(1, 1080); check(image != null && image.getPixel(0,0) == 0xffff0000, "RAR4 image decoded"); image.recycle();
+        }
+        File seven = new File(fixtures, "pages.7z"); Bitmap image = Bitmap.createBitmap(30, 40, Bitmap.Config.ARGB_8888); image.eraseColor(0xff2468ab);
+        java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream(); image.compress(Bitmap.CompressFormat.PNG,100,png); image.recycle();
+        try (org.apache.commons.compress.archivers.sevenz.SevenZOutputFile output = new org.apache.commons.compress.archivers.sevenz.SevenZOutputFile(seven)) {
+            for (String name : new String[]{"chapter/page10.png", "chapter/page2.png"}) {
+                org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry entry = new org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry(); entry.setName(name);
+                output.putArchiveEntry(entry); output.write(png.toByteArray()); output.closeArchiveEntry();
+            }
+        }
+        try (PageSource source = new PageSource(context,Uri.fromFile(seven),seven.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2_000_000)) {
+            check(source.pageCount()==2 && source.pageName(0).equals("chapter/page2.png"),"7z page count and sorting");
+            image=source.decode(1,1080); check(image.getWidth()==30 && image.getPixel(0,0)==0xff2468ab,"7z LZMA2 image decoded"); image.recycle();
+            image=source.decode(0,1080); check(image.getHeight()==40,"7z reverse navigation"); image.recycle();
+        }
+        Uri book=Uri.parse("content://test/cropped");
+        android.graphics.RectF crop=new android.graphics.RectF(.1f,.2f,.8f,.9f); AppState.setCrop(context,book,crop);
+        check(AppState.crop(context,book).equals(crop),"Crop persists per book");
+        Uri newBook=Uri.parse("content://test/cropped-renamed"); AppState.relocate(context,book,newBook,"renamed.cbz");
+        check(AppState.crop(context,book)==null && AppState.crop(context,newBook).equals(crop),"Crop follows rename");
+        boolean invalid=false;try{AppState.setCrop(context,newBook,new android.graphics.RectF(-1,0,1,1));}catch(IllegalArgumentException expected){invalid=true;}check(invalid,"Reject invalid saved crop");
+        Uri album=Albums.rename(context,null,"Album"); LibraryEntry albumImage=new LibraryEntry(newBook,"page.png","image/png","画像",false,0,0);
+        Albums.update(context,album,java.util.Arrays.asList(albumImage,albumImage),true);check(Albums.list(context,album).size()==1,"Album additions deduplicate images");
+        Albums.rename(context,album,"Renamed album");check(Albums.list(context,null).get(0).name.equals("Renamed album"),"Album rename persists");
+        Albums.delete(context,album);check(AppState.crop(context,newBook).equals(crop),"Deleting album preserves source reading data");
+        String unique="run-"+System.nanoTime();
+        getUiAutomation().adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");
+        Uri tree=android.provider.DocumentsContract.buildTreeDocumentUri("jp.yaman.comicexplorer.parity.documents","root");
+        Uri root=android.provider.DocumentsContract.buildDocumentUriUsingTree(tree,"root");
+        Uri run=android.provider.DocumentsContract.createDocument(context.getContentResolver(),root,android.provider.DocumentsContract.Document.MIME_TYPE_DIR,unique);
+        try {
+            Uri sourceDir=android.provider.DocumentsContract.createDocument(context.getContentResolver(),run,android.provider.DocumentsContract.Document.MIME_TYPE_DIR,"source");
+            Uri target=android.provider.DocumentsContract.createDocument(context.getContentResolver(),run,android.provider.DocumentsContract.Document.MIME_TYPE_DIR,"target");
+            Uri page=android.provider.DocumentsContract.createDocument(context.getContentResolver(),sourceDir,"image/png","page.png");
+            try(java.io.OutputStream out=context.getContentResolver().openOutputStream(page)){out.write(png.toByteArray());}
+            Uri note=android.provider.DocumentsContract.createDocument(context.getContentResolver(),sourceDir,"text/plain","notes.txt");
+            try(java.io.OutputStream out=context.getContentResolver().openOutputStream(note)){out.write(new byte[]{1,2,3});}
+            check(LibraryDirectoryReader.read(context.getContentResolver(),sourceDir,sourceDir,false).size()==2,"Read actual document folder, not tree root");
+            AppState.addRecent(context,page,"page.png","画像"); AppState.updateReadingProgress(context,page,2,8); AppState.setBookmark(context,page,2,true,"page.png","画像"); AppState.setCrop(context,page,crop);
+            LibraryEntry source=new LibraryEntry(sourceDir,"source",android.provider.DocumentsContract.Document.MIME_TYPE_DIR,"",true,0,0);
+            Uri copied=new DocumentTransfer(context).transfer(source,target,false,DocumentTransfer.KEEP_BOTH);
+            check(LibraryDirectoryReader.read(context.getContentResolver(),copied,copied,false).size()==2,"Copy folder includes non-comic files");
+            boolean self=false;try{new DocumentTransfer(context).transfer(source,sourceDir,true,0);}catch(java.io.IOException expected){self=true;}check(self,"Reject moving folder into itself");
+            Uri skipped=new DocumentTransfer(context).transfer(source,target,false,DocumentTransfer.SKIP);check(skipped==null,"Skip conflicts without changing source");
+            Uri moved=new DocumentTransfer(context).transfer(source,target,true,DocumentTransfer.REPLACE);
+            LibraryEntry movedPage=null;for(LibraryEntry child:LibraryDirectoryReader.read(context.getContentResolver(),moved,moved,false))if(child.name.equals("page.png"))movedPage=child;
+            check(movedPage!=null && AppState.hasBookmark(context,movedPage.uri,2) && AppState.getPosition(context,movedPage.uri)==2 && AppState.crop(context,movedPage.uri).equals(crop),"Folder move migrates descendant bookmarks, progress and crop");
+            DocumentTransfer.rename(context,new LibraryEntry(moved,"source",android.provider.DocumentsContract.Document.MIME_TYPE_DIR,"",true,0,0),"renamed");
+            LibraryEntry renamedDir=null;for(LibraryEntry child:LibraryDirectoryReader.read(context.getContentResolver(),target,target,false))if(child.name.equals("renamed"))renamedDir=child;
+            LibraryEntry renamedPage=null;for(LibraryEntry child:LibraryDirectoryReader.read(context.getContentResolver(),renamedDir.uri,renamedDir.uri,false))if(child.name.equals("page.png"))renamedPage=child;
+            check(renamedPage!=null && AppState.hasBookmark(context,renamedPage.uri,2),"Folder rename migrates descendant reading data");
+            Uri otherTree=android.provider.DocumentsContract.buildTreeDocumentUri("jp.yaman.comicexplorer.parity.documents2","root");
+            Uri otherTarget=android.provider.DocumentsContract.buildDocumentUriUsingTree(otherTree,android.provider.DocumentsContract.getDocumentId(target));
+            Uri cross=new DocumentTransfer(context).transfer(renamedPage,otherTarget,false,0);
+            check(cross.getAuthority().equals(otherTarget.getAuthority()),"Cross-provider copy verified");
+            Uri fail=android.provider.DocumentsContract.createDocument(context.getContentResolver(),run,"image/png","fail.png");
+            try(java.io.OutputStream out=context.getContentResolver().openOutputStream(fail)){out.write(png.toByteArray());}
+            boolean failed=false;try{new DocumentTransfer(context).transfer(new LibraryEntry(fail,"fail.png","image/png","画像",false,0,0),target,true,0);}catch(Exception expected){failed=true;}
+            try(java.io.InputStream in=context.getContentResolver().openInputStream(fail)){check(failed && in.read()==137,"Failed move retains source bytes");}
+            boolean partial=false;for(LibraryEntry child:LibraryDirectoryReader.read(context.getContentResolver(),target,target,false))if(child.name.equals("fail.png"))partial=true;
+            check(!partial,"Failed transfer removes partial destination");
+        } finally {android.provider.DocumentsContract.deleteDocument(context.getContentResolver(),run); getUiAutomation().dropShellPermissionIdentity();}
+    }
+
     private void checkFtp(File directory) throws Exception {
         try(java.net.ServerSocket control=new java.net.ServerSocket(0,1,java.net.InetAddress.getByName("127.0.0.1"))) {
             control.setSoTimeout(10000);
             java.util.concurrent.atomic.AtomicReference<Throwable> failure=new java.util.concurrent.atomic.AtomicReference<>();
+            java.util.concurrent.atomic.AtomicReference<byte[]> uploaded=new java.util.concurrent.atomic.AtomicReference<>();
             Thread server=new Thread(() -> {
                 java.net.ServerSocket data=null;
                 try(java.net.Socket socket=control.accept()) {
@@ -205,6 +356,12 @@ public final class ParityInstrumentation extends Instrumentation {
                             output.print("150 Opening data\r\n");output.flush();
                             try(java.net.Socket transfer=data.accept()) {transfer.getOutputStream().write((command.equals("LIST")?"-rw-r--r-- 1 test test 7 Jan 01 2026 page.cbz\r\n":"fixture").getBytes(java.nio.charset.StandardCharsets.UTF_8));}
                             data.close();data=null;reply="226 Complete";
+                        } else if(command.equals("STOR")) {
+                            output.print("150 Opening data\r\n"); output.flush();
+                            try(java.net.Socket transfer=data.accept();java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream()) {
+                                DocumentTransfer.copyAndHash(transfer.getInputStream(),bytes,null);uploaded.set(bytes.toByteArray());
+                            }
+                            data.close();data=null;reply="226 Complete";
                         } else if(command.equals("QUIT")) {output.print("221 Bye\r\n");output.flush();break;}
                         else if(command.equals("FEAT"))reply="500 Unsupported";
                         output.print(reply+"\r\n");output.flush();
@@ -217,11 +374,16 @@ public final class ParityInstrumentation extends Instrumentation {
                 check(files.size()==1 && files.get(0).name.equals("page.cbz"),"FTP passive directory listing");
                 File copy=new File(directory,"ftp-download");remote.download("page.cbz",copy);
                 check(new String(java.nio.file.Files.readAllBytes(copy.toPath()),java.nio.charset.StandardCharsets.UTF_8).equals("fixture"),"FTP binary retrieval");
+                remote.upload("uploaded.cbz",copy);check(java.util.Arrays.equals(uploaded.get(),java.nio.file.Files.readAllBytes(copy.toPath())),"FTP binary upload");
             }
             server.join(10000);check(!server.isAlive() && failure.get()==null,"FTP connection closes cleanly");
         }
     }
     private void check(boolean value,String message){if(!value)throw new AssertionError(message);checks++;}
+    private static void browser(ViewerActivity viewer, boolean chapters, boolean strip) {
+        try {java.lang.reflect.Method method=ViewerActivity.class.getDeclaredMethod("showPageBrowser",boolean.class,boolean.class);method.setAccessible(true);method.invoke(viewer,chapters,strip);}
+        catch(Exception e){throw new RuntimeException(e);}
+    }
     private boolean clickText(String text) {
         android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
         if(root==null)return false;

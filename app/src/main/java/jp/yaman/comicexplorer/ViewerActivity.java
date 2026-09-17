@@ -132,6 +132,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         getWindow().setNavigationBarColor(Ui.DARK_BACKGROUND);
         sourceUri = getIntent().getData();
         if (sourceUri == null) { finish(); return; }
+        customCrop = AppState.crop(this, sourceUri);
         title = getIntent().getStringExtra(EXTRA_TITLE);
         if (title == null || title.trim().isEmpty()) title = "Comic Explorer";
         imageUris = getIntent().getParcelableArrayListExtra(EXTRA_IMAGE_URIS);
@@ -476,7 +477,18 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     }
 
     private Bitmap decodePage(int target) throws IOException {
-        Bitmap raw = decodeLayout(target);
+        return decodeLayout(target);
+    }
+
+    private Bitmap processedSinglePage(int target) throws IOException {
+        Bitmap raw = cropMargins(decodeSinglePage(target));
+        int targetWidth = getResources().getDisplayMetrics().widthPixels / (usesDualPageLayout() ? 2 : 1);
+        Bitmap processed = ImageProcessing.apply(this, raw, targetWidth, Math.min(maxBitmapPixels, 2_000_000));
+        if (processed != raw) raw.recycle();
+        return processed;
+    }
+
+    private Bitmap applyCustomCrop(Bitmap raw) {
         if (customCrop != null) {
             int x = Math.min(raw.getWidth()-1, Math.round(raw.getWidth()*customCrop.left));
             int y = Math.min(raw.getHeight()-1, Math.round(raw.getHeight()*customCrop.top));
@@ -485,18 +497,16 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             Bitmap crop = Bitmap.createBitmap(raw, x, y, width, height);
             if (crop != raw) raw.recycle(); raw = crop;
         }
-        Bitmap processed = ImageProcessing.apply(this, raw, getResources().getDisplayMetrics().widthPixels, Math.min(maxBitmapPixels, 2_000_000));
-        if (processed != raw) raw.recycle();
-        return processed;
+        return raw;
     }
 
     private Bitmap decodeLayout(int target) throws IOException {
-        Bitmap first = decodeSinglePage(target);
-        if (!usesDualPageLayout() || target + 1 >= totalPages) return cropMargins(first);
+        Bitmap first = processedSinglePage(target);
+        if (!usesDualPageLayout() || target + 1 >= totalPages) return first;
         Bitmap second = null;
         try {
-            second = decodeSinglePage(target + 1);
-            return cropMargins(combinePages(first, second, AppState.direction(this) == AppState.DIRECTION_RTL));
+            second = processedSinglePage(target + 1);
+            return combinePages(first, second, AppState.direction(this) == AppState.DIRECTION_RTL);
         } finally {
             first.recycle();
             if (second != null) second.recycle();
@@ -504,7 +514,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     }
 
     private Bitmap decodeSinglePage(int target) throws IOException {
-        return pageSource.decode(target, getResources().getDisplayMetrics().widthPixels);
+        return applyCustomCrop(pageSource.decode(target, getResources().getDisplayMetrics().widthPixels));
     }
     private Bitmap combinePages(Bitmap first, Bitmap second, boolean rightToLeft) {
         int sourceWidth = first.getWidth() + second.getWidth();
@@ -644,6 +654,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         });
         menu.add(I18n.t(R.string.ui_page_thumbnails), () -> showPageBrowser(false));
         menu.add(I18n.t(R.string.ui_chapters), () -> showPageBrowser(true));
+        menu.add(I18n.t(R.string.ui_page_strip), () -> showPageBrowser(false, true));
         menu.add(I18n.t(R.string.ui_margin_cropping), this::showCropEditor);
         menu.add(I18n.t(R.string.ui_open_the_next_file), () -> nextBook(true));
         menu.show(this, I18n.t(R.string.ui_more));
@@ -1072,6 +1083,9 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         startActivity(intent); finish();
     }
     private void showPageBrowser(boolean chapters) {
+        showPageBrowser(chapters, false);
+    }
+    private void showPageBrowser(boolean chapters, boolean strip) {
         if (!initialized) return;
         ArrayList<Integer> indices = new ArrayList<>(); ArrayList<String> labels = new ArrayList<>();
         String previous = null;
@@ -1081,7 +1095,11 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             if (!chapters || !chapter.equals(previous)) { indices.add(i); labels.add(chapters ? chapter : (i+1) + " · " + name); }
             previous = chapter;
         }
-        android.widget.GridView grid = new android.widget.GridView(this); grid.setNumColumns(chapters ? 1 : 3);
+        boolean wide = getResources().getConfiguration().smallestScreenWidthDp >= 600;
+        int thumbnailWidth = wide ? 128 : 96, thumbnailHeight = wide ? 61 : 47;
+        android.widget.ListView grid = new android.widget.ListView(this);
+        grid.setChoiceMode(android.widget.ListView.CHOICE_MODE_SINGLE);
+        grid.setDividerHeight(0); grid.setVerticalScrollBarEnabled(false);
         final boolean[] closed = {false};
         grid.setAdapter(new android.widget.BaseAdapter() {
             @Override public int getCount() { return indices.size(); }
@@ -1089,41 +1107,75 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             @Override public long getItemId(int i) { return indices.get(i); }
             @Override public View getView(int position, View recycled, ViewGroup parent) {
                 LinearLayout cell = new LinearLayout(ViewerActivity.this); cell.setOrientation(LinearLayout.VERTICAL); cell.setPadding(dp(4), dp(4), dp(4), dp(4));
+                if (strip) cell.setLayoutParams(new android.widget.Gallery.LayoutParams(dp(thumbnailWidth), -1));
                 android.widget.ImageView thumbnail = new android.widget.ImageView(ViewerActivity.this); thumbnail.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-                cell.addView(thumbnail, new LinearLayout.LayoutParams(-1, dp(chapters ? 100 : 130)));
-                cell.addView(text(labels.get(position), 12, Ui.DARK_TEXT)); cell.setContentDescription(labels.get(position));
+                if (!chapters) cell.addView(thumbnail, new LinearLayout.LayoutParams(-1, dp(strip ? thumbnailHeight : 130)));
+                TextView label = text(chapters ? labels.get(position) : Integer.toString(indices.get(position) + 1), 12, Ui.DARK_TEXT);
+                label.setGravity(chapters ? Gravity.CENTER_VERTICAL : Gravity.CENTER);
+                label.setMinHeight(dp(chapters ? 48 : 24));
+                cell.addView(label); cell.setContentDescription(labels.get(position));
+                boolean current = indices.get(position) <= page && (position + 1 == indices.size() || indices.get(position + 1) > page);
+                cell.setBackgroundColor(current ? Ui.DARK_SURFACE_RAISED : Ui.DARK_SURFACE);
+                cell.setSelected(current);
+                if (chapters) return cell;
                 worker.execute(() -> {
                     if (destroyed || closed[0]) return;
                     try {
                         Bitmap page = decodeSinglePage(indices.get(position)); int[] size = coverSize(page.getWidth(), page.getHeight());
                         Bitmap small = Bitmap.createScaledBitmap(page, size[0], size[1], true); if (small != page) page.recycle();
-                        runOnUiThread(() -> { if (!destroyed && !closed[0]) thumbnail.setImageBitmap(small); });
+                        runOnUiThread(() -> { if (!destroyed && !closed[0]) thumbnail.setImageBitmap(small); else small.recycle(); });
                     } catch (Exception | OutOfMemoryError ignored) { }
                 });
                 return cell;
             }
         });
-        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(chapters ? I18n.t(R.string.ui_chapters) : I18n.t(R.string.ui_page_thumbnails)).setView(grid).setNegativeButton(I18n.t(R.string.ui_close), null));
+        LinearLayout drawer = new LinearLayout(this); drawer.setOrientation(LinearLayout.VERTICAL); drawer.setBackgroundColor(Ui.DARK_SURFACE);
+        LinearLayout tabs = new LinearLayout(this);
+        if (!chapters) tabs.setOrientation(LinearLayout.VERTICAL);
+        android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        for (int tab = 0; tab < 2; tab++) {
+            final boolean chapterTab = tab == 1;
+            Button button = Ui.button(this, I18n.t(chapterTab ? R.string.ui_chapters : R.string.ui_page_thumbnails), Ui.ButtonStyle.DARK_GHOST);
+            button.setSelected(chapters == chapterTab);
+            button.setOnClickListener(v -> { dialog.dismiss(); showPageBrowser(chapterTab); });
+            tabs.addView(button, chapters ? new LinearLayout.LayoutParams(0, -2, 1) : new LinearLayout.LayoutParams(-1, -2));
+        }
+        android.widget.AdapterView<?> pages = grid;
+        if (strip) {
+            android.widget.Gallery gallery = new android.widget.Gallery(this); gallery.setSpacing(dp(8)); gallery.setAdapter((android.widget.BaseAdapter)grid.getAdapter()); pages = gallery;
+        } else drawer.addView(tabs);
+        drawer.addView(pages, new LinearLayout.LayoutParams(-1, 0, 1));
+        Button close = Ui.button(this, I18n.t(R.string.ui_close), Ui.ButtonStyle.DARK_GHOST); close.setOnClickListener(v -> dialog.dismiss()); drawer.addView(close);
+        dialog.setContentView(drawer); dialog.show();
+        dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Ui.DARK_SURFACE));
+        dialog.getWindow().setGravity(strip ? Gravity.BOTTOM : Gravity.START | Gravity.TOP);
+        dialog.getWindow().setLayout(strip ? -1 : Math.min(dp(chapters ? (wide ? 450 : 280) : thumbnailWidth), Math.round(getResources().getDisplayMetrics().widthPixels * .88f)), strip ? dp(thumbnailHeight + 88) : -1);
+        int selected = 0; for (int i = 0; i < indices.size(); i++) if (indices.get(i) <= page) selected = i;
+        pages.setSelection(selected);
+        if (!strip) { grid.setItemChecked(selected, true); drawer.setTranslationX(-dp(chapters ? (wide ? 450 : 280) : thumbnailWidth)); drawer.animate().translationX(0).setDuration(180).start(); }
         dialog.setOnDismissListener(d -> closed[0] = true);
-        grid.setOnItemClickListener((parent, view, position, id) -> { goToPage(indices.get(position)); dialog.dismiss(); });
+        pages.setOnItemClickListener((parent, view, position, id) -> { goToPage(indices.get(position)); if (!strip) dialog.dismiss(); else ((android.widget.BaseAdapter)grid.getAdapter()).notifyDataSetChanged(); });
     }
     private void showCropEditor() {
         if (!initialized) return;
         worker.execute(() -> {
             try {
-                Bitmap bitmap = decodeLayout(page);
+                Bitmap bitmap = pageSource.decode(page, getResources().getDisplayMetrics().widthPixels);
                 runOnUiThread(() -> {
                     if (destroyed || isFinishing()) return;
                     CropView crop = new CropView(this, bitmap);
+                    crop.setSelection(customCrop);
                     LinearLayout editor = new LinearLayout(this); editor.setOrientation(LinearLayout.VERTICAL);
                     crop.setMinimumHeight(0);
                     editor.addView(crop, new LinearLayout.LayoutParams(-1, Math.min(dp(320), Math.round(getResources().getDisplayMetrics().heightPixels * .35f))));
-                    String[] edges={"Left", "Top", "Right", "Bottom"};
+                    String[] edges={I18n.t(R.string.ui_left), I18n.t(R.string.ui_top), I18n.t(R.string.ui_right), I18n.t(R.string.ui_bottom)};
                     for(int edge=0;edge<4;edge++) {
                         int selectedEdge=edge;
                         LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
                         TextView label=text(edges[edge],13,Ui.DARK_TEXT); row.addView(label,new LinearLayout.LayoutParams(dp(64),-2));
-                        SeekBar bar=new SeekBar(this); bar.setMax(100);bar.setProgress(edge<2?0:100);bar.setContentDescription(edges[edge]);Ui.styleSeekBar(bar,true);
+                        android.graphics.RectF selectedCrop = crop.selection();
+                        SeekBar bar=new SeekBar(this); bar.setMax(100);bar.setProgress(Math.round(100 * (edge == 0 ? selectedCrop.left : edge == 1 ? selectedCrop.top : edge == 2 ? selectedCrop.right : selectedCrop.bottom)));bar.setContentDescription(edges[edge]);Ui.styleSeekBar(bar,true);
                         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
                             @Override public void onProgressChanged(SeekBar view,int value,boolean user){if(user)crop.setEdge(selectedEdge,value/100f);}
                             @Override public void onStartTrackingTouch(SeekBar view){} @Override public void onStopTrackingTouch(SeekBar view){}
@@ -1131,8 +1183,8 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
                     }
                     android.widget.ScrollView cropScroll = new android.widget.ScrollView(this); cropScroll.addView(editor);
                     AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_margin_cropping)).setView(cropScroll)
-                            .setNegativeButton(I18n.t(R.string.ui_cancel), null).setNeutralButton(I18n.t(R.string.ui_default), (d, i) -> { customCrop = null; refreshReader(); })
-                            .setPositiveButton(I18n.t(R.string.ui_crop), (d, i) -> { customCrop = crop.selection(); refreshReader(); }));
+                            .setNegativeButton(I18n.t(R.string.ui_cancel), null).setNeutralButton(I18n.t(R.string.ui_default), (d, i) -> { customCrop = null; AppState.setCrop(this, sourceUri, null); refreshReader(); })
+                            .setPositiveButton(I18n.t(R.string.ui_crop), (d, i) -> { customCrop = crop.selection(); AppState.setCrop(this, sourceUri, customCrop); refreshReader(); }));
                     dialog.getWindow().setLayout(-1, Math.round(getResources().getDisplayMetrics().heightPixels*.85f));
                 });
             } catch (Exception | OutOfMemoryError e) { runOnUiThread(() -> Toast.makeText(this, I18n.t(R.string.ui_cannot_load_page), Toast.LENGTH_SHORT).show()); }
