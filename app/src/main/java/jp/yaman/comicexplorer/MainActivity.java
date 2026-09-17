@@ -469,7 +469,7 @@ public final class MainActivity extends BaseActivity {
         listView.setVisibility(gridMode ? View.GONE : View.VISIBLE);
         gridView.setVisibility(gridMode ? View.VISIBLE : View.GONE);
         gridView.setNumColumns(AppState.gridColumns(this));
-        gridView.setBackgroundColor(AppState.number(this, "grid_color", Ui.DARK_BACKGROUND));
+        gridView.setBackgroundColor(AppState.number(this, "grid_color", 0xff303030));
         if (locationRow != null) locationRow.setVisibility(AppState.showLibraryPath(this) ? View.VISIBLE : View.GONE);
         int scrollPosition = AppState.leftLibraryScrollbar(this)
                 ? View.SCROLLBAR_POSITION_LEFT : View.SCROLLBAR_POSITION_RIGHT;
@@ -1050,7 +1050,12 @@ public final class MainActivity extends BaseActivity {
                 convertView = row;
             } else holder = (Holder) convertView.getTag();
             LibraryEntry item = getItem(position);
-            if (gridMode) convertView.setBackgroundColor(AppState.number(MainActivity.this, "grid_color", Ui.DARK_BACKGROUND));
+            if (gridMode) {
+                int background=AppState.number(MainActivity.this,"grid_color",0xff303030);
+                int foreground=androidx.core.graphics.ColorUtils.calculateLuminance(background)>.179 ? 0xff000000 : 0xffffffff;
+                convertView.setBackgroundColor(background);holder.name.setTextColor(foreground);holder.detail.setTextColor(foreground);
+                holder.progress.setTextColor(androidx.core.graphics.ColorUtils.calculateContrast(Ui.READER_ACCENT,background)>=4.5 ? Ui.READER_ACCENT : foreground);
+            }
             holder.name.setText(item.name);
             holder.name.setVisibility(!gridMode || AppState.enabled(MainActivity.this, "grid_name", true) ? View.VISIBLE : View.GONE);
             String detail = item.directory ? I18n.t("album".equals(item.uri.getScheme()) ? R.string.ui_albums : R.string.ui_directory) : item.kind + (item.size > 0 ? "  •  " + ComicFile.formatSize(item.size) : "");

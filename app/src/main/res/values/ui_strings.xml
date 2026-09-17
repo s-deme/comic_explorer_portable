@@ -305,7 +305,7 @@
     <string name="ui_question_mark" formatted="false">"?"</string>
     <string name="ui_full_screen" formatted="false">"Full screen"</string>
     <string name="ui_cannot_create_cover_directory" formatted="false">"Cannot create cover directory."</string>
-    <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">"Tap or swipe to turn pages. Tap the center for menus."</string>
+    <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">Tap the page for menus. Swipe or use the page buttons to turn pages.</string>
     <string name="ui_no_results" formatted="false">"No results"</string>
     <string name="ui_double_tap" formatted="false">"Double tap"</string>
     <string name="ui_icon" formatted="false">"Icon"</string>
@@ -340,7 +340,7 @@
     <string name="ui_cannot_create_destination" formatted="false">"Cannot create destination."</string>
     <string name="ui_share_name_smb" formatted="false">"Share name (SMB)"</string>
     <string name="ui_ok" formatted="false">"OK"</string>
-    <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">"Book page. Swipe or tap the sides to turn pages. Tap the center for menus."</string>
+    <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">Tap the page for menus. Swipe or use the page buttons to turn pages.</string>
     <string name="ui_cannot_rename" formatted="false">"Cannot rename"</string>
     <string name="ui_move" formatted="false">"Move"</string>
     <string name="ui_select_a_pdf_cbz_zip_or_image" formatted="false">"Select a PDF, ZIP/CBZ, RAR/CBR, 7z or image"</string>

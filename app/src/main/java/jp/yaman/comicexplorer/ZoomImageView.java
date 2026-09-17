@@ -19,13 +19,15 @@ public final class ZoomImageView extends ImageView {
     }
 
     private final Matrix matrix = new Matrix();
+    private final android.widget.OverScroller panScroller;
+    private android.animation.ValueAnimator zoomAnimator;
     private final ScaleGestureDetector scaleDetector;
     private final GestureDetector gestureDetector;
     private float lastX;
     private float lastY;
     private float relativeScale = 1f;
-    private float doubleTapScale = 2.25f;
-    private int doubleTapMode = AppState.DOUBLE_TAP_TOGGLE;
+    private float doubleTapScale = 1.8f;
+    private int doubleTapMode = AppState.DOUBLE_TAP_OFF;
     private boolean dragging;
     private boolean multiTouch;
     private int activePointer;
@@ -41,13 +43,14 @@ public final class ZoomImageView extends ImageView {
     public ZoomImageView(Context context, AttributeSet attrs) {
         super(context, attrs);
         setScaleType(ScaleType.MATRIX);
+        panScroller = new android.widget.OverScroller(context);
         touchSlop = android.view.ViewConfiguration.get(context).getScaledTouchSlop();
         setBackgroundColor(0xFF101114);
         setFocusable(true);
         setContentDescription(I18n.t(R.string.ui_book_page_swipe_or_tap_the_sides_to_turn_pages));
         scaleDetector = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override public boolean onScale(ScaleGestureDetector detector) {
-                float next = Math.max(1f, Math.min(6f, relativeScale * detector.getScaleFactor()));
+                float next = Math.max(1f, Math.min(maximumScale(), relativeScale * detector.getScaleFactor()));
                 float factor = next / relativeScale;
                 relativeScale = next;
                 matrix.postScale(factor, factor, detector.getFocusX(), detector.getFocusY());
@@ -65,18 +68,26 @@ public final class ZoomImageView extends ImageView {
                 if (doubleTapMode == AppState.DOUBLE_TAP_OFF) return true;
                 android.graphics.RectF bounds = new android.graphics.RectF();
                 if (getDrawable() != null) { bounds.set(0, 0, getDrawable().getIntrinsicWidth(), getDrawable().getIntrinsicHeight()); matrix.mapRect(bounds); }
-                if (doubleTapMode == AppState.DOUBLE_TAP_FIT || doubleTapMode == AppState.DOUBLE_TAP_TOGGLE && !bounds.contains(event.getX(), event.getY())) fitImage();
-                else if (doubleTapMode == AppState.DOUBLE_TAP_TOGGLE || relativeScale <= 1.05f) {
-                    float factor = doubleTapScale / relativeScale;
-                    relativeScale = doubleTapScale;
-                    matrix.postScale(factor, factor, event.getX(), event.getY());
-                    constrainImage();
-                }
+                boolean inside = bounds.contains(event.getX(), event.getY());
+                boolean fit = doubleTapMode == AppState.DOUBLE_TAP_FIT
+                        || doubleTapMode == AppState.DOUBLE_TAP_TOGGLE && !inside
+                        || doubleTapMode == AppState.DOUBLE_TAP_ZOOM && extremeAspect();
+                float fill = fillScale();
+                float target = fit ? (Math.abs(relativeScale-fill)<.01f ? 1.8f : fill) : relativeScale*doubleTapScale;
+                animateZoom(Math.max(1f,Math.min(maximumScale(),target)),event.getX(),event.getY(),false);
                 return true;
             }
 
             @Override public boolean onFling(MotionEvent start, MotionEvent end, float velocityX, float velocityY) {
-                if (listener == null || multiTouch || start == null || relativeScale > 1.05f) return false;
+                if (multiTouch || start == null) return false;
+                if (canPan(true) || canPan(false)) {
+                    android.graphics.RectF bounds = imageBounds();
+                    panScroller.fling(Math.max(0,Math.round(-bounds.left)),Math.max(0,Math.round(-bounds.top)),
+                            canPan(true) ? -(int)velocityX : 0,canPan(false) ? -(int)velocityY : 0,
+                            0,Math.max(0,Math.round(bounds.width()-getWidth())),0,Math.max(0,Math.round(bounds.height()-getHeight())));
+                    postInvalidateOnAnimation(); return true;
+                }
+                if (listener == null || relativeScale > 1.05f) return false;
                 float dx = end.getX() - start.getX();
                 float dy = end.getY() - start.getY();
                 if (verticalPaging && !canPan(false) && Math.abs(dy) > touchSlop * 4 && Math.abs(dy) > Math.abs(dx) * 1.5f && Math.abs(velocityY) > 400) {
@@ -143,9 +154,17 @@ public final class ZoomImageView extends ImageView {
     }
 
     @Override public void setImageBitmap(android.graphics.Bitmap bitmap) {
+        if(getDrawable() instanceof android.graphics.drawable.Animatable)((android.graphics.drawable.Animatable)getDrawable()).stop();
         super.setImageBitmap(bitmap);
         post(this::fitImage);
     }
+    @Override public void setImageDrawable(Drawable drawable) {
+        if(getDrawable() instanceof android.graphics.drawable.Animatable)((android.graphics.drawable.Animatable)getDrawable()).stop();
+        super.setImageDrawable(drawable);
+        if(drawable instanceof android.graphics.drawable.Animatable && isAttachedToWindow() && getWindowVisibility()==VISIBLE)((android.graphics.drawable.Animatable)drawable).start();
+    }
+    @Override protected void onAttachedToWindow(){super.onAttachedToWindow();if(getDrawable() instanceof android.graphics.drawable.Animatable)((android.graphics.drawable.Animatable)getDrawable()).start();}
+    @Override protected void onWindowVisibilityChanged(int visibility){super.onWindowVisibilityChanged(visibility);if(getDrawable() instanceof android.graphics.drawable.Animatable){if(visibility==VISIBLE)((android.graphics.drawable.Animatable)getDrawable()).start();else ((android.graphics.drawable.Animatable)getDrawable()).stop();}}
 
     @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
         super.onSizeChanged(width, height, oldWidth, oldHeight);
@@ -153,6 +172,7 @@ public final class ZoomImageView extends ImageView {
     }
 
     public void fitImage() {
+        stopMotion();
         Drawable drawable = getDrawable();
         if (drawable == null || getWidth() == 0 || getHeight() == 0) return;
         float imageWidth = drawable.getIntrinsicWidth();
@@ -176,6 +196,48 @@ public final class ZoomImageView extends ImageView {
         relativeScale = 1f;
         setImageMatrix(matrix);
     }
+
+    private boolean extremeAspect() {
+        Drawable image=getDrawable();
+        if(image==null || image.getIntrinsicHeight()<=0)return false;
+        float ratio=image.getIntrinsicWidth()/(float)image.getIntrinsicHeight();return ratio>2.8f || ratio<.3f;
+    }
+    private float fillScale() {
+        Drawable image=getDrawable();
+        if(image==null || getWidth()==0 || getHeight()==0)return 1.8f;
+        float ratio=image.getIntrinsicWidth()/(float)image.getIntrinsicHeight()/(getWidth()/(float)getHeight());
+        float scale=Math.max(ratio,1/ratio);return !Float.isFinite(scale) || scale<=1 ? 1.8f : scale;
+    }
+    private float maximumScale() {return extremeAspect() ? Math.max(5f,fillScale()*2) : 5f;}
+
+    private void stopMotion() {
+        panScroller.abortAnimation();
+        if (zoomAnimator != null) { zoomAnimator.cancel(); zoomAnimator = null; }
+    }
+    private void animateZoom(float scale, float x, float y, boolean fit) {
+        stopMotion();
+        float[] start=new float[9], end=new float[9]; matrix.getValues(start);
+        float from=relativeScale;
+        if(fit) fitImage(); else {matrix.postScale(scale/from,scale/from,x,y); constrainImage();}
+        matrix.getValues(end); matrix.setValues(start); relativeScale=from; setImageMatrix(matrix);
+        zoomAnimator=android.animation.ValueAnimator.ofFloat(0,1); zoomAnimator.setDuration(150);
+        zoomAnimator.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        zoomAnimator.addUpdateListener(animation -> {
+            float progress=(Float)animation.getAnimatedValue(); float[] values=new float[9];
+            for(int i=0;i<9;i++)values[i]=start[i]+(end[i]-start[i])*progress;
+            matrix.setValues(values);relativeScale=from+(scale-from)*progress;constrainImage();
+        });
+        zoomAnimator.start();
+    }
+    @Override public void computeScroll() {
+        if(panScroller.computeScrollOffset()) {
+            android.graphics.RectF bounds=imageBounds();
+            matrix.postTranslate(canPan(true) ? -panScroller.getCurrX()-bounds.left : 0,
+                    canPan(false) ? -panScroller.getCurrY()-bounds.top : 0);
+            constrainImage();postInvalidateOnAnimation();
+        }
+    }
+    @Override protected void onDetachedFromWindow() {stopMotion();if(getDrawable() instanceof android.graphics.drawable.Animatable)((android.graphics.drawable.Animatable)getDrawable()).stop();super.onDetachedFromWindow();}
 
     private android.graphics.RectF imageBounds() {
         android.graphics.RectF bounds = new android.graphics.RectF();
@@ -207,12 +269,14 @@ public final class ZoomImageView extends ImageView {
     @Override public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
+            stopMotion();
             activePointer = event.getPointerId(0);
             lastX = event.getX(); lastY = event.getY();
             dragging = false; multiTouch = false;
             if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(relativeScale > 1.01f);
         } else if (action == MotionEvent.ACTION_POINTER_DOWN) {
             multiTouch = true;
+            stopMotion();
             if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
         }
         scaleDetector.onTouchEvent(event);

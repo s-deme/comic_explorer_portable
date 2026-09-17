@@ -14,7 +14,10 @@ final class Albums {
     }
     static void save(Context context, JSONObject albums) { AppState.prefs(context).edit().putString("albums", albums.toString()).apply(); }
     static ArrayList<LibraryEntry> list(Context context, Uri album) {
-        ArrayList<LibraryEntry> result = new ArrayList<>(); JSONObject albums = read(context);
+        return list(read(context), album);
+    }
+    private static ArrayList<LibraryEntry> list(JSONObject albums, Uri album) {
+        ArrayList<LibraryEntry> result = new ArrayList<>();
         try {
             if (album == null) {
                 java.util.Iterator<String> ids = albums.keys();
@@ -36,23 +39,29 @@ final class Albums {
     }
     static void delete(Context context, Uri album) { JSONObject albums = read(context); albums.remove(album.getAuthority()); save(context, albums); }
     static void update(Context context, Uri album, java.util.List<LibraryEntry> changes, boolean add) {
+        JSONObject albums = read(context); update(albums, album, changes, add); save(context, albums);
+    }
+    private static void update(JSONObject albums, Uri album, java.util.List<LibraryEntry> changes, boolean add) {
         try {
-            JSONObject albums = read(context), selected = albums.getJSONObject(album.getAuthority());
+            JSONObject selected = albums.getJSONObject(album.getAuthority());
             java.util.LinkedHashMap<String, LibraryEntry> items = new java.util.LinkedHashMap<>();
-            for (LibraryEntry item : list(context, album)) items.put(item.uri.toString(), item);
+            for (LibraryEntry item : list(albums, album)) items.put(item.uri.toString(), item);
             for (LibraryEntry item : changes) { if (add && ComicFile.isImage(item.name, item.mime)) items.put(item.uri.toString(), item); else if (!add) items.remove(item.uri.toString()); }
             JSONArray values = new JSONArray();
             for (LibraryEntry item : items.values()) values.put(new JSONObject().put("uri", item.uri.toString()).put("name", item.name).put("mime", item.mime == null ? "image/*" : item.mime));
-            selected.put("items", values); save(context, albums);
+            selected.put("items", values);
         } catch (org.json.JSONException e) { throw new IllegalStateException(e); }
     }
     static void relocate(Context context, Uri from, Uri to, String title) {
-        for (LibraryEntry album : list(context, null)) {
-            ArrayList<LibraryEntry> items = list(context, album.uri);
+        JSONObject albums = read(context); boolean changed = false;
+        for (LibraryEntry album : list(albums, null)) {
+            ArrayList<LibraryEntry> items = list(albums, album.uri);
             for (LibraryEntry item : items) if (item.uri.equals(from)) {
-                update(context, album.uri, java.util.Collections.singletonList(item), false);
-                update(context, album.uri, java.util.Collections.singletonList(new LibraryEntry(to, title, item.mime, item.kind, false, 0, 0)), true);
+                update(albums, album.uri, java.util.Collections.singletonList(item), false);
+                update(albums, album.uri, java.util.Collections.singletonList(new LibraryEntry(to, title, item.mime, item.kind, false, 0, 0)), true);
+                changed = true;
             }
         }
+        if (changed) save(context, albums);
     }
 }

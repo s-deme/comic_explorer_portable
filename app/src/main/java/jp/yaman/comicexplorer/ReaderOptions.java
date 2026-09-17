@@ -23,14 +23,14 @@ public final class ReaderOptions {
         });
         rows.check(I18n.t(R.string.ui_show_filename), null, "grid_name", true, changed);
         rows.check(I18n.t(R.string.ui_square), null, "grid_square", false, changed);
-        rows.slider(I18n.t(R.string.ui_columns), "grid_columns", 3, 1, 10, "", changed);
-        rows.action(I18n.t(R.string.ui_background), String.format("#%06X", AppState.number(activity, "grid_color", Ui.DARK_BACKGROUND) & 0xFFFFFF), () -> color(activity, "grid_color", changed));
+        rows.slider(I18n.t(R.string.ui_columns), "grid_columns", 4, 1, 10, "", changed);
+        rows.action(I18n.t(R.string.ui_background), String.format("#%06X", AppState.number(activity, "grid_color", 0xff303030) & 0xFFFFFF), () -> color(activity, "grid_color", changed));
         rows.show(I18n.t(R.string.ui_list_type));
     }
     public static void color(Activity activity, String key, Runnable changed) {
         android.widget.LinearLayout layout = new android.widget.LinearLayout(activity); layout.setOrientation(android.widget.LinearLayout.VERTICAL); layout.setPadding(Ui.dp(activity, 16), 0, Ui.dp(activity, 16), 0);
         EditText input = new EditText(activity); input.setSingleLine(true); input.setHint("#RRGGBB");
-        input.setText(String.format("#%06X", AppState.number(activity, key, Ui.DARK_BACKGROUND) & 0xFFFFFF));
+        input.setText(String.format("#%06X", AppState.number(activity, key, key.equals("grid_color") ? 0xff303030 : Ui.DARK_BACKGROUND) & 0xFFFFFF));
         input.setContentDescription(I18n.t(R.string.ui_background_color));
         int[] colors = {0xFF000000, 0xFF212121, 0xFF555555, 0xFFFFFFFF, 0xFFEF5350, 0xFFFFA726, 0xFFFFEE58, 0xFF689F38, 0xFF26A69A, 0xFF42A5F5, 0xFF7E57C2, 0xFFEC407A};
         for (int row = 0; row < 3; row++) {
@@ -62,27 +62,48 @@ public final class ReaderOptions {
         rows.slider(I18n.t(R.string.ui_opacity), "page_button_opacity", 70, 0, 100, "%", changed);
         rows.slider(I18n.t(R.string.ui_size), "page_button_height", 96, 48, 160, " dp", changed);
         rows.check(I18n.t(R.string.ui_scroll_animation), null, "scroll_smooth", true, changed);
-        rows.slider(I18n.t(R.string.ui_scroll_length_vertical), "scroll_length", 90, 50, 100, "%", changed);
+        rows.slider(I18n.t(R.string.ui_scroll_overlap), "scroll_overlap", 23, 0, 100, " sp", changed);
         rows.show(I18n.t(R.string.ui_page_button_area));
     }
     public static void zoom(Activity activity, Runnable changed) {
         PreferenceRows rows = new PreferenceRows(activity);
-        rows.radio(new String[]{I18n.t(R.string.ui_disabled), I18n.t(R.string.ui_fit_screen_2), I18n.t(R.string.ui_zoom), I18n.t(R.string.ui_zoom_inside_fit_screen_outside)}, new int[]{0, 2, 1, 3}, "double_tap_mode", 3, false, changed);
-        rows.slider(I18n.t(R.string.ui_scale), "double_tap_scale", 225, 100, 600, "%", changed);
+        rows.radio(new String[]{I18n.t(R.string.ui_disabled), I18n.t(R.string.ui_fit_screen_2), I18n.t(R.string.ui_zoom), I18n.t(R.string.ui_zoom_inside_fit_screen_outside)}, new int[]{0, 2, 1, 3}, "double_tap_mode", 0, false, changed);
+        rows.slider(I18n.t(R.string.ui_scale), "double_tap_scale", 180, 100, 600, "%", changed);
         rows.show(I18n.t(R.string.ui_double_tap_zoom));
     }
     public static void filters(Activity activity, Runnable changed) {
         PreferenceRows rows = new PreferenceRows(activity);
-        rows.compactCheck(I18n.t(R.string.ui_grayscale), "filter_gray", AppState.imageFilter(activity) == 1, changed);
-        rows.compactCheck(I18n.t(R.string.ui_auto_contrast), "filter_contrast", AppState.imageFilter(activity) == 2, changed);
-        rows.compactCheck(I18n.t(R.string.ui_upscaling), "filter_upscale", false, changed);
-        rows.radio(new String[]{"Linear", "Bicubic", "Lanczos"}, new int[]{0, 1, 2}, "filter_interpolation", 0, true, changed);
-        rows.compactCheck(I18n.t(R.string.ui_sharpen_filter), "filter_sharp", false, changed);
-        rows.slider(I18n.t(R.string.ui_sharpening_strength), "sharp_strength", 5, 0, 20, "", changed);
-        rows.compactCheck(I18n.t(R.string.ui_invert_color), "filter_invert", false, changed);
-        rows.compactCheck(I18n.t(R.string.ui_blue_light), "filter_blue", AppState.imageFilter(activity) == 4, changed);
-        rows.slider(I18n.t(R.string.ui_blue_light), "blue_strength", 30, 0, 100, "%", changed);
-        rows.show(I18n.t(R.string.ui_filter));
+        Runnable visibility = () -> {
+            for(int i=0;i<rows.content.getChildCount();i++) {
+                android.view.View child=rows.content.getChildAt(i);
+                if(child.getTag() instanceof String) {
+                    String key=(String)child.getTag();
+                    boolean fallback=key.equals("filter_blue") && AppState.imageFilter(activity)==4;
+                    child.setVisibility(AppState.enabled(activity,key,fallback) ? android.view.View.VISIBLE : android.view.View.GONE);
+                }
+            }
+        };
+        Runnable update=() -> {visibility.run();changed.run();};
+        rows.compactCheck(I18n.t(R.string.ui_grayscale), "filter_gray", AppState.imageFilter(activity) == 1, update);
+        rows.compactCheck(I18n.t(R.string.ui_auto_contrast), "filter_contrast", AppState.imageFilter(activity) == 2, update);
+        rows.compactCheck(I18n.t(R.string.ui_upscaling), "filter_upscale", false, update);
+        int first=rows.content.getChildCount();
+        rows.radio(new String[]{"Linear", "Bicubic", "Lanczos"}, new int[]{0, 1, 2}, "filter_interpolation", 2, true, update);
+        tagOptions(rows,first,"filter_upscale");
+        rows.compactCheck(I18n.t(R.string.ui_sharpen_filter), "filter_sharp", false, update);
+        first=rows.content.getChildCount();
+        rows.slider(I18n.t(R.string.ui_sharpening_strength), "sharp_strength", 0, 0, 20, "", update);
+        tagOptions(rows,first,"filter_sharp");
+        rows.compactCheck(I18n.t(R.string.ui_invert_color), "filter_invert", false, update);
+        rows.compactCheck(I18n.t(R.string.ui_blue_light), "filter_blue", AppState.imageFilter(activity) == 4, update);
+        first=rows.content.getChildCount();
+        rows.slider(I18n.t(R.string.ui_blue_light), "blue_strength", 50, 0, 100, "%", update);
+        tagOptions(rows,first,"filter_blue"); visibility.run();
+        AlertDialog dialog=rows.show(I18n.t(R.string.ui_filter));
+        if(dialog.getWindow()!=null)dialog.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+    }
+    private static void tagOptions(PreferenceRows rows,int first,String key) {
+        for(int i=first;i<rows.content.getChildCount();i++)rows.content.getChildAt(i).setTag(key);
     }
     public static void hardware(Activity activity, Runnable changed) {
         PreferenceRows rows = new PreferenceRows(activity);

@@ -12,7 +12,7 @@ import java.util.function.IntConsumer;
 
 /** Recycles only visible page views, so large books do not allocate one bitmap per page. */
 public final class ContinuousReader extends ListView {
-    public interface Decoder { Bitmap decode(int page) throws Exception; }
+    public interface Decoder { android.graphics.drawable.Drawable decode(int page) throws Exception; }
     private final Activity activity;
     private final ExecutorService worker;
     private final Decoder decoder;
@@ -20,22 +20,40 @@ public final class ContinuousReader extends ListView {
     private final ZoomImageView.InteractionListener interaction;
     private int count, generation;
     private boolean stopped;
+    private android.animation.ValueAnimator scrollAnimation;
     public ContinuousReader(Activity activity, ExecutorService worker, Decoder decoder, IntConsumer position, ZoomImageView.InteractionListener interaction) {
         super(activity); this.activity = activity; this.worker = worker; this.decoder = decoder; this.position = position; this.interaction = interaction;
         setBackgroundColor(0xff101114);
         setDivider(new android.graphics.drawable.ColorDrawable(0xff555555));
-        setDividerHeight(Ui.dp(activity, AppState.number(activity, "page_gap", 0)) + (AppState.enabled(activity, "scroll_divider", true) ? 1 : 0));
+        setDividerHeight(Ui.dp(activity, AppState.number(activity, "page_gap", 0)) + (AppState.enabled(activity, "scroll_divider", false) ? 1 : 0));
         setAdapter(adapter);
         setOnScrollListener(new OnScrollListener() {
             @Override public void onScrollStateChanged(AbsListView view, int state) { }
             @Override public void onScroll(AbsListView view, int first, int visible, int total) { if (visible > 0) position.accept(first); }
         });
     }
-    public void reset(int pages, int page) { generation++; count = pages; adapter.notifyDataSetChanged(); setSelection(page); }
-    public void stop() { stopped = true; generation++; }
+    public void reset(int pages, int page) { cancelScroll();generation++; count = pages; adapter.notifyDataSetChanged(); setSelection(page); }
+    public void stop() {
+        cancelScroll();stopped = true; generation++;
+        for(int i=0;i<getChildCount();i++)if(getChildAt(i) instanceof android.widget.ImageView) {
+            android.graphics.drawable.Drawable drawable=((android.widget.ImageView)getChildAt(i)).getDrawable();
+            if(drawable instanceof android.graphics.drawable.Animatable)((android.graphics.drawable.Animatable)drawable).stop();
+        }
+    }
+    private void cancelScroll(){if(scrollAnimation!=null){scrollAnimation.cancel();scrollAnimation=null;}}
+    @Override public boolean onTouchEvent(android.view.MotionEvent event){if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN)cancelScroll();return super.onTouchEvent(event);}
     public void move(boolean forward) {
-        int distance = Math.round(getHeight() * AppState.number(activity, "scroll_length", 90) / 100f) * (forward ? 1 : -1);
-        if (AppState.enabled(activity, "scroll_smooth", true)) smoothScrollBy(distance, 250); else scrollListBy(distance);
+        int overlap=Math.round(AppState.number(activity,"scroll_overlap",23)*getResources().getDisplayMetrics().scaledDensity);
+        int length=Math.max(1,getHeight()-overlap);
+        if(!AppState.prefs(activity).contains("setting.scroll_overlap") && AppState.prefs(activity).contains("setting.scroll_length"))length=Math.round(getHeight()*AppState.number(activity,"scroll_length",90)/100f);
+        int distance=length*(forward ? 1 : -1);
+        int duration=Math.min(2000,(int)((length/(float)Math.max(1,getHeight())+1)*300));
+        cancelScroll();
+        if (AppState.enabled(activity, "scroll_smooth", true)) {
+            scrollAnimation=android.animation.ValueAnimator.ofInt(0,distance);scrollAnimation.setDuration(duration);
+            scrollAnimation.setInterpolator(value -> {float t=value-1;return t*t*t*t*t+1;});
+            int[] previous={0};scrollAnimation.addUpdateListener(value -> {int next=(Integer)value.getAnimatedValue();scrollListBy(next-previous[0]);previous[0]=next;});scrollAnimation.start();
+        } else scrollListBy(distance);
     }
     private final BaseAdapter adapter = new BaseAdapter() {
         @Override public int getCount() { return count; }
@@ -51,14 +69,14 @@ public final class ContinuousReader extends ListView {
             image.setLayoutParams(new AbsListView.LayoutParams(-1, Math.max(1, getHeight())));
             worker.execute(() -> {
                 if (stopped || token != generation || binding.get()) return;
-                Bitmap bitmap = null; String error = null;
+                android.graphics.drawable.Drawable bitmap = null; String error = null;
                 try { bitmap = decoder.decode(index); } catch (Exception | OutOfMemoryError e) { error = e.getMessage(); }
-                Bitmap result = bitmap; String failure = error;
+                android.graphics.drawable.Drawable result = bitmap; String failure = error;
                 activity.runOnUiThread(() -> {
                     if (stopped || token != generation || image.getTag() != binding || activity.isFinishing()) return;
                     if (result == null) { image.setContentDescription((index+1) + I18n.t(R.string.ui_could_not_load_page) + failure); return; }
-                    image.getLayoutParams().height = Math.max(48, Math.round(getWidth() * result.getHeight() / (float)result.getWidth()));
-                    image.setImageBitmap(result); image.requestLayout();
+                    image.getLayoutParams().height = Math.max(48, Math.round(getWidth() * result.getIntrinsicHeight() / (float)result.getIntrinsicWidth()));
+                    image.setImageDrawable(result); image.requestLayout();image.post(image::fitImage);
                 });
             });
             return image;

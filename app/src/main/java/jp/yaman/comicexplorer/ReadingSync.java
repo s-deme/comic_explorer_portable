@@ -71,18 +71,14 @@ public final class ReadingSync {
         for(AppState.SavedItem item:AppState.recents(context)) {
 
             // ponytail: rehash recent books each sync; revision-aware caching if large libraries make this slow.
-            {
-                try(InputStream input=context.getContentResolver().openInputStream(item.uri)) {
-                    if(input==null) continue;
-                    java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256"); byte[] buffer=new byte[65536]; int count;
-                    while((count=input.read(buffer))!=-1) digest.update(buffer,0,count);
-                    StringBuilder id=new StringBuilder(); for(byte value:digest.digest()) id.append(String.format(java.util.Locale.ROOT,"%02x",value & 255));
-                    synchronized(ReadingSync.class) {
-                        if(requestGeneration!=generation) return;
-                        AppState.identifyForSync(context,item,id.toString());
-                    }
-                } catch(java.io.IOException | SecurityException ignored) { }
-            }
+            try(InputStream input=context.getContentResolver().openInputStream(item.uri)) {
+                if(input==null) continue;
+                String id=org.apache.commons.codec.digest.DigestUtils.sha256Hex(input);
+                synchronized(ReadingSync.class) {
+                    if(requestGeneration!=generation) return;
+                    AppState.identifyForSync(context,item,id);
+                }
+            } catch(java.io.IOException | SecurityException ignored) { }
         }
         String device=AppState.syncDevice(context);
         String ownName="progress-v1-"+device+".json", ownId=null, next="";

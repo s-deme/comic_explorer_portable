@@ -34,6 +34,7 @@ public final class ComicFile {
         return extension.toUpperCase(Locale.ROOT);
     }
     static String formatExtension(String name, String mime) {
+        if(name!=null && name.toLowerCase(Locale.ROOT).matches(".*\\.(7z|zip)\\.001"))return "001";
         String extension = extension(name);
         if (isArchive(extension, null) || "pdf".equals(extension)) return extension;
         if ("application/pdf".equals(mime)) return "pdf";
@@ -47,7 +48,7 @@ public final class ComicFile {
     }
 
     static boolean isArchive(String extension, String mime) {
-        return "zip".equals(extension) || "cbz".equals(extension) || "application/zip".equals(mime)
+        return "001".equals(extension) || "zip".equals(extension) || "cbz".equals(extension) || "application/zip".equals(mime)
                 || "rar".equals(extension) || "cbr".equals(extension) || "7z".equals(extension) || "cb7".equals(extension)
                 || "application/vnd.rar".equals(mime) || "application/x-rar-compressed".equals(mime)
                 || "application/x-cbr".equals(mime) || "application/vnd.comicbook-rar".equals(mime) || "application/x-7z-compressed".equals(mime)

@@ -87,12 +87,22 @@ public final class PreferenceRows {
         android.widget.RadioGroup group = new android.widget.RadioGroup(activity);
         boolean inRow = horizontal && activity.getResources().getConfiguration().fontScale <= 1.2f;
         group.setOrientation(inRow ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        LinearLayout labels = new LinearLayout(activity);
+        if(inRow) content.addView(labels);
         int selected = AppState.number(activity, key, fallback);
         for (int i = 0; i < options.length; i++) {
             android.widget.RadioButton button = new android.widget.RadioButton(activity);
             button.setId(android.view.View.generateViewId()); button.setTag(values[i]);
             button.setText(options[i]); button.setTextColor(Ui.DARK_TEXT);
-            if (inRow) { button.setTextSize(13); button.setMinWidth(0); }
+            if (inRow) {
+                TextView label=Ui.text(activity,options[i],14,Ui.DARK_TEXT);label.setGravity(Gravity.CENTER);
+                label.setPadding(0,Ui.dp(activity,8),0,0);labels.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+                button.setText("");button.setContentDescription(options[i]);button.setMinWidth(0);
+                button.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
+                    int icon=button.getButtonDrawable()==null ? Ui.dp(activity,24) : button.getButtonDrawable().getIntrinsicWidth();
+                    int padding=Math.max(0,(r-l-icon)/2); if(button.getPaddingLeft()!=padding)button.setPadding(padding,0,0,0);
+                });
+            }
             button.setMinHeight(Ui.dp(activity, 48));
             button.setPadding(Ui.dp(activity, inRow ? 4 : 12), 0, Ui.dp(activity, inRow ? 0 : 12), 0);
             Ui.styleDarkCheckable(button);

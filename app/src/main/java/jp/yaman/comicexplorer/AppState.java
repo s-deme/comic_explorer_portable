@@ -5,8 +5,6 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -185,6 +183,21 @@ public final class AppState {
                 getPosition(context, uri), totalPages(context, uri)));
         for (SavedItem item : recents(context)) if (!item.uri.equals(uri) && items.size() < RECENT_LIMIT) items.add(item);
         saveRecents(context, items);
+    }
+
+    static void importHistory(Context context,List<SavedItem> imported) {
+        ArrayList<SavedItem> combined=new ArrayList<>(recents(context));
+        Set<String> existing=new HashSet<>();for(SavedItem item:combined)existing.add(item.uri.toString());
+        SharedPreferences pref=prefs(context);SharedPreferences.Editor editor=pref.edit();
+        for(SavedItem item:imported) {
+            if(!existing.add(item.uri.toString()))continue;
+            String id=key(item.uri);
+            if(pref.contains("position."+id))combined.add(new SavedItem(item.uri,item.title,item.kind,item.timestamp,getPosition(context,item.uri),totalPages(context,item.uri)));
+            else {
+                editor.putInt("position."+id,item.position).putInt("total."+id,item.totalPages);combined.add(item);
+            }
+        }
+        editor.apply();Collections.sort(combined,(a,b)->Long.compare(b.timestamp,a.timestamp));saveRecents(context,combined);
     }
 
     public static List<SavedItem> recents(Context context) {
@@ -442,85 +455,85 @@ public final class AppState {
     }
 
     public static int direction(Context context) {
-        return prefs(context).getInt("setting.direction", DIRECTION_LTR);
+        return number(context, "direction", DIRECTION_LTR);
     }
 
     public static void setDirection(Context context, int direction) {
-        prefs(context).edit().putInt("setting.direction", direction).apply();
+        put(context, "direction", direction);
     }
 
     public static int fitMode(Context context) {
-        return prefs(context).getInt("setting.fit", FIT_SCREEN);
+        return number(context, "fit", FIT_SCREEN);
     }
 
     public static void setFitMode(Context context, int mode) {
-        prefs(context).edit().putInt("setting.fit", mode).apply();
+        put(context, "fit", mode);
     }
 
     public static boolean keepScreenOn(Context context) {
-        return prefs(context).getBoolean("setting.keep_screen_on", true);
+        return enabled(context, "keep_screen_on", true);
     }
 
     public static void setKeepScreenOn(Context context, boolean enabled) {
-        prefs(context).edit().putBoolean("setting.keep_screen_on", enabled).apply();
+        put(context, "keep_screen_on", enabled);
     }
 
     public static boolean resumeLastPosition(Context context) {
-        return prefs(context).getBoolean("setting.resume_last_position", true);
+        return enabled(context, "resume_last_position", true);
     }
 
     public static void setResumeLastPosition(Context context, boolean enabled) {
-        prefs(context).edit().putBoolean("setting.resume_last_position", enabled).apply();
+        put(context, "resume_last_position", enabled);
     }
 
     public static boolean startFullscreen(Context context) {
-        return prefs(context).getBoolean("setting.start_fullscreen", true);
+        return enabled(context, "start_fullscreen", true);
     }
 
     public static void setStartFullscreen(Context context, boolean enabled) {
-        prefs(context).edit().putBoolean("setting.start_fullscreen", enabled).apply();
+        put(context, "start_fullscreen", enabled);
     }
 
     public static boolean volumeNavigation(Context context) {
-        return prefs(context).getBoolean("setting.volume_navigation", false);
+        return enabled(context, "volume_navigation", false);
     }
 
     public static void setVolumeNavigation(Context context, boolean enabled) {
-        prefs(context).edit().putBoolean("setting.volume_navigation", enabled).apply();
+        put(context, "volume_navigation", enabled);
     }
-    public static boolean reverseVolumeNavigation(Context context) { return prefs(context).getBoolean("setting.reverse_volume_navigation", false); }
-    public static void setReverseVolumeNavigation(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.reverse_volume_navigation", enabled).apply(); }
+    public static boolean reverseVolumeNavigation(Context context) { return enabled(context, "reverse_volume_navigation", false); }
+    public static void setReverseVolumeNavigation(Context context, boolean enabled) { put(context, "reverse_volume_navigation", enabled); }
 
-    public static boolean gridView(Context context) { return prefs(context).getBoolean("setting.grid_view", false); }
-    public static void setGridView(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.grid_view", enabled).apply(); }
-    public static int gridColumns(Context context) { return Math.max(1, Math.min(10, prefs(context).getInt("setting.grid_columns", 3))); }
-    public static void setGridColumns(Context context, int columns) { prefs(context).edit().putInt("setting.grid_columns", Math.max(1, Math.min(10, columns))).apply(); }
-    public static boolean showLibraryPath(Context context) { return prefs(context).getBoolean("setting.show_library_path", true); }
-    public static void setShowLibraryPath(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.show_library_path", enabled).apply(); }
-    public static boolean leftLibraryScrollbar(Context context) { return prefs(context).getBoolean("setting.left_library_scrollbar", false); }
-    public static void setLeftLibraryScrollbar(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.left_library_scrollbar", enabled).apply(); }
-    public static boolean pageButtons(Context context) { return prefs(context).getBoolean("setting.page_buttons", true); }
-    public static void setPageButtons(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.page_buttons", enabled).apply(); }
-    public static int pageButtonOpacity(Context context) { return Math.max(0, Math.min(100, prefs(context).getInt("setting.page_button_opacity", 70))); }
-    public static void setPageButtonOpacity(Context context, int opacity) { prefs(context).edit().putInt("setting.page_button_opacity", Math.max(0, Math.min(100, opacity))).apply(); }
-    public static int pageButtonHeight(Context context) { return Math.max(64, Math.min(160, prefs(context).getInt("setting.page_button_height", 96))); }
-    public static void setPageButtonHeight(Context context, int height) { prefs(context).edit().putInt("setting.page_button_height", Math.max(64, Math.min(160, height))).apply(); }
-    public static int readingFlow(Context context) { return prefs(context).getInt("setting.reading_flow", FLOW_HORIZONTAL); }
-    public static void setReadingFlow(Context context, int mode) { prefs(context).edit().putInt("setting.reading_flow", mode).apply(); }
-    public static int pageLayout(Context context) { return Math.max(PAGE_SINGLE, Math.min(PAGE_AUTO, prefs(context).getInt("setting.page_layout", PAGE_SINGLE))); }
-    public static void setPageLayout(Context context, int mode) { prefs(context).edit().putInt("setting.page_layout", Math.max(PAGE_SINGLE, Math.min(PAGE_AUTO, mode))).apply(); }
-    public static boolean dualPageDivider(Context context) { return prefs(context).getBoolean("setting.dual_page_divider", true); }
-    public static void setDualPageDivider(Context context, boolean enabled) { prefs(context).edit().putBoolean("setting.dual_page_divider", enabled).apply(); }
-    public static int doubleTapScale(Context context) { return Math.max(100, Math.min(600, prefs(context).getInt("setting.double_tap_scale", 225))); }
-    public static void setDoubleTapScale(Context context, int percent) { prefs(context).edit().putInt("setting.double_tap_scale", Math.max(100, Math.min(600, percent))).apply(); }
-    public static int doubleTapMode(Context context) { return prefs(context).getInt("setting.double_tap_mode", DOUBLE_TAP_TOGGLE); }
-    public static void setDoubleTapMode(Context context, int mode) { prefs(context).edit().putInt("setting.double_tap_mode", mode).apply(); }
-    public static int imageFilter(Context context) { return prefs(context).getInt("setting.image_filter", FILTER_NONE); }
-    public static void setImageFilter(Context context, int filter) { prefs(context).edit().putInt("setting.image_filter", filter).apply(); }
-    public static int cropPercent(Context context) { return Math.max(0, Math.min(10, prefs(context).getInt("setting.crop_percent", 0))); }
-    public static void setCropPercent(Context context, int percent) { prefs(context).edit().putInt("setting.crop_percent", Math.max(0, Math.min(10, percent))).apply(); }
-    public static int archiveEncoding(Context context) { return prefs(context).getInt("setting.archive_encoding", 0); }
-    public static void setArchiveEncoding(Context context, int encoding) { prefs(context).edit().putInt("setting.archive_encoding", encoding).apply(); }
+    public static boolean gridView(Context context) { return enabled(context, "grid_view", false); }
+    public static void setGridView(Context context, boolean enabled) { put(context, "grid_view", enabled); }
+    public static int gridColumns(Context context) { return Math.max(1, Math.min(10, number(context, "grid_columns", 4))); }
+    public static void setGridColumns(Context context, int columns) { put(context, "grid_columns", Math.max(1, Math.min(10, columns))); }
+    public static boolean showLibraryPath(Context context) { return enabled(context, "show_library_path", true); }
+    public static void setShowLibraryPath(Context context, boolean enabled) { put(context, "show_library_path", enabled); }
+    public static boolean leftLibraryScrollbar(Context context) { return enabled(context, "left_library_scrollbar", false); }
+    public static void setLeftLibraryScrollbar(Context context, boolean enabled) { put(context, "left_library_scrollbar", enabled); }
+    public static boolean pageButtons(Context context) { return enabled(context, "page_buttons", true); }
+    public static void setPageButtons(Context context, boolean enabled) { put(context, "page_buttons", enabled); }
+    public static int pageButtonOpacity(Context context) { return Math.max(0, Math.min(100, number(context, "page_button_opacity", 70))); }
+    public static void setPageButtonOpacity(Context context, int opacity) { put(context, "page_button_opacity", Math.max(0, Math.min(100, opacity))); }
+    public static int pageButtonHeight(Context context) { return Math.max(64, Math.min(160, number(context, "page_button_height", 96))); }
+    public static void setPageButtonHeight(Context context, int height) { put(context, "page_button_height", Math.max(64, Math.min(160, height))); }
+    public static int readingFlow(Context context) { return number(context, "reading_flow", FLOW_HORIZONTAL); }
+    public static void setReadingFlow(Context context, int mode) { put(context, "reading_flow", mode); }
+    public static int pageLayout(Context context) { return Math.max(PAGE_SINGLE, Math.min(PAGE_AUTO, number(context, "page_layout", PAGE_SINGLE))); }
+    public static void setPageLayout(Context context, int mode) { put(context, "page_layout", Math.max(PAGE_SINGLE, Math.min(PAGE_AUTO, mode))); }
+    public static boolean dualPageDivider(Context context) { return enabled(context, "dual_page_divider", true); }
+    public static void setDualPageDivider(Context context, boolean enabled) { put(context, "dual_page_divider", enabled); }
+    public static int doubleTapScale(Context context) { return Math.max(100, Math.min(600, number(context, "double_tap_scale", 180))); }
+    public static void setDoubleTapScale(Context context, int percent) { put(context, "double_tap_scale", Math.max(100, Math.min(600, percent))); }
+    public static int doubleTapMode(Context context) { return number(context, "double_tap_mode", DOUBLE_TAP_OFF); }
+    public static void setDoubleTapMode(Context context, int mode) { put(context, "double_tap_mode", mode); }
+    public static int imageFilter(Context context) { return number(context, "image_filter", FILTER_NONE); }
+    public static void setImageFilter(Context context, int filter) { put(context, "image_filter", filter); }
+    public static int cropPercent(Context context) { return Math.max(0, Math.min(10, number(context, "crop_percent", 0))); }
+    public static void setCropPercent(Context context, int percent) { put(context, "crop_percent", Math.max(0, Math.min(10, percent))); }
+    public static int archiveEncoding(Context context) { return number(context, "archive_encoding", 0); }
+    public static void setArchiveEncoding(Context context, int encoding) { put(context, "archive_encoding", encoding); }
 
     public static boolean hasSeenReaderHint(Context context) {
         return prefs(context).getBoolean("hint.reader_gestures", false);
@@ -531,11 +544,11 @@ public final class AppState {
     }
 
     public static int brightness(Context context) {
-        return prefs(context).getInt("setting.brightness", -1);
+        return number(context, "brightness", -1);
     }
 
     public static void setBrightness(Context context, int value) {
-        prefs(context).edit().putInt("setting.brightness", value).apply();
+        put(context, "brightness", value);
     }
 
     public static File coverFile(Context context, Uri uri) {
@@ -581,10 +594,7 @@ public final class AppState {
 
     static String key(Uri uri) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(uri.toString().getBytes(StandardCharsets.UTF_8));
-            StringBuilder value = new StringBuilder();
-            for (byte item : digest) value.append(String.format("%02x", item));
-            return value.toString();
+            return org.apache.commons.codec.digest.DigestUtils.sha256Hex(uri.toString());
         } catch (Exception ignored) {
             return Integer.toHexString(uri.toString().hashCode());
         }

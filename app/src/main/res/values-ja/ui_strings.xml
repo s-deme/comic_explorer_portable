@@ -305,7 +305,7 @@
     <string name="ui_question_mark" formatted="false">"しますか？"</string>
     <string name="ui_full_screen" formatted="false">"フルスクリーン"</string>
     <string name="ui_cannot_create_cover_directory" formatted="false">"表紙の保存先を作成できません。"</string>
-    <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">"左右をタップ／スワイプでページ移動、中央タップでメニューを表示します"</string>
+    <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">画面タップでメニューを表示。スワイプまたはページボタンでページを移動します。</string>
     <string name="ui_no_results" formatted="false">"見つかりません"</string>
     <string name="ui_double_tap" formatted="false">"ダブルタップ"</string>
     <string name="ui_icon" formatted="false">"アイコン"</string>
@@ -340,7 +340,7 @@
     <string name="ui_cannot_create_destination" formatted="false">"保存先を作成できません。"</string>
     <string name="ui_share_name_smb" formatted="false">"共有名（SMB）"</string>
     <string name="ui_ok" formatted="false">"確認"</string>
-    <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">"作品ページ。左右へスワイプまたは左右をタップしてページを移動。中央タップでメニューを表示。"</string>
+    <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">画面タップでメニューを表示。スワイプまたはページボタンでページを移動します。</string>
     <string name="ui_cannot_rename" formatted="false">"名前を変更できません"</string>
     <string name="ui_move" formatted="false">"移動"</string>
     <string name="ui_select_a_pdf_cbz_zip_or_image" formatted="false">"PDF、ZIP/CBZ、RAR/CBR、7z、画像を選択してください"</string>

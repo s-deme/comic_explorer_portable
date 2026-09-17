@@ -24,6 +24,8 @@ public final class ComicFileTest {
         assert ComicFile.kindFor("download", "application/vnd.rar").equals("RAR");
         assert ComicFile.kindFor("download", "application/x-7z-compressed").equals("7Z");
         assert !ComicFile.isSupported("book.exe", null);
-        System.out.println("ComicFile: 24 checks passed.");
+        assert ComicFile.isSupported("book.7z.001", null);
+        assert ComicFile.isSupported("book.zip.001", null);
+        System.out.println("ComicFile: 26 checks passed.");
     }
 }

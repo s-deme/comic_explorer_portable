@@ -31,4 +31,11 @@
     <string name="ui_album_empty">Добавьте изображения из галереи или файлов.</string>
     <string name="ui_add_images">Добавить изображения</string>
     <string name="ui_page_strip">Лента страниц</string>
+    <string name="ui_reference_import">Импорт из ComicScreen</string>
+    <string name="ui_reference_import_detail">Выберите копию DB_DATA.db или basedata.xml. Исходные файлы и аккаунты не изменяются.</string>
+    <string name="ui_reference_import_summary">Настройки: %1$d; история: %2$d; закладки/избранное: %3$d; пропущено: %4$d.\nПоддерживаемые настройки будут заменены. Данные чтения сохраняются. Отображаются 100 последних записей истории. Может потребоваться повторный доступ к книгам. Альбомы и аккаунты не импортируются.</string>
+    <string name="ui_reference_import_failed">Файл не поддерживается, повреждён или превышает лимит импорта. Данные не импортированы.</string>
+    <string name="ui_book_password">Пароль книги</string>
+    <string name="ui_archive_volumes">Выбрать тома архива</string>
+    <string name="ui_scroll_overlap">Перекрытие при прокрутке</string>
 </resources>

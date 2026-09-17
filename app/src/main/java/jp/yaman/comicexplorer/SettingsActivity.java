@@ -12,7 +12,23 @@ import android.widget.Toast;
 public final class SettingsActivity extends BaseActivity {
     @Override public void onCreate(Bundle state) { super.onCreate(state); buildUi(); }
     @Override protected void onActivityResult(int request, int result, android.content.Intent data) {
-        super.onActivityResult(request, result, data); ReadingSync.result(this, request, result, data);
+        super.onActivityResult(request, result, data);
+        if(request==84 && result==RESULT_OK && data!=null && data.getData()!=null) {
+            android.net.Uri source=data.getData();
+            new Thread(() -> {
+                try {
+                    ReferenceImport plan=ReferenceImport.read(this,source);
+                    runOnUiThread(() -> {
+                        if(isFinishing() || isDestroyed())return;
+                        String summary=String.format(java.util.Locale.getDefault(),I18n.t(R.string.ui_reference_import_summary),plan.settings.size(),plan.history.size(),plan.entries.size(),plan.skipped);
+                        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_reference_import)).setMessage(summary)
+                            .setNegativeButton(I18n.t(R.string.ui_cancel),null).setPositiveButton(I18n.t(R.string.ui_apply),(dialog,which) -> {
+                                new Thread(() -> {plan.apply(this);runOnUiThread(() -> {if(!isFinishing() && !isDestroyed())recreate();});},"reference-import").start();
+                            }));
+                    });
+                } catch(Exception error) {runOnUiThread(() -> {if(!isFinishing())Toast.makeText(this,I18n.t(R.string.ui_reference_import_failed),Toast.LENGTH_LONG).show();});}
+            },"reference-inspect").start();
+        } else ReadingSync.result(this, request, result, data);
     }
     private void buildUi() {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
@@ -46,7 +62,7 @@ public final class SettingsActivity extends BaseActivity {
         rows.section("IMAGE VIEW");
         rows.check(I18n.t(R.string.ui_full_screen), I18n.t(R.string.ui_hide_status_and_navigation_bars), "start_fullscreen", true, unchanged);
         rows.check(I18n.t(R.string.ui_page_dividing_line_dual_pages), I18n.t(R.string.ui_show_a_dividing_line_between_dual_pages), "dual_page_divider", true, unchanged);
-        rows.check(I18n.t(R.string.ui_page_dividing_line_scroll_pages), I18n.t(R.string.ui_show_a_dividing_line_between_scroll_pages), "scroll_divider", true, unchanged);
+        rows.check(I18n.t(R.string.ui_page_dividing_line_scroll_pages), I18n.t(R.string.ui_show_a_dividing_line_between_scroll_pages), "scroll_divider", false, unchanged);
         rows.check(I18n.t(R.string.ui_punch_hole_display_portrait), I18n.t(R.string.ui_expands_the_image_area_to_punch_holes), "cutout_port", false, unchanged);
         rows.check(I18n.t(R.string.ui_punch_hole_display_landscape), I18n.t(R.string.ui_expands_the_image_area_to_punch_holes), "cutout_land", false, unchanged);
         rows.section("CACHE DATA");
@@ -67,6 +83,8 @@ public final class SettingsActivity extends BaseActivity {
             AppState.clearLibrary(this); AppState.clearReadingData(this); runOnUiThread(this::finish);
         }, "clear-cache").start()));
         rows.section("INFORMATION");
+        rows.action(I18n.t(R.string.ui_reference_import),I18n.t(R.string.ui_reference_import_detail),() -> startActivityForResult(
+                new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).addCategory(android.content.Intent.CATEGORY_OPENABLE).setType("*/*"),84));
         rows.action("About", I18n.t(R.string.ui_about), () -> Ui.show(new AlertDialog.Builder(this).setTitle("Comic Explorer")
                 .setMessage(I18n.t(R.string.ui_comic_explorer_1_1_2_read_comics_and_pdfs_from))
                 .setPositiveButton(I18n.t(R.string.ui_close), null)));

@@ -19,6 +19,7 @@
             android:name=".ViewerActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:exported="false" />
+        <activity android:name=".CropActivity" android:exported="false" android:screenOrientation="behind" />
         <activity
             android:name=".SettingsActivity"
             android:exported="false" />

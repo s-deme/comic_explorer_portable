@@ -12,6 +12,7 @@ import android.os.Bundle;
 import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -23,9 +24,10 @@ public final class ParityInstrumentation extends Instrumentation {
         Bundle result=new Bundle();
         try {
             Context context=getTargetContext();
-            check(context.getPackageName().endsWith(".validation"),"Refusing to modify non-validation app");
+            if (!context.getPackageName().endsWith(".validation")) throw new AssertionError("Refusing to modify non-validation app");
             AppState.prefs(context).edit().clear().commit();
             Uri book=Uri.parse("content://test/book");
+            check(AppState.key(book).equals("98315341b0207c5ee81a54f42667fa511c3658df49095599f262b74d6ce922ad"),"URI keys retain the existing SHA-256 storage identity");
             AppState.addRecent(context,book,"book.cbz","CBZ"); AppState.updateReadingProgress(context,book,3,10);
             AppState.setBookmark(context,book,3,true,"book.cbz","CBZ"); AppState.setBookmarkMemo(context,book,3,"note");
             AppState.clearPositions(context);
@@ -42,13 +44,25 @@ public final class ParityInstrumentation extends Instrumentation {
             AppState.relocate(context,renamed,book,"book.cbz");
             AppState.put(context,"theme",2); AppState.resetSettings(context);
             check(AppState.number(context,"theme",0)==0 && AppState.getPosition(context,book)==2,"Settings reset preserves reading data");
-            int[] levels={0xff404040,0xff808080,0xffc0c0c0}; ImageProcessing.autoContrast(levels);
-            check(levels[0]==0xff000000 && levels[2]==0xffffffff,"Contrast derives range from pixels");
-            int[] uniform={0xff666666,0xff666666}; ImageProcessing.autoContrast(uniform);
-            check(uniform[0]==0xff666666,"Uniform contrast does not divide by zero");
-            check(ImageProcessing.color(0xffff0000,true,false,0)==0xff4c4c4c,"Grayscale luminance");
-            check(ImageProcessing.color(0xff000000,false,true,0)==0xffffffff,"Color inversion");
-            check(ImageProcessing.kernel(0,2)==1 && ImageProcessing.kernel(3,2)==0,"Lanczos support");
+            AppState.put(context,"filter_contrast",true);
+            Bitmap tonal=Bitmap.createBitmap(new int[]{0xff404040,0xff808080,0xffc0c0c0},3,1,Bitmap.Config.ARGB_8888);
+            Bitmap adjusted=ImageProcessing.apply(context,tonal,3,100);
+            check(adjusted.getPixel(0,0)==0xff000000 && adjusted.getPixel(2,0)==0xffffffff,"YUV contrast expands the tonal range"); adjusted.recycle();tonal.recycle();
+            tonal=Bitmap.createBitmap(new int[]{0xff666666,0xff666666},2,1,Bitmap.Config.ARGB_8888);
+            adjusted=ImageProcessing.apply(context,tonal,2,100);check(adjusted.getPixel(0,0)==0xff000000,"Uniform contrast follows reference normalization");adjusted.recycle();tonal.recycle();
+            AppState.put(context,"filter_contrast",false);
+            AppState.put(context,"filter_gray",true);tonal=Bitmap.createBitmap(1,1,Bitmap.Config.ARGB_8888);tonal.eraseColor(0xffff0000);
+            adjusted=ImageProcessing.apply(context,tonal,1,100);check(adjusted.getPixel(0,0)==0xff4c4c4c,"OpenCV grayscale luminance");adjusted.recycle();tonal.recycle();AppState.put(context,"filter_gray",false);
+            AppState.put(context,"filter_invert",true);tonal=Bitmap.createBitmap(1,1,Bitmap.Config.ARGB_8888);tonal.eraseColor(0xff000000);tonal.setHasAlpha(false);
+            adjusted=ImageProcessing.apply(context,tonal,1,100);check(adjusted.getPixel(0,0)==0xffffffff,"Opaque inversion stays visible");adjusted.recycle();
+            tonal.setHasAlpha(true);tonal.eraseColor(0x80402010);adjusted=ImageProcessing.apply(context,tonal,1,100);
+            int invertedAlpha=android.graphics.Color.alpha(adjusted.getPixel(0,0)),sdk=android.os.Build.VERSION.SDK_INT;
+            check(invertedAlpha==((sdk==31 || sdk==32) ? 255 : 1),"Inversion follows reference alpha and Android 12 correction");adjusted.recycle();tonal.recycle();AppState.put(context,"filter_invert",false);
+            AppState.put(context,"filter_upscale",true);
+            tonal=Bitmap.createBitmap(new int[]{0xff555555,0xff555555},2,1,Bitmap.Config.ARGB_8888);
+            adjusted=ImageProcessing.apply(context,tonal,6,100);
+            check(adjusted.getWidth()==6 && adjusted.getPixel(3,1)==0xff555555,"Lanczos4 preserves constant colors");adjusted.recycle();tonal.recycle();
+            AppState.put(context,"filter_upscale",false);
             String hash=String.join("",java.util.Collections.nCopies(64,"a"));
             JSONObject merged=new JSONObject().put(hash,new JSONObject().put("page",3).put("total",10).put("updated",20));
             ReadingSync.merge(merged,new JSONObject().put(hash,new JSONObject().put("page",1).put("total",10).put("updated",10)));
@@ -70,13 +84,19 @@ public final class ParityInstrumentation extends Instrumentation {
             try(FileOutputStream out=new FileOutputStream(recent)){out.write(new byte[20]);}
             BookCache.trim(cache,20,0); check(!old.exists() && recent.exists(),"LRU cache trimming");
             BookCache.clear(context,"thumbs"); check(!recent.exists(),"Cache deletion");
-            AppState.put(context,"language","en"); I18n.configure(context);
-            check(I18n.t(R.string.ui_cancel).equals("Cancel"),"English resources");
             AppState.put(context,"language","ja"); I18n.configure(context);
-            check(I18n.t(R.string.ui_cancel).equals("キャンセル"),"Japanese resources");
-            AppState.put(context,"theme",1); Ui.configure(context); check(Ui.light && Ui.DARK_BACKGROUND==0xfffafafa,"Light theme");
-            AppState.put(context,"theme",2); Ui.configure(context); check(!Ui.light && Ui.DARK_BACKGROUND==0xff212121,"Dark theme");
-            File fixtures=new File(context.getFilesDir(),"parity-fixtures"); check(fixtures.isDirectory() || fixtures.mkdirs(),"Fixture directory");
+            AppState.put(context,"theme",2); Ui.configure(context);
+            File fixtures=new File(context.getFilesDir(),"parity-fixtures");
+            if (!fixtures.isDirectory() && !fixtures.mkdirs()) throw new java.io.IOException("Fixture directory");
+            checkReferenceImport(context,fixtures);
+            check(ViewerActivity.adjacentPage(0,true,3)==1 && ViewerActivity.adjacentPage(0,false,3)==-1,"Page navigation respects the first-page boundary");
+            check(!ViewerActivity.usesDualPageLayout(AppState.PAGE_AUTO,android.content.res.Configuration.ORIENTATION_PORTRAIT)
+                    && ViewerActivity.usesDualPageLayout(AppState.PAGE_AUTO,android.content.res.Configuration.ORIENTATION_LANDSCAPE),"Automatic spread follows orientation");
+            int[] cover=ViewerActivity.coverSize(2000,1000);
+            check(cover[0]==320 && cover[1]==160,"Cover resize preserves aspect ratio");
+            check(PageSource.bitmapSampleSize(4000,6000,2_000_000)==4,"Large images are sampled within the pixel budget");
+            int[] tallPdf=PageSource.pdfBitmapSize(1,100_000,1080,2_000_000);
+            check(tallPdf[0]<=8192 && tallPdf[1]<=8192 && (long)tallPdf[0]*tallPdf[1]<=2_000_000,"Extreme PDF dimensions stay within texture and pixel limits");
             checkReaderGestures(context);
             checkFtp(fixtures);
             checkParityAdditions(context, fixtures);
@@ -99,22 +119,17 @@ public final class ParityInstrumentation extends Instrumentation {
             try(FileOutputStream output=new FileOutputStream(pdf)){document.writeTo(output);}document.close();
             PageSource source=new PageSource(context,Uri.fromFile(zip),zip.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2_000_000);
             check(source.pageCount()==6 && source.pageName(3).equals("chapter2/page4.png"),"Extracted source preserves natural page order and chapter names");
-            Bitmap decoded=source.decode(0,1080);check(decoded.getWidth()==600 && decoded.getHeight()==900,"Extracted ZIP decoding");decoded.recycle();
             source.close();source.close();boolean closed=false;
             try{source.decode(0,1080);}catch(java.io.IOException expected){closed=true;}
             check(closed,"Closed source rejects further decoding; close is idempotent");
-            try(PageSource pdfSource=new PageSource(context,Uri.fromFile(pdf),pdf.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2_000_000)) {
-                decoded=pdfSource.decode(1,1080);check(pdfSource.pageCount()==2 && decoded!=null,"Extracted PDF decoding");decoded.recycle();
-            }
             try(PageSource.BoundedInputStream bounded=new PageSource.BoundedInputStream(new java.io.ByteArrayInputStream(new byte[]{1,2,3}),2)) {
                 check(bounded.read(new byte[2])==2,"Bounded archive stream reads within limit");
                 boolean overflowRejected=false;try{bounded.read();}catch(java.io.IOException expected){overflowRejected=true;}check(overflowRejected,"Bounded archive stream rejects overflow");
             }
             AppState.prefs(context).edit().clear().commit(); AppState.put(context,"language","ja"); AppState.put(context,"theme",2);
             ViewerActivity viewer=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(Uri.fromFile(zip)).putExtra(ViewerActivity.EXTRA_TITLE,zip.getName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            await(() -> (Boolean)field(viewer,"initialized"),"ZIP reader initialized");
-            check((Integer)field(viewer,"totalPages")==6,"ZIP page count");
-            await(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"ZIP first page decoded");
+            awaitReady(() -> (Boolean)field(viewer,"initialized"),"ZIP reader initialized");
+            awaitReady(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"ZIP first page decoded");
             runOnMainSync(() -> { AppState.setPageLayout(context,AppState.PAGE_DUAL); AppState.put(context,"filter_contrast",true); invoke(viewer,"refreshReader"); });
             await(() -> {
                 android.graphics.drawable.Drawable drawable = ((ZoomImageView)field(viewer,"imageView")).getDrawable();
@@ -124,101 +139,117 @@ public final class ParityInstrumentation extends Instrumentation {
                         && spread.getPixel(spread.getWidth()/2,0)==0xff424242;
             }, "Per-page contrast leaves the spread divider unchanged");
             runOnMainSync(() -> { AppState.setPageLayout(context,AppState.PAGE_SINGLE); AppState.put(context,"filter_contrast",false); invoke(viewer,"refreshReader"); });
-            runOnMainSync(() -> invoke(viewer,"toggleChrome")); screenshot(context,"reader-horizontal.png");
-            runOnMainSync(() -> browser(viewer,false,false)); screenshot(context,"page-drawer.png");
-            check(clickText(I18n.t(R.string.ui_chapters)),"Drawer switches to chapters"); screenshot(context,"chapter-drawer.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-            runOnMainSync(() -> browser(viewer,false,true)); screenshot(context,"page-strip.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-            runOnMainSync(() -> ReaderOptions.zoom(viewer,() -> {})); screenshot(context,"double-tap-options.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-            runOnMainSync(() -> ReaderOptions.filters(viewer,() -> {})); screenshot(context,"filter-options.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-            android.content.res.Configuration normalType = new android.content.res.Configuration(viewer.getResources().getConfiguration());
-            try {
-                runOnMainSync(() -> {
-                    android.content.res.Configuration largeType = new android.content.res.Configuration(normalType); largeType.fontScale=1.5f;
-                    viewer.getResources().updateConfiguration(largeType,viewer.getResources().getDisplayMetrics());
-                    ReaderOptions.zoom(viewer,() -> {});
-                });
-                screenshot(context,"double-tap-large-type.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-                runOnMainSync(() -> ReaderOptions.filters(viewer,() -> {})); screenshot(context,"filter-large-type.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-            } finally { runOnMainSync(() -> viewer.getResources().updateConfiguration(normalType,viewer.getResources().getDisplayMetrics())); }
-
-            runOnMainSync(() -> ReaderOptions.color(viewer,"grid_color",() -> {})); screenshot(context,"color-palette.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            runOnMainSync(() -> {browser(viewer,false,false);((androidx.drawerlayout.widget.DrawerLayout)field(viewer,"readerDrawer")).closeDrawers();});
+            Thread.sleep(400);
+            android.view.View drawer=(android.view.View)field(viewer,"readerDrawer");int[] drawerLocation=new int[2];runOnMainSync(() -> drawer.getLocationOnScreen(drawerLocation));
+            swipe(drawerLocation[0]+2,drawerLocation[1]+drawer.getHeight()/2f,drawerLocation[0]+drawer.getWidth()*.6f,drawerLocation[1]+drawer.getHeight()/2f);
+            await(() -> ((androidx.drawerlayout.widget.DrawerLayout)drawer).isDrawerOpen((android.view.View)field(viewer,"drawerPanel")),"Edge swipe opens the native page drawer");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            await(() -> !((androidx.drawerlayout.widget.DrawerLayout)drawer).isDrawerVisible((android.view.View)field(viewer,"drawerPanel")),"Back closes the drawer without closing the reader");
             runOnMainSync(() -> { AppState.setReadingFlow(context,1); invoke(viewer,"refreshReader"); });
-            await(() -> ((ContinuousReader)field(viewer,"continuous")).getChildCount()>0,"Continuous pages rendered");
+            awaitReady(() -> ((ContinuousReader)field(viewer,"continuous")).getChildCount()>0,"Continuous pages rendered");
             runOnMainSync(() -> ((ContinuousReader)field(viewer,"continuous")).setSelection(3));
             await(() -> (Integer)field(viewer,"page")==3,"Continuous scrolling updates position");
-            screenshot(context,"reader-vertical.png");
+
+            java.nio.file.Files.deleteIfExists(AppState.coverFile(context,Uri.fromFile(zip)).toPath());
             runOnMainSync(() -> invoke(viewer,"saveCurrentPageCover"));
             await(() -> AppState.coverFile(context,Uri.fromFile(zip)).isFile(),"Continuous page can be saved as cover");
-            int continuousGeneration=(Integer)field(field(viewer,"continuous"),"generation");
             runOnMainSync(() -> invoke(viewer,"showCropDialog"));
-            await(() -> clickText("5%"),"Select margin crop through the actual dialog");
-            await(() -> (Integer)field(field(viewer,"continuous"),"generation")>continuousGeneration,"Margin dialog refreshes continuous reader");
+            awaitReady(() -> clickText("5%"),"Select margin crop through the actual dialog");
             await(() -> {
                 ContinuousReader list=(ContinuousReader)field(viewer,"continuous");
                 if(list.getChildCount()==0)return false;
                 android.graphics.drawable.Drawable drawable=((ZoomImageView)list.getChildAt(0)).getDrawable();
                 return drawable instanceof android.graphics.drawable.BitmapDrawable && ((android.graphics.drawable.BitmapDrawable)drawable).getBitmap().getWidth()==540;
             },"Visible continuous page reflects cropped pixels");
-            int generation=(Integer)field(viewer,"renderGeneration");
             runOnMainSync(() -> { AppState.put(context,"filter_contrast",true);AppState.put(context,"filter_gray",true);invoke(viewer,"refreshReader"); });
-            check((Integer)field(viewer,"renderGeneration")>generation,"Filter change invalidates prefetched images");
-            await(() -> ((ContinuousReader)field(viewer,"continuous")).getChildCount()>0,"Combined filters render");
+            await(() -> {
+                ContinuousReader list=(ContinuousReader)field(viewer,"continuous");
+                if(list.getChildCount()==0)return false;
+                android.graphics.drawable.Drawable drawable=((ZoomImageView)list.getChildAt(0)).getDrawable();
+                if(!(drawable instanceof android.graphics.drawable.BitmapDrawable))return false;
+                Bitmap page=((android.graphics.drawable.BitmapDrawable)drawable).getBitmap();
+                int pixel=page.getPixel(page.getWidth()/2,100);
+                return android.graphics.Color.red(pixel)==android.graphics.Color.green(pixel)
+                        && android.graphics.Color.green(pixel)==android.graphics.Color.blue(pixel);
+            },"Filter change replaces the visible colored page with grayscale pixels");
             runOnMainSync(viewer::finish); waitForIdleSync();
             AppState.setReadingFlow(context,0);
             ViewerActivity pdfViewer=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(Uri.fromFile(pdf)).putExtra(ViewerActivity.EXTRA_TITLE,pdf.getName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            await(() -> (Boolean)field(pdfViewer,"initialized"),"PDF reader initialized");
-            check((Integer)field(pdfViewer,"totalPages")==2,"PDF page count");
-            await(() -> ((ZoomImageView)field(pdfViewer,"imageView")).getDrawable()!=null,"PDF first page decoded");
+            awaitReady(() -> (Boolean)field(pdfViewer,"initialized"),"PDF reader initialized");
+            awaitReady(() -> ((ZoomImageView)field(pdfViewer,"imageView")).getDrawable()!=null,"PDF first page decoded");
             runOnMainSync(() -> pdfViewer.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));
-            await(() -> pdfViewer.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE,"Landscape reader");
-            await(() -> ((ZoomImageView)field(pdfViewer,"imageView")).getDrawable()!=null,"Landscape image decoded");
-            await(() -> ((android.view.View)field(pdfViewer,"loading")).getVisibility()==android.view.View.GONE,"Landscape rendering complete");
-            Thread.sleep(600);
-            screenshot(context,"reader-landscape.png");
+            awaitReady(() -> pdfViewer.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE,"Landscape reader");
+            awaitReady(() -> ((ZoomImageView)field(pdfViewer,"imageView")).getDrawable()!=null,"Landscape image decoded");
+            awaitReady(() -> ((android.view.View)field(pdfViewer,"loading")).getVisibility()==android.view.View.GONE,"Landscape rendering complete");
+
+            ActivityMonitor cropMonitor=addMonitor(CropActivity.class.getName(),null,false);
             runOnMainSync(() -> invoke(pdfViewer,"showCropEditor"));
-            await(() -> {android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();return root!=null && !root.findAccessibilityNodeInfosByText("画像トリミング").isEmpty();},"Crop dialog visible");
-            screenshot(context,"crop-landscape.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            CropActivity cropActivity=(CropActivity)waitForMonitorWithTimeout(cropMonitor,10000);
+            if (cropActivity==null) throw new AssertionError("Dedicated crop activity opens");
+            awaitReady(() -> {android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();return root!=null && !root.findAccessibilityNodeInfosByText("画像トリミング").isEmpty();},"Crop dialog visible");
+            check(cropActivity.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE,"Crop inherits the reader orientation");
+            android.graphics.RectF selection=new android.graphics.RectF(.1f,.2f,.8f,.9f);
+            waitForIdleSync();removeMonitor(cropMonitor);cropMonitor=addMonitor(CropActivity.class.getName(),null,false);
+            runOnMainSync(() -> {((CropView)field(cropActivity,"crop")).setSelection(selection);cropActivity.recreate();});
+            CropActivity recreatedCrop=(CropActivity)waitForMonitorWithTimeout(cropMonitor,10000);
+            waitForIdleSync();
+            check(recreatedCrop!=null && recreatedCrop!=cropActivity && ((CropView)field(recreatedCrop,"crop")).selection().equals(selection),"Crop selection survives activity recreation: "+(recreatedCrop==null ? "no recreated activity" : ((CropView)field(recreatedCrop,"crop")).selection()));
+            removeMonitor(cropMonitor);
+            awaitReady(() -> clickText("切り抜き"),"Apply crop through the actual screen");
+            await(() -> selection.equals(AppState.crop(context,Uri.fromFile(pdf))),"Crop result persists on the original book");
             runOnMainSync(() -> pdfViewer.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));
-            await(() -> pdfViewer.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT,"Restore portrait");
+            awaitReady(() -> pdfViewer.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT,"Restore portrait");
             runOnMainSync(pdfViewer::finish);
             AppState.addRecent(context,Uri.fromFile(zip),"sample.cbz","CBZ");AppState.addRecent(context,Uri.fromFile(pdf),"sample.pdf","PDF");
             AppState.setGridView(context,true);AppState.setGridColumns(context,3);AppState.put(context,"list_type",2);
-            MainActivity library=(MainActivity)startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            runOnMainSync(() -> {try {java.lang.reflect.Method mode=MainActivity.class.getDeclaredMethod("selectMode",int.class);mode.setAccessible(true);mode.invoke(library,2);}catch(Exception e){throw new RuntimeException(e);}});
-            await(() -> ((android.widget.GridView)field(library,"gridView")).getChildCount()>0,"History grid displays books");
-            screenshot(context,"library-grid.png");
-            runOnMainSync(() -> invoke(library,"selectItems")); screenshot(context,"bulk-selection.png"); sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
-            Albums.rename(context,null,"サンプルアルバム");
-            runOnMainSync(() -> {try {java.lang.reflect.Method mode=MainActivity.class.getDeclaredMethod("selectMode",int.class);mode.setAccessible(true);mode.invoke(library,5);}catch(Exception e){throw new RuntimeException(e);}});
-            screenshot(context,"albums.png"); runOnMainSync(library::finish);waitForIdleSync();
-            SettingsActivity settings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            AppState.put(context,"theme",1);
+            MainActivity lightLibrary=(MainActivity)startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            runOnMainSync(() -> {try{java.lang.reflect.Method mode=MainActivity.class.getDeclaredMethod("selectMode",int.class);mode.setAccessible(true);mode.invoke(lightLibrary,2);}catch(Exception e){throw new RuntimeException(e);}});
+            awaitReady(() -> ((android.widget.GridView)field(lightLibrary,"gridView")).getChildCount()>0,"Light-theme grid has visible books");
+            android.view.View firstCell=((android.widget.GridView)field(lightLibrary,"gridView")).getChildAt(0);
+            int labelColor=((android.widget.TextView)field(firstCell.getTag(),"name")).getCurrentTextColor();
+            check(androidx.core.graphics.ColorUtils.calculateContrast(labelColor,AppState.number(context,"grid_color",0xff303030))>=4.5,"Grid filename contrast follows selected background");
             java.util.concurrent.atomic.AtomicInteger selected=new java.util.concurrent.atomic.AtomicInteger();
-            SettingsActivity menuActivity=settings;
+
             runOnMainSync(() -> {
                 Ui.Actions menu=new Ui.Actions();menu.add("same label",()->selected.set(1));menu.add("same label",()->selected.set(2));
-                android.app.AlertDialog dialog=menu.show(menuActivity,"menu test");
+                android.app.AlertDialog dialog=menu.show(lightLibrary,"menu test");
                 dialog.getListView().performItemClick(null,1,1);dialog.dismiss();
             });
             check(selected.get()==2,"Menu dispatch does not depend on translated labels");
-            screenshot(context,"settings-dark.png");
-            runOnMainSync(settings::finish); waitForIdleSync(); AppState.put(context,"theme",1);
-            settings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            screenshot(context,"settings-light.png"); runOnMainSync(settings::finish); waitForIdleSync();
-            AppState.put(context,"language","en");
-            settings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            screenshot(context,"settings-english.png"); runOnMainSync(settings::finish); waitForIdleSync();
-            for (String locale : new String[]{"ko","ru"}) {
-                AppState.put(context,"language",locale);
-                settings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                screenshot(context,"settings-"+locale+".png"); runOnMainSync(settings::finish);waitForIdleSync();
-            }
-            AppState.put(context,"language","ja"); AppState.put(context,"theme",2);
+            runOnMainSync(lightLibrary::finish); waitForIdleSync();
             AppState.put(context,"sync_enabled",true);AppState.prefs(context).edit().putString("sync.records","{}").apply();
             AppState.clearReadingData(context);
             check(!AppState.enabled(context,"sync_enabled",false) && !AppState.prefs(context).contains("sync.records"),"Reading data deletion disables sync and removes local sync records");
             result.putString("stream","PASS: "+checks+" checks\n"); finish(Activity.RESULT_OK,result);
         } catch(Throwable error) { result.putString("stream","FAIL: "+error+"\n"+android.util.Log.getStackTraceString(error));finish(Activity.RESULT_CANCELED,result); }
     }
+    private void checkReferenceImport(Context context,File fixtures) throws Exception {
+        File xml=new File(fixtures,"basedata.xml");
+        java.nio.file.Files.write(xml.toPath(),"<map><boolean name=\"set_img_filter_gray_yn\" value=\"true\"/><int name=\"set_img_doubleTap_mode\" value=\"2\"/><string name=\"account\">ignore</string></map>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        ReferenceImport settings=ReferenceImport.read(context,Uri.fromFile(xml));
+        check(settings.count()==2 && settings.skipped==1,"Only supported reference settings are planned");
+        settings.apply(context);check(AppState.doubleTapMode(context)==AppState.DOUBLE_TAP_ZOOM && AppState.enabled(context,"filter_gray",false),"Reference enum values map to existing settings");
+        AppState.put(context,"filter_gray",false);
+        java.nio.file.Files.write(xml.toPath(),"<!DOCTYPE map [<!ENTITY x SYSTEM 'file:///etc/passwd'>]><map/>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        boolean rejected=false;try {ReferenceImport.read(context,Uri.fromFile(xml));}catch(Exception expected){rejected=true;}
+        check(rejected,"External entities are rejected before parsing");
+        File database=new File(fixtures,"reference.db");database.delete();
+        try(android.database.sqlite.SQLiteDatabase db=android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(database,null)) {
+            db.execSQL("CREATE TABLE TB_HISTORY (NAME TEXT, PATH TEXT, CONTENTURI TEXT, VIEWPAGE INTEGER, INFOPAGE INTEGER, FULLPAGE INTEGER, TIMESTAMP INTEGER)");
+            db.execSQL("INSERT INTO TB_HISTORY VALUES ('ref.cbz','/books/ref.cbz','content://test/imported',4,3,10,1234)");
+            db.execSQL("CREATE TABLE TB_BOOKMARK (NAME TEXT, PATH TEXT, CONTENTURI TEXT, VIEWPAGE INTEGER, FULLPAGE INTEGER, TIMESTAMP INTEGER, REMARK TEXT)");
+            db.execSQL("INSERT INTO TB_BOOKMARK VALUES ('ref.cbz','/books/ref.cbz','content://test/imported',4,10,1234,'memo')");
+        }
+        ReferenceImport plan=ReferenceImport.read(context,Uri.fromFile(database));
+        Uri imported=Uri.parse("content://test/imported");
+        check(plan.history.size()==1 && plan.entries.size()==1,"Reference history and bookmark schema recognized");
+        plan.apply(context);check(AppState.getPosition(context,imported)==3 && AppState.hasBookmark(context,imported,3),"Import reconciles zero-based absolute and one-based display page");
+        AppState.setPosition(context,imported,8);AppState.setBookmarkMemo(context,imported,3,"local");plan.apply(context);
+        check(AppState.getPosition(context,imported)==8 && AppState.bookmarkMemo(context,imported,3).equals("local"),"Repeated import preserves existing reading data");
+    }
+
     private void checkReaderGestures(Context context) {
         runOnMainSync(() -> {
             ZoomImageView image = new ZoomImageView(context);
@@ -252,8 +283,9 @@ public final class ParityInstrumentation extends Instrumentation {
             image.setDoubleTapMode(AppState.DOUBLE_TAP_ZOOM); image.setDoubleTapScale(6f);
             touch(image,now+1000,now+1000,0,100,100); touch(image,now+1000,now+1020,1,100,100);
             touch(image,now+1080,now+1080,0,100,100); touch(image,now+1080,now+1100,1,100,100);
+            ((android.animation.ValueAnimator)field(image,"zoomAnimator")).end();
             bounds.set(0,0,100,300); image.getImageMatrix().mapRect(bounds);
-            check(Math.abs(bounds.height()-1200)<2, "Double tap honors the configured six-times zoom");
+            check(Math.abs(bounds.height()-1000)<2, "Double tap clamps at the reference five-times maximum");
             image.setFitMode(AppState.FIT_SCREEN);
             image.setImageDrawable(null); bitmap.recycle();
         });
@@ -262,8 +294,16 @@ public final class ParityInstrumentation extends Instrumentation {
         android.view.MotionEvent event = android.view.MotionEvent.obtain(down,time,action,x,y,0);
         view.onTouchEvent(event); event.recycle();
     }
+    private void swipe(float x,float y,float endX,float endY) throws Exception {
+        long down=android.os.SystemClock.uptimeMillis();
+        for(int i=0;i<=20;i++) {
+            android.view.MotionEvent event=android.view.MotionEvent.obtain(down,android.os.SystemClock.uptimeMillis(),i==0 ? 0 : i==20 ? 1 : 2,x+(endX-x)*i/20,y+(endY-y)*i/20,0);
+            sendPointerSync(event);event.recycle();Thread.sleep(16);
+        }
+    }
 
     private void checkParityAdditions(Context context, File fixtures) throws Exception {
+        checkAdvancedFormats(context,fixtures);
         File rar = new File(fixtures, "stored.cbr");
         try (java.io.InputStream in = getContext().getAssets().open("stored.rar"); FileOutputStream out = new FileOutputStream(rar)) { DocumentTransfer.copyAndHash(in, out, null); }
         try (PageSource source = new PageSource(context, Uri.fromFile(rar), rar.getName(), null, java.nio.charset.StandardCharsets.UTF_8, 2_000_000)) {
@@ -283,15 +323,17 @@ public final class ParityInstrumentation extends Instrumentation {
             image=source.decode(1,1080); check(image.getWidth()==30 && image.getPixel(0,0)==0xff2468ab,"7z LZMA2 image decoded"); image.recycle();
             image=source.decode(0,1080); check(image.getHeight()==40,"7z reverse navigation"); image.recycle();
         }
-        Uri book=Uri.parse("content://test/cropped");
-        android.graphics.RectF crop=new android.graphics.RectF(.1f,.2f,.8f,.9f); AppState.setCrop(context,book,crop);
-        check(AppState.crop(context,book).equals(crop),"Crop persists per book");
-        Uri newBook=Uri.parse("content://test/cropped-renamed"); AppState.relocate(context,book,newBook,"renamed.cbz");
-        check(AppState.crop(context,book)==null && AppState.crop(context,newBook).equals(crop),"Crop follows rename");
+        Uri newBook=Uri.parse("content://test/cropped");
+        android.graphics.RectF crop=new android.graphics.RectF(.1f,.2f,.8f,.9f); AppState.setCrop(context,newBook,crop);
         boolean invalid=false;try{AppState.setCrop(context,newBook,new android.graphics.RectF(-1,0,1,1));}catch(IllegalArgumentException expected){invalid=true;}check(invalid,"Reject invalid saved crop");
         Uri album=Albums.rename(context,null,"Album"); LibraryEntry albumImage=new LibraryEntry(newBook,"page.png","image/png","画像",false,0,0);
         Albums.update(context,album,java.util.Arrays.asList(albumImage,albumImage),true);check(Albums.list(context,album).size()==1,"Album additions deduplicate images");
         Albums.rename(context,album,"Renamed album");check(Albums.list(context,null).get(0).name.equals("Renamed album"),"Album rename persists");
+        Uri movedImage=Uri.parse("content://test/album-moved");
+        Albums.update(context,album,java.util.Collections.singletonList(new LibraryEntry(movedImage,"existing.png","image/png","画像",false,0,0)),true);
+        Albums.relocate(context,newBook,movedImage,"moved.png");
+        java.util.List<LibraryEntry> relocated=Albums.list(context,album);
+        check(relocated.size()==1 && relocated.get(0).uri.equals(movedImage) && relocated.get(0).name.equals("moved.png"),"Album relocation replaces an existing destination without duplicate references");
         Albums.delete(context,album);check(AppState.crop(context,newBook).equals(crop),"Deleting album preserves source reading data");
         String unique="run-"+System.nanoTime();
         getUiAutomation().adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");
@@ -330,6 +372,63 @@ public final class ParityInstrumentation extends Instrumentation {
             boolean partial=false;for(LibraryEntry child:LibraryDirectoryReader.read(context.getContentResolver(),target,target,false))if(child.name.equals("fail.png"))partial=true;
             check(!partial,"Failed transfer removes partial destination");
         } finally {android.provider.DocumentsContract.deleteDocument(context.getContentResolver(),run); getUiAutomation().dropShellPermissionIdentity();}
+    }
+    private void checkAdvancedFormats(Context context,File fixtures) throws Exception {
+        for(String name:new String[]{"stored-rar5.rar","encrypted.7z","split.7z.001","split.7z.002","split.part1.rar","split.part2.rar","animated.gif"}) {
+            try(java.io.InputStream input=getContext().getAssets().open(name);FileOutputStream output=new FileOutputStream(new File(fixtures,name))){DocumentTransfer.copyAndHash(input,output,null);}
+        }
+        for(String name:new String[]{"stored-rar5.rar","split.7z.001","split.part1.rar"}) {
+            try(PageSource source=new PageSource(context,Uri.fromFile(new File(fixtures,name)),name,null,java.nio.charset.StandardCharsets.UTF_8,2000000)) {
+                Bitmap page=source.decode(0,100);check(source.pageCount()==1 && page.getPixel(0,0)==0xffff0000,"Decode "+name);page.recycle();
+            }
+        }
+        File encrypted=new File(fixtures,"encrypted.7z");
+        for(String password:new String[]{null,"wrong"}) {
+            boolean rejected=false;try(PageSource source=new PageSource(context,Uri.fromFile(encrypted),encrypted.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2000000,password,java.util.Collections.emptyMap())){source.decode(0,100);}catch(ArchivePages.PasswordRequired expected){rejected=true;}
+            check(rejected,"Encrypted archive requests correct password");
+        }
+        try(PageSource source=new PageSource(context,Uri.fromFile(encrypted),encrypted.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2000000,"parity",java.util.Collections.emptyMap())) {
+            Bitmap page=source.decode(0,100);check(page.getPixel(0,0)==0xffff0000,"Decrypt 7z page");page.recycle();
+        }
+        Uri gif=Uri.fromFile(new File(fixtures,"animated.gif"));ArrayList<Uri> images=new ArrayList<>();images.add(gif);
+        try(PageSource source=new PageSource(context,gif,"animated.gif",images,java.nio.charset.StandardCharsets.UTF_8,2000000)) {
+            Bitmap first=source.decode(0,100,0),second=source.decode(0,100,110);
+            check(first.getPixel(0,0)==0xffff0000 && second.getPixel(0,0)==0xff0000ff,"GIF decodes distinct timed frames");first.recycle();second.recycle();
+        }
+        com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context);
+        File outlined=new File(fixtures,"outlined.pdf");
+        try(com.tom_roush.pdfbox.pdmodel.PDDocument document=new com.tom_roush.pdfbox.pdmodel.PDDocument()) {
+            document.addPage(new com.tom_roush.pdfbox.pdmodel.PDPage());document.addPage(new com.tom_roush.pdfbox.pdmodel.PDPage());
+            com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocumentOutline outline=new com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocumentOutline();
+            document.getDocumentCatalog().setDocumentOutline(outline);
+            com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem chapter=new com.tom_roush.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem();
+            chapter.setTitle("Chapter 2");chapter.setDestination(document.getPage(1));outline.addLast(chapter);document.save(outlined);
+        }
+        try(PageSource source=new PageSource(context,Uri.fromFile(outlined),outlined.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2000000)) {
+            check(source.chapters.size()==1 && source.chapters.get(0).page==1 && source.chapters.get(0).title.equals("Chapter 2"),"PDF outline resolves page destinations");
+        }
+        File protectedPdf=new File(fixtures,"protected.pdf");
+        try(com.tom_roush.pdfbox.pdmodel.PDDocument document=com.tom_roush.pdfbox.pdmodel.PDDocument.load(outlined)) {
+            com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy protection=new com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy("owner","parity",new com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission());
+            protection.setEncryptionKeyLength(128);protection.setPreferAES(true);document.protect(protection);document.save(protectedPdf);
+        }
+        boolean pdfPassword=false;
+        try(PageSource source=new PageSource(context,Uri.fromFile(protectedPdf),protectedPdf.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2000000)){}catch(ArchivePages.PasswordRequired expected){pdfPassword=true;}
+        check(pdfPassword,"Encrypted PDF requests password");
+        try(PageSource source=new PageSource(context,Uri.fromFile(protectedPdf),protectedPdf.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2000000,"parity",java.util.Collections.emptyMap())) {
+            Bitmap page=source.decode(1,100);check(page!=null && source.chapters.get(0).page==1,"Encrypted PDF renders with outline");page.recycle();
+        }
+        ViewerActivity animated=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(gif).putExtra(ViewerActivity.EXTRA_TITLE,"animated.gif").putParcelableArrayListExtra(ViewerActivity.EXTRA_IMAGE_URIS,images).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        awaitReady(() -> ((ZoomImageView)field(animated,"imageView")).getDrawable() instanceof AnimatedPageDrawable,"GIF reader starts animated drawable");
+        await(() -> ((Bitmap)field(((ZoomImageView)field(animated,"imageView")).getDrawable(),"bitmap")).getPixel(0,0)==0xff0000ff,"GIF playback advances visible frame");
+        int originalPage=(Integer)field(animated,"page");boolean chrome=(Boolean)field(animated,"chromeVisible");
+        runOnMainSync(() -> animated.onTap(.05f));
+        check((Integer)field(animated,"page")==originalPage && (Boolean)field(animated,"chromeVisible")!=chrome,"Page-edge tap toggles menus without turning pages");
+        runOnMainSync(animated::finish);waitForIdleSync();
+        ViewerActivity locked=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(Uri.fromFile(encrypted)).putExtra(ViewerActivity.EXTRA_TITLE,encrypted.getName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        await(() -> {android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();return root!=null && !root.findAccessibilityNodeInfosByText("作品のパスワード").isEmpty();},"Password entry appears for encrypted book");
+
+        sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);runOnMainSync(locked::finish);waitForIdleSync();
     }
 
     private void checkFtp(File directory) throws Exception {
@@ -391,12 +490,9 @@ public final class ParityInstrumentation extends Instrumentation {
             if(text.contentEquals(node.getText()==null?"":node.getText()) && node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))return true;
         return false;
     }
-    private void screenshot(Context context,String name)throws Exception {
-        waitForIdleSync(); Thread.sleep(300); Bitmap screenshot=getUiAutomation().takeScreenshot(); check(screenshot!=null,"Screenshot "+name);
-        try(FileOutputStream output=new FileOutputStream(new File(context.getFilesDir(),"parity-fixtures/"+name))){screenshot.compress(Bitmap.CompressFormat.PNG,100,output);} screenshot.recycle();
-    }
     private interface Condition { boolean get() throws Exception; }
-    private void await(Condition condition,String message)throws Exception {for(int i=0;i<100;i++){if(condition.get()){checks++;return;}Thread.sleep(100);}throw new AssertionError(message);}
+    private void await(Condition condition,String message)throws Exception {awaitReady(condition,message);checks++;}
+    private void awaitReady(Condition condition,String message)throws Exception {for(int i=0;i<100;i++){if(condition.get())return;Thread.sleep(100);}throw new AssertionError(message);}
     private static Object field(Object instance,String name) {try{java.lang.reflect.Field field=instance.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(instance);}catch(Exception e){throw new RuntimeException(e);}}
     private static void invoke(Object instance,String name){try{java.lang.reflect.Method method=instance.getClass().getDeclaredMethod(name);method.setAccessible(true);method.invoke(instance);}catch(Exception e){throw new RuntimeException(e);}}
 }

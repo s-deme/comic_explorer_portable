@@ -333,7 +333,7 @@
     <string name="ui_change_sort_order" formatted="false">"정렬 순서 변경"</string>
     <string name="ui_question_mark" formatted="false">"?"</string>
     <string name="ui_cannot_create_cover_directory" formatted="false">"표지 폴더를 만들 수 없습니다."</string>
-    <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">"탭하거나 스와이프하여 페이지를 넘깁니다. 가운데를 탭하면 메뉴가 표시됩니다."</string>
+    <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">페이지를 탭하면 메뉴가 표시됩니다. 스와이프하거나 페이지 버튼으로 페이지를 넘깁니다.</string>
     <string name="ui_no_results" formatted="false">"검색 결과 없음"</string>
     <string name="ui_double_tap" formatted="false">"두 번 탭"</string>
     <string name="ui_right_page_button" formatted="false">"오른쪽 페이지 버튼"</string>
@@ -354,7 +354,7 @@
     <string name="ui_page_not_found_in_archive" formatted="false">"압축 파일에서 페이지를 찾을 수 없습니다."</string>
     <string name="ui_cannot_create_destination" formatted="false">"저장 위치를 만들 수 없습니다."</string>
     <string name="ui_share_name_smb" formatted="false">"공유 이름(SMB)"</string>
-    <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">"책 페이지. 가장자리를 탭하거나 스와이프하여 넘깁니다. 가운데를 탭하면 메뉴가 표시됩니다."</string>
+    <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">페이지를 탭하면 메뉴가 표시됩니다. 스와이프하거나 페이지 버튼으로 페이지를 넘깁니다.</string>
     <string name="ui_cannot_rename" formatted="false">"이름을 변경할 수 없습니다"</string>
     <string name="ui_select_a_pdf_cbz_zip_or_image" formatted="false">"PDF, ZIP/CBZ, RAR/CBR, 7z 또는 이미지 선택"</string>
     <string name="ui_reading_position_cleared" formatted="false">"읽기 위치 삭제됨"</string>

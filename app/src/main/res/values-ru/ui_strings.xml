@@ -333,7 +333,7 @@
     <string name="ui_change_sort_order" formatted="false">"Изменить порядок сортировки"</string>
     <string name="ui_question_mark" formatted="false">"?"</string>
     <string name="ui_cannot_create_cover_directory" formatted="false">"Не удалось создать папку обложек."</string>
-    <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">"Нажимайте по краям или смахивайте для перелистывания. Нажмите в центре для меню."</string>
+    <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">Нажмите на страницу для меню. Листайте смахиванием или кнопками страниц.</string>
     <string name="ui_no_results" formatted="false">"Ничего не найдено"</string>
     <string name="ui_double_tap" formatted="false">"Двойное нажатие"</string>
     <string name="ui_right_page_button" formatted="false">"Правая кнопка перелистывания"</string>
@@ -354,7 +354,7 @@
     <string name="ui_page_not_found_in_archive" formatted="false">"Страница не найдена в архиве."</string>
     <string name="ui_cannot_create_destination" formatted="false">"Не удалось создать место назначения."</string>
     <string name="ui_share_name_smb" formatted="false">"Имя общего ресурса (SMB)"</string>
-    <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">"Страница книги. Смахивайте или нажимайте по краям для перелистывания. Нажмите в центре для меню."</string>
+    <string name="ui_book_page_swipe_or_tap_the_sides_to_turn_pages" formatted="false">Нажмите на страницу для меню. Листайте смахиванием или кнопками страниц.</string>
     <string name="ui_cannot_rename" formatted="false">"Не удалось переименовать"</string>
     <string name="ui_select_a_pdf_cbz_zip_or_image" formatted="false">"Выберите PDF, ZIP/CBZ, RAR/CBR, 7z или изображение"</string>
     <string name="ui_reading_position_cleared" formatted="false">"Позиция чтения сброшена"</string>
