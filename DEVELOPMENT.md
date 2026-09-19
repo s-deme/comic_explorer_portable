@@ -1,10 +1,63 @@
 # 開発・検証・リリース手順
 
+## 変更に応じた最小限の検証
+
+通常は変更に関係する分野だけを実行する。アイコン・文言の変更はビルドと変更画面の確認、配色変更は `themes` と代表的な明暗画面、閲覧操作・設定反映は `reader`、保存・同期・転送は `data`、FTPは `network`、追加形式のデコードは `formats` を選ぶ。複数分野に影響する共通処理や公開前は全件とLintを実行する。成功後の再実行は、新たな変更・失敗・未解決の懸念がある場合に限る。名称整理だけなら撮影不要。
+
+テストコードを変えたときは `:app:assembleDebugAndroidTest`、アプリを変えたときは `:app:assembleDebug` も実行し、対応する検証用APKをインストールする（どちらも `-PcomicExplorerValidation=true`）。新しいテスト基盤や依存ライブラリは不要。
+
+```powershell
+# テーマだけ。他の分野は suite の値を置き換える。
+adb shell am instrument -w -e suite themes jp.yaman.comicexplorer.validation.test/jp.yaman.comicexplorer.ParityInstrumentation
+# 全件。suite を省略しても全件実行。
+adb shell am instrument -w -e suite all jp.yaman.comicexplorer.validation.test/jp.yaman.comicexplorer.ParityInstrumentation
+```
+
+| suite | 範囲 |
+|---|---|
+| `themes` | 旧ライト／ダークID、9テーマの配色、不明ID、選択・保存・再生成・キャンセル |
+| `reader` | 画像補正、ページ境界、ZIP／PDF、ジェスチャー、閲覧設定、切り抜き、関連する表示不具合 |
+| `data` | 読書情報、同期競合、設定インポート、キャッシュ、アルバム、転送と失敗時の原本保持 |
+| `network` | パス境界、ローカルの模擬FTPサーバーとの通信 |
+| `formats` | RAR・7z・分割／暗号化アーカイブ・アニメーション等の追加形式 |
+
+各分野は検証専用アプリの設定を初期化して独立実行する。通常版アプリでは実行を拒否し、未知のsuiteも初期化前に拒否する。終了コードだけでなく出力の `PASS [分野]` / `FAIL [分野]` を確認する。形式判定・自然順ソートを変更した場合は、既存のCLIテスト `tests/ComicFileTest.java` も実行する。
+
+テーマのスタイル定数を丸写しした10件の照合は旧IDの互換性2件へ縮小した。配色・データ保全・入力境界・既知の不具合の検証は維持する。
+
+分割後の単独実行を確認済み: themes 14件、data 37件、network 5件、formats 18件、reader 41件（合計115件）。不正なsuiteの拒否も確認した。reader単独実行ではUI自動操作の接続を画面生成前に明示し、先行する分野への依存を除いた。記録は `build/minimal-test-build.txt` と `build/minimal-test-*.txt`。今回変更したのはテストと手順書だけのため、画面撮影・Lint・通過した分野の繰り返し実行は行わない。
+
+## 2026-09-20 UI・閲覧設定のリファクタリング
+
+色の明暗別エイリアスを背景・面・文字・強調色の役割名へ統合。異なる背景を使うボタンスタイルは維持し、同一だったPRIMARY系のみ統合した。テーマは保存ID・表示名・スタイルを一組で定義し、既存ID 0〜9を維持する。アイコン生成と状態更新をUiへ集約し、起動／復帰時の閲覧設定反映を共通化した。起動時の全画面設定は復帰時には適用しない。ページ構成・スクロール・フィット・明るさ・画面回転・方向の6ダイアログをReaderOptionsへ移した。
+
+回帰テスト123チェック成功（テーマID互換性、9テーマの配色、設定画面から戻った際の反映を含む）。その後の不要な明暗引数／旧メソッド名整理を含む最終ビルド・Lint成功、0 errors / 40 warnings。最終APKのライト／青の閲覧画面と青の本棚を目視確認。記録: `build/refactor-test.txt`、`build/refactor-final-build.txt`、`build/refactor-*.png`。通常版・配布用APKは未更新。
+
 Comic Explorer for Android の開発者向け情報です。アプリの使い方は [README.md](README.md) を参照してください。
 
 改善項目と実装状況は [PRODUCT_IMPROVEMENTS.md](PRODUCT_IMPROVEMENTS.md) を参照してください。
 
 ComicScreen対応の最新範囲と未検証箇所は [COMICSCREEN_IMPLEMENTATION.md](COMICSCREEN_IMPLEMENTATION.md) に記載しています。
+
+## 2026-09-20 9種類のテーマ
+
+設定に色見本付きのテーマ選択を追加。ライト・ダーク・赤・青・緑・紫・ピンク・オレンジ・グレーと「システムに合わせる」を選べます。通常は3列で、文字拡大や狭い画面では列数を減らします。選択は即時保存・反映し、既存のシステム／ライト／ダークの保存値は維持します。
+
+配色の定義元をAndroidのテーマリソースへ集約し、アプリ側の共通色も同じリソースから取得。標準ウィジェット、設定、ライブラリ、読書メニュー、ページ一覧へ反映します。色付きテーマは暗い無彩色の背景を基本とし、原稿画像の処理・色は変更しません。グリッド背景を個別指定している場合はその設定を保持します。
+
+検証: テーマ選択・保存・再生成・キャンセルと9テーマのコントラスト／ネイティブアクセント一致を含むInstrumentation **110チェック成功**。最終APKビルド成功、Lint **0 errors / 40 warnings**、XMLの実配色から生成した**63組のコントラスト検査成功**。ライト／赤の選択画面、文字1.5倍の2列表示、青の設定・ライブラリ（空状態）・読書画面を目視確認しました。TalkBack実操作・全言語の画面確認・Android 10実機は未検証です。記録は `build/themes-build.txt`、`build/themes-test.txt`、`build/theme-contrast.txt`、`build/theme-*.png`。配布用APKは未更新です。
+
+## 2026-09-20 漫画向けの初期送り方向
+
+未設定時の送り方向を左送り（RTL）へ変更。スワイプ・ページボタン・見開きの並びは既存の共通設定を使用し、明示的に保存された方向は保持します。初期値と右送り設定の保持を検証に追加し、ビルド成功・Instrumentation **98チェック成功**。記録は `build/manga-default-build.txt` と `build/manga-default-test.txt`。配布APKは未更新です。
+
+## 2026-09-20 読書メニューの整理
+
+右上の「⋮」から5分類を直接開く構成へ変更し、3ページ式ツールバーと切替ジェスチャーを廃止しました。主要操作は1段に固定。反転は画像フィルターへ、メモ編集はしおりへ、共通の余白割合と本別トリミングは適用範囲を明記して集約しています。送り方向とスクロール方式は独立して変更でき、読書位置リセットには確認を挟みます。既存の設定キー・保存データ・キー割当は維持しています。
+
+明るいテーマの読書ツールバーにも適切なアイコン色を適用し、システムバー余白はDrawerLayout内のFrameLayoutへ適用するよう修正しました。回帰テストには、メニュー経由の送り方向変更が縦スクロールを維持することと、リセットのキャンセルで表示・保存位置が変わらないことを追加しています。
+
+検証: 最終APK・テストAPKのビルド成功、Instrumentation **96チェック成功**、Lint **0 errors / 40 warnings**。エミュレーターで明るいテーマの縦・横向き、文字1.5倍のメニュー、暗いテーマの横向きメニューを目視確認。記録は `build/reader-menu-build.txt`、`build/reader-menu-test.txt`、`build/reader-menu*.png`。通常版アプリと `dist/comic-explorer.apk` は更新していません。TalkBack実操作は未検証です。文字1.5倍では既存の下部ページ番号欄が折り返して欠けるため、メニュー外の表示課題として残っています。
 
 ## 2026-09-18 リファクタリング5回
 

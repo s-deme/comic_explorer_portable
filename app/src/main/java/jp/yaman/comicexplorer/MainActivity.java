@@ -96,7 +96,7 @@ public final class MainActivity extends BaseActivity {
     private ListView listView;
     private GridView gridView;
     private LibraryAdapter adapter;
-    private Button quickView;
+    private ImageButton quickView;
     private ArrayList<LibraryEntry> transferring;
     private boolean movingFiles;
     private int transferConflict;
@@ -155,7 +155,7 @@ public final class MainActivity extends BaseActivity {
         compactHeight = getResources().getDisplayMetrics().heightPixels / getResources().getDisplayMetrics().density < 600f;
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Ui.DARK_BACKGROUND);
+        root.setBackgroundColor(Ui.BACKGROUND);
 
         LinearLayout toolbar = new LinearLayout(this);
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
@@ -164,7 +164,7 @@ public final class MainActivity extends BaseActivity {
         upButton = toolbarButton(R.drawable.ic_arrow_back, I18n.t(R.string.ui_parent_folder));
         upButton.setOnClickListener(view -> goUp());
         toolbar.addView(upButton, new LinearLayout.LayoutParams(dp(48), dp(56)));
-        screenTitle = text("Comic Explorer", 20, Ui.TOOLBAR_TEXT);
+        screenTitle = text("Comic Explorer", 20, Ui.TEXT_PRIMARY);
         Ui.title(screenTitle);
         screenTitle.setGravity(Gravity.CENTER_VERTICAL);
         screenTitle.setSingleLine(true);
@@ -181,7 +181,7 @@ public final class MainActivity extends BaseActivity {
 
         LinearLayout tabs = new LinearLayout(this);
         tabs.setGravity(Gravity.CENTER_VERTICAL);
-        tabs.setBackgroundColor(Ui.DARK_SURFACE);
+        tabs.setBackgroundColor(Ui.SURFACE);
         libraryDestination = tabButton(I18n.t(R.string.ui_storage), MODE_LIBRARY, I18n.t(R.string.ui_show_storage));
         directoriesDestination = tabButton(I18n.t(R.string.ui_directory), MODE_DIRECTORIES, I18n.t(R.string.ui_show_saved_directories));
         recentsDestination = tabButton(I18n.t(R.string.ui_history), MODE_RECENTS, I18n.t(R.string.ui_show_reading_history));
@@ -208,7 +208,7 @@ public final class MainActivity extends BaseActivity {
         LinearLayout searchRow = new LinearLayout(this);
         searchRow.setGravity(Gravity.CENTER_VERTICAL);
         searchRow.setPadding(dp(8), dp(4), dp(8), dp(4));
-        searchRow.setBackgroundColor(Ui.DARK_SURFACE_RAISED);
+        searchRow.setBackgroundColor(Ui.SURFACE_RAISED);
         searchRow.addView(search, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
         root.addView(searchRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
         searchPanel = searchRow;
@@ -217,13 +217,13 @@ public final class MainActivity extends BaseActivity {
         LinearLayout location = new LinearLayout(this);
         location.setGravity(Gravity.CENTER_VERTICAL);
         location.setPadding(dp(6), 0, dp(6), 0);
-        location.setBackgroundColor(Ui.DARK_BACKGROUND);
-        pathText = text("", 11, Ui.READER_ACCENT);
+        location.setBackgroundColor(Ui.BACKGROUND);
+        pathText = text("", 11, Ui.BRAND);
         Ui.label(pathText);
         pathText.setSingleLine(true);
         pathText.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         location.addView(pathText, new LinearLayout.LayoutParams(0, dp(24), 1f));
-        stateText = text("", 11, Ui.DARK_MUTED);
+        stateText = text("", 11, Ui.TEXT_SECONDARY);
         stateText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         stateText.setSingleLine(true);
         stateText.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -232,9 +232,9 @@ public final class MainActivity extends BaseActivity {
         root.addView(locationRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(24)));
 
         listView = new ListView(this);
-        listView.setDivider(new android.graphics.drawable.ColorDrawable(Ui.DARK_OUTLINE));
+        listView.setDivider(new android.graphics.drawable.ColorDrawable(Ui.OUTLINE));
         listView.setDividerHeight(dp(1));
-        listView.setBackgroundColor(Ui.DARK_BACKGROUND);
+        listView.setBackgroundColor(Ui.BACKGROUND);
         listView.setContentDescription(I18n.t(R.string.ui_books));
         // Keep row-level tap and long-press handling available when a row has a star control.
         listView.setItemsCanFocus(false);
@@ -252,7 +252,7 @@ public final class MainActivity extends BaseActivity {
         gridView.setPadding(dp(4), dp(6), dp(4), dp(6));
         gridView.setClipToPadding(false);
         gridView.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
-        gridView.setBackgroundColor(Ui.DARK_BACKGROUND);
+        gridView.setBackgroundColor(Ui.BACKGROUND);
         gridView.setContentDescription(I18n.t(R.string.ui_book_thumbnails));
         gridView.setAdapter(adapter);
         gridView.setOnItemClickListener((parent, view, position, id) -> open(visibleRows.get(position)));
@@ -261,11 +261,12 @@ public final class MainActivity extends BaseActivity {
             return true;
         });
         FrameLayout content = new FrameLayout(this);
-        content.setBackgroundColor(Ui.DARK_BACKGROUND);
+        content.setBackgroundColor(Ui.BACKGROUND);
         content.addView(listView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         content.addView(gridView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        quickView = Ui.button(this, "▶", Ui.ButtonStyle.DARK_PRIMARY);
-        quickView.setContentDescription(I18n.t(R.string.ui_open_last_book));
+        quickView = Ui.iconButton(this, R.drawable.ic_reader_resume_book, I18n.t(R.string.ui_open_last_book));
+        quickView.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.ON_BRAND));
+        quickView.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Ui.BRAND));
         quickView.setOnClickListener(v -> {
             List<AppState.SavedItem> recents = AppState.recents(this);
             if (!recents.isEmpty()) { AppState.SavedItem last = recents.get(0); open(new LibraryEntry(last.uri, last.title, null, last.kind, false, 0, last.timestamp), false); }
@@ -278,12 +279,12 @@ public final class MainActivity extends BaseActivity {
 
         LinearLayout navigation = new LinearLayout(this);
         navigation.setGravity(Gravity.CENTER_VERTICAL);
-        navigation.setBackgroundColor(Ui.DARK_SURFACE_RAISED);
+        navigation.setBackgroundColor(Ui.SURFACE_RAISED);
         Button actionsButton = navigationAction(I18n.t(R.string.ui_actions), I18n.t(R.string.ui_actions_for_this_list), R.drawable.ic_nav_folder);
         actionsButton.setOnClickListener(view -> showListActions());
         Button recentButton = navigationAction(I18n.t(R.string.ui_history), I18n.t(R.string.ui_show_reading_history), R.drawable.ic_nav_history);
         recentButton.setOnClickListener(view -> selectMode(MODE_RECENTS));
-        viewButton = navigationAction(gridMode ? I18n.t(R.string.ui_list) : I18n.t(R.string.ui_grid), I18n.t(R.string.ui_change_list_type), R.drawable.ic_image_file);
+        viewButton = navigationAction(gridMode ? I18n.t(R.string.ui_list) : I18n.t(R.string.ui_grid), I18n.t(R.string.ui_change_list_type), R.drawable.ic_reader_pages);
         viewButton.setOnClickListener(view -> toggleCollectionView());
         sortButton = navigationAction(I18n.t(R.string.ui_sort), I18n.t(R.string.ui_change_sort_order), R.drawable.ic_nav_sort);
         sortButton.setOnClickListener(view -> chooseSort());
@@ -338,12 +339,12 @@ public final class MainActivity extends BaseActivity {
         emptyProgress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.BRAND));
         emptyProgress.setVisibility(View.GONE);
         panel.addView(emptyProgress, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        emptyTitle = text("", 17, Ui.DARK_TEXT);
+        emptyTitle = text("", 17, Ui.TEXT_PRIMARY);
         Ui.title(emptyTitle);
         emptyTitle.setGravity(Gravity.CENTER);
         emptyTitle.setPadding(0, dp(12), 0, dp(6));
         panel.addView(emptyTitle);
-        emptyMessage = text("", 14, Ui.DARK_MUTED);
+        emptyMessage = text("", 14, Ui.TEXT_SECONDARY);
         emptyMessage.setGravity(Gravity.CENTER);
         emptyMessage.setLineSpacing(0, 1.08f);
         panel.addView(emptyMessage);
@@ -469,7 +470,7 @@ public final class MainActivity extends BaseActivity {
         listView.setVisibility(gridMode ? View.GONE : View.VISIBLE);
         gridView.setVisibility(gridMode ? View.VISIBLE : View.GONE);
         gridView.setNumColumns(AppState.gridColumns(this));
-        gridView.setBackgroundColor(AppState.number(this, "grid_color", 0xff303030));
+        gridView.setBackgroundColor(AppState.number(this, "grid_color", Ui.BACKGROUND));
         if (locationRow != null) locationRow.setVisibility(AppState.showLibraryPath(this) ? View.VISIBLE : View.GONE);
         int scrollPosition = AppState.leftLibraryScrollbar(this)
                 ? View.SCROLLBAR_POSITION_LEFT : View.SCROLLBAR_POSITION_RIGHT;
@@ -1028,11 +1029,11 @@ public final class MainActivity extends BaseActivity {
                 info.setOrientation(LinearLayout.VERTICAL);
                 info.setGravity(Gravity.CENTER_VERTICAL);
                 info.setPadding(dp(gridMode ? 2 : 8), dp(gridMode ? 5 : 0), dp(4), 0);
-                TextView name = text("", gridMode ? 13 : 15, Ui.DARK_TEXT);
+                TextView name = text("", gridMode ? 13 : 15, Ui.TEXT_PRIMARY);
                 name.setMaxLines(2);
                 name.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 info.addView(name);
-                TextView detail = text("", gridMode ? 11 : 12, Ui.DARK_MUTED);
+                TextView detail = text("", gridMode ? 11 : 12, Ui.TEXT_SECONDARY);
                 detail.setPadding(0, dp(2), 0, 0);
                 detail.setSingleLine(true);
                 detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1040,7 +1041,7 @@ public final class MainActivity extends BaseActivity {
                 row.addView(info, gridMode
                         ? new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                         : new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-                TextView progress = text("", gridMode ? 11 : 12, Ui.READER_ACCENT);
+                TextView progress = text("", gridMode ? 11 : 12, Ui.BRAND);
                 progress.setGravity(gridMode ? Gravity.START : Gravity.END | Gravity.CENTER_VERTICAL);
                 row.addView(progress, gridMode
                         ? new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(22))
@@ -1051,10 +1052,10 @@ public final class MainActivity extends BaseActivity {
             } else holder = (Holder) convertView.getTag();
             LibraryEntry item = getItem(position);
             if (gridMode) {
-                int background=AppState.number(MainActivity.this,"grid_color",0xff303030);
+                int background=AppState.number(MainActivity.this,"grid_color",Ui.BACKGROUND);
                 int foreground=androidx.core.graphics.ColorUtils.calculateLuminance(background)>.179 ? 0xff000000 : 0xffffffff;
                 convertView.setBackgroundColor(background);holder.name.setTextColor(foreground);holder.detail.setTextColor(foreground);
-                holder.progress.setTextColor(androidx.core.graphics.ColorUtils.calculateContrast(Ui.READER_ACCENT,background)>=4.5 ? Ui.READER_ACCENT : foreground);
+                holder.progress.setTextColor(androidx.core.graphics.ColorUtils.calculateContrast(Ui.BRAND,background)>=4.5 ? Ui.BRAND : foreground);
             }
             holder.name.setText(item.name);
             holder.name.setVisibility(!gridMode || AppState.enabled(MainActivity.this, "grid_name", true) ? View.VISIBLE : View.GONE);

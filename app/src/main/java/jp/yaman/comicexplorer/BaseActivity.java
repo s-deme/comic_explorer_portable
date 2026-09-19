@@ -10,7 +10,7 @@ public abstract class BaseActivity extends Activity {
         appearance = appearance();
         I18n.configure(this);
         Ui.configure(this);
-        setTheme(Ui.light ? R.style.AppThemeLight : R.style.AppTheme);
+        setTheme(Ui.themeStyle);
         super.onCreate(state);
     }
     private String appearance() {

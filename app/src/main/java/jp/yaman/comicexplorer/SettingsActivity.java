@@ -32,13 +32,13 @@ public final class SettingsActivity extends BaseActivity {
     }
     private void buildUi() {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Ui.SETTINGS_TOOLBAR);
+        root.setBackgroundColor(Ui.TOOLBAR);
         LinearLayout toolbar = new LinearLayout(this); toolbar.setGravity(Gravity.CENTER_VERTICAL);
-        toolbar.setBackgroundColor(Ui.SETTINGS_TOOLBAR);
+        toolbar.setBackgroundColor(Ui.TOOLBAR);
         ImageButton back = new ImageButton(this); back.setImageResource(R.drawable.ic_arrow_back);
-        Ui.styleToolbarButton(back, Ui.SETTINGS_TOOLBAR); back.setContentDescription(I18n.t(R.string.ui_close_settings)); back.setOnClickListener(v -> finish());
+        Ui.styleToolbarButton(back, Ui.TOOLBAR); back.setContentDescription(I18n.t(R.string.ui_close_settings)); back.setOnClickListener(v -> finish());
         toolbar.addView(back, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 56)));
-        TextView title = Ui.text(this, I18n.t(R.string.ui_settings), 20, Ui.TOOLBAR_TEXT); toolbar.addView(title);
+        TextView title = Ui.text(this, I18n.t(R.string.ui_settings), 20, Ui.TEXT_PRIMARY); toolbar.addView(title);
         root.addView(toolbar, new LinearLayout.LayoutParams(-1, Ui.dp(this, 56)));
         PreferenceRows rows = new PreferenceRows(this);
         Runnable unchanged = () -> { };
@@ -50,7 +50,7 @@ public final class SettingsActivity extends BaseActivity {
             Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_language)).setItems(labels, (d, i) -> { AppState.put(this, "language", codes[i]); recreate(); }));
         });
         rows.choice(I18n.t(R.string.ui_encoding), ReaderOptions.ENCODINGS, "archive_encoding", 0, unchanged);
-        rows.choice(I18n.t(R.string.ui_theme), new String[]{I18n.t(R.string.ui_system_settings), I18n.t(R.string.ui_light_theme), I18n.t(R.string.ui_dark_theme)}, "theme", 0, this::recreate);
+        rows.action(I18n.t(R.string.ui_theme), I18n.t(Ui.THEMES[Ui.themeIndex(this)].name), this::showThemePicker);
         rows.action(I18n.t(R.string.ui_reset_settings), I18n.t(R.string.ui_reset_all_settings_2), () -> confirm(I18n.t(R.string.ui_reset_all_settings), () -> { AppState.resetSettings(this); recreate(); }));
         rows.section("LIST VIEW");
         rows.check(I18n.t(R.string.ui_show_statusbar), I18n.t(R.string.ui_show_time_and_battery_status), "list_statusbar", true, unchanged);
@@ -91,6 +91,58 @@ public final class SettingsActivity extends BaseActivity {
         ScrollView scroll = new ScrollView(this); scroll.addView(rows.content); root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root); Ui.applySystemBarInsets(this, root);
     }
+    private void showThemePicker() {
+        int selected = Ui.themeIndex(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 8));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(content);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_theme))
+                .setView(scroll).setNegativeButton(I18n.t(R.string.ui_cancel), null).create();
+        android.content.res.Configuration config = getResources().getConfiguration();
+        int width = Math.min(560, config.screenWidthDp) - 72;
+        int columns = Math.max(1, Math.min(3, (int)(width / (92 * config.fontScale))));
+        LinearLayout row = null;
+        for (int index = 0; index < Ui.THEMES.length; index++) {
+            final int theme = index;
+            if (index == 0 || (index - 1) % columns == 0) {
+                row = new LinearLayout(this);
+                content.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            }
+            String name = I18n.t(Ui.THEMES[index].name);
+            android.widget.Button option = Ui.button(this, name + (index == selected ? " ✓" : ""),
+                    index == selected ? Ui.ButtonStyle.TONAL : Ui.ButtonStyle.SECONDARY);
+            option.setMinHeight(Ui.dp(this, 80));
+            option.setPadding(Ui.dp(this, 4), Ui.dp(this, 8), Ui.dp(this, 4), Ui.dp(this, 8));
+            option.setSelected(index == selected);
+            option.setContentDescription(name + (index == selected ? I18n.t(R.string.ui_selected_2) : ""));
+            if (android.os.Build.VERSION.SDK_INT >= 30)
+                option.setStateDescription(I18n.t(index == selected ? R.string.ui_selected : R.string.ui_not_selected));
+            android.graphics.drawable.GradientDrawable swatch = new android.graphics.drawable.GradientDrawable();
+            if (index == 0) {
+                swatch.setOrientation(android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT);
+                swatch.setColors(new int[]{0xFFFAFAFA, 0xFF18181B});
+            } else swatch.setColor(index == 1 ? 0xFFFAFAFA : index == 2 ? 0xFF18181B : Ui.themeAccent(this, index));
+            swatch.setCornerRadius(Ui.dp(this, 6));
+            swatch.setStroke(Ui.dp(this, 1), Ui.OUTLINE);
+            swatch.setBounds(0, 0, Ui.dp(this, 40), Ui.dp(this, 20));
+            option.setCompoundDrawables(null, swatch, null, null);
+            option.setCompoundDrawablePadding(Ui.dp(this, 8));
+            option.setOnClickListener(view -> {
+                dialog.dismiss();
+                if (theme != selected) { AppState.put(this, "theme", Ui.THEMES[theme].id); recreate(); }
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1);
+            params.setMargins(Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4));
+            row.addView(option, params);
+        }
+        // Keep the last row the same width as the complete rows at large font sizes.
+        while (row.getChildCount() < columns) row.addView(new android.view.View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        dialog.show();
+        Ui.styleDialog(dialog);
+    }
+
     private void clearCache(String kind) {
         confirm(I18n.t(R.string.ui_delete_cache), () -> new Thread(() -> {
             try { BookCache.clear(this, kind); runOnUiThread(() -> { if(!isFinishing() && !isDestroyed()) buildUi(); }); }

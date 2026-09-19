@@ -18,7 +18,6 @@
     <string name="ui_open_the_last_compressed_file" formatted="false">"가장 최근에 본 압축 파일을 바로 열음"</string>
     <string name="ui_background_color" formatted="false">"배경색 설정"</string>
     <string name="ui_columns" formatted="false">"세로열"</string>
-    <string name="ui_right_vertical" formatted="false">"우측 + 수직"</string>
     <string name="ui_zoom" formatted="false">"줌인"</string>
     <string name="ui_name" formatted="false">"이름"</string>
     <string name="ui_zoom_inside_fit_screen_outside" formatted="false">"줌인 + 화면맞춤(여백)"</string>
@@ -80,7 +79,6 @@
     <string name="ui_keep_screen_on" formatted="false">"화면켜짐유지"</string>
     <string name="ui_full_screen" formatted="false">"풀스크린"</string>
     <string name="ui_icon" formatted="false">"아이콘"</string>
-    <string name="ui_left_vertical" formatted="false">"좌측 + 수직"</string>
     <string name="ui_open_the_next_file" formatted="false">"다음 파일 열기"</string>
     <string name="ui_show_a_dividing_line_between_dual_pages" formatted="false">"2페이지씩 보기시 페이지 사이에 분할선 표시"</string>
     <string name="ui_upscaling" formatted="false">"업스케일링 (선명도 개선)"</string>
@@ -137,8 +135,6 @@
     <string name="ui_page_number_tap_to_jump" formatted="false">"페이지 번호. 탭하여 이동"</string>
     <string name="ui_single_page" formatted="false">"한 페이지"</string>
     <string name="ui_sync_data_is_too_large" formatted="false">"동기화 데이터가 너무 큽니다"</string>
-    <string name="ui_next_menu_page" formatted="false">"다음 메뉴 페이지"</string>
-    <string name="ui_3_tap_for_next" formatted="false">" / 3. 탭하여 다음으로"</string>
     <string name="ui_add_hardware_key" formatted="false">"하드웨어 키 추가"</string>
     <string name="ui_delete_reading_data_and_library_registrations_book_files_will_be" formatted="false">"읽기 데이터와 라이브러리 등록을 삭제할까요? 책 파일은 유지됩니다."</string>
     <string name="ui_two_pages" formatted="false">"두 페이지"</string>
@@ -179,7 +175,6 @@
     <string name="ui_cannot_read_cache" formatted="false">"캐시를 읽을 수 없습니다"</string>
     <string name="ui_stretch_to_fill_screen" formatted="false">"화면을 채우도록 늘리기"</string>
     <string name="ui_key_binding_saved" formatted="false">"키 할당 저장됨"</string>
-    <string name="ui_more_reading_settings" formatted="false">"추가 읽기 설정"</string>
     <string name="ui_screen_rotation" formatted="false">"화면 회전"</string>
     <string name="ui_disabled" formatted="false">"사용 안 함"</string>
     <string name="ui_unsupported_format_choose_pdf_cbz_zip_or_images" formatted="false">"지원하지 않는 형식입니다. PDF, ZIP/CBZ, RAR/CBR, 7z 또는 이미지를 선택하세요."</string>
@@ -265,7 +260,6 @@
     <string name="ui_no_favorites" formatted="false">"즐겨찾기 없음"</string>
     <string name="ui_search_file_names" formatted="false">"파일 이름 검색"</string>
     <string name="ui_cannot_delete_folder" formatted="false">"폴더를 삭제할 수 없습니다"</string>
-    <string name="ui_first_menu_page" formatted="false">"첫 메뉴 페이지"</string>
     <string name="ui_change_list_type" formatted="false">"목록 표시 방식 변경"</string>
     <string name="ui_both_buttons_move_forward" formatted="false">"두 버튼 모두 다음 페이지로"</string>
     <string name="ui_cannot_delete_connection_root" formatted="false">"연결 루트를 삭제할 수 없습니다"</string>
@@ -292,7 +286,6 @@
     <string name="ui_remove_saved_directory" formatted="false">"저장된 디렉터리 제거"</string>
     <string name="ui_browse_folders" formatted="false">"폴더 찾아보기"</string>
     <string name="ui_wait_for_the_page_to_load_before_saving" formatted="false">"페이지가 로드된 후 저장하세요"</string>
-    <string name="ui_show_next_reader_menu" formatted="false">"다음 읽기 메뉴 표시"</string>
     <string name="ui_enter_a_host_name" formatted="false">"호스트 이름을 입력하세요"</string>
     <string name="ui_cannot_open_pdf" formatted="false">"PDF를 열 수 없습니다."</string>
     <string name="ui_not_enough_free_space" formatted="false">"저장 공간이 부족합니다"</string>
@@ -339,7 +332,6 @@
     <string name="ui_right_page_button" formatted="false">"오른쪽 페이지 버튼"</string>
     <string name="ui_go_to_page" formatted="false">"페이지로 이동"</string>
     <string name="ui_reading_direction" formatted="false">"읽기 방향"</string>
-    <string name="ui_page_navigation" formatted="false">"페이지 이동"</string>
     <string name="ui_lock_landscape" formatted="false">"가로 화면 고정"</string>
     <string name="ui_saved_directories" formatted="false">"저장된 디렉터리"</string>
     <string name="ui_current_page_set_as_cover" formatted="false">"현재 페이지를 표지로 설정했습니다"</string>
@@ -348,7 +340,6 @@
     <string name="ui_invalid_name" formatted="false">"잘못된 이름"</string>
     <string name="ui_delete_all" formatted="false">"모두 삭제"</string>
     <string name="ui_cannot_create_cache" formatted="false">"캐시를 만들 수 없습니다"</string>
-    <string name="ui_reader_menu_1_3" formatted="false">"읽기 메뉴 1 / 3"</string>
     <string name="ui_cannot_modify_connection_root" formatted="false">"연결 루트를 변경할 수 없습니다"</string>
     <string name="ui_page_slider" formatted="false">"페이지 슬라이더"</string>
     <string name="ui_page_not_found_in_archive" formatted="false">"압축 파일에서 페이지를 찾을 수 없습니다."</string>
@@ -363,7 +354,6 @@
     <string name="ui_cannot_save_thumbnail" formatted="false">"썸네일을 저장할 수 없습니다"</string>
     <string name="ui_size_2" formatted="false">"크기"</string>
     <string name="ui_first_page" formatted="false">"첫 페이지"</string>
-    <string name="ui_invert_colors" formatted="false">"색상 반전"</string>
     <string name="ui_supports_pdf_cbz_zip_and_images" formatted="false">"PDF, ZIP/CBZ, RAR/CBR, 7z 및 이미지를 지원합니다."</string>
     <string name="ui_rename" formatted="false">"이름 변경"</string>
     <string name="ui_cannot_move_between_connections" formatted="false">"연결 간 이동을 할 수 없습니다"</string>
@@ -372,19 +362,16 @@
     <string name="ui_actions" formatted="false">"작업"</string>
     <string name="ui_cannot_connect" formatted="false">"연결할 수 없습니다"</string>
     <string name="ui_folder_access_was_revoked" formatted="false">"폴더 접근 권한이 해제되었습니다."</string>
-    <string name="ui_restore_colors" formatted="false">"색상 복원"</string>
     <string name="ui_reverse_volume_keys" formatted="false">"음량 키 방향 반전"</string>
     <string name="ui_restore_default_cover" formatted="false">"기본 표지 복원"</string>
     <string name="ui_cannot_save_cache" formatted="false">"캐시를 저장할 수 없습니다"</string>
     <string name="ui_sync_failed_check_your_connection_and_google_drive_permissions" formatted="false">"동기화에 실패했습니다. 연결 및 Google Drive 권한을 확인하세요."</string>
     <string name="ui_delete_all_saved_reading_positions" formatted="false">"저장된 읽기 위치를 모두 삭제할까요?"</string>
-    <string name="ui_more" formatted="false">"더 보기"</string>
     <string name="ui_done" formatted="false">"완료"</string>
     <string name="ui_the_archive_exceeds_the_limit_of_20_000_pages" formatted="false">"압축 파일이 20,000페이지 제한을 초과합니다."</string>
     <string name="ui_pages_2" formatted="false">"페이지"</string>
     <string name="ui_open_last_book" formatted="false">"마지막 책 열기"</string>
     <string name="ui_port_blank_for_default" formatted="false">"포트(비우면 기본값)"</string>
-    <string name="ui_zoom_2" formatted="false">"확대"</string>
     <string name="ui_resume_from_this_page" formatted="false">" 이 페이지에서 이어 읽을까요?"</string>
     <string name="ui_reload_file" formatted="false">"파일 다시 불러오기"</string>
     <string name="ui_last_page" formatted="false">"마지막 페이지"</string>
@@ -401,4 +388,24 @@
     <string name="ui_cannot_open_a_folder_as_a_file" formatted="false">"폴더를 파일로 열 수 없습니다"</string>
     <string name="ui_reading_position" formatted="false">"읽기 위치: "</string>
     <string name="ui_bookmarked_books" formatted="false">"책갈피가 있는 책"</string>
+    <string name="ui_find_page">페이지 찾기</string>
+    <string name="ui_display_reading">표시 및 읽기</string>
+    <string name="ui_book_actions">이 책의 작업</string>
+    <string name="ui_control_settings">조작 설정</string>
+    <string name="ui_page_list_style">페이지 목록 표시 방식</string>
+    <string name="ui_reading_mode">읽기 방식</string>
+    <string name="ui_scroll_mode">스크롤 방식</string>
+    <string name="ui_crop_settings">여백 및 자르기</string>
+    <string name="ui_crop_all_books">비율로 여백 자르기 (모든 책)</string>
+    <string name="ui_crop_this_book">자르기 영역 선택 (이 책)</string>
+    <string name="ui_reset_position_confirm">첫 페이지로 돌아가 저장된 읽기 위치를 초기화할까요? 책갈피는 유지됩니다.</string>
+    <string name="ui_bookmark_actions">책갈피</string>
+    <string name="ui_theme_red">빨강</string>
+    <string name="ui_theme_blue">파랑</string>
+    <string name="ui_theme_green">초록</string>
+    <string name="ui_theme_purple">보라</string>
+    <string name="ui_theme_pink">분홍</string>
+    <string name="ui_theme_orange">주황</string>
+    <string name="ui_theme_gray">회색</string>
+    <string name="ui_theme_system">시스템 설정 따르기</string>
 </resources>

@@ -31,16 +31,16 @@ public final class CropActivity extends BaseActivity {
         float[] initial = state == null ? getIntent().getFloatArrayExtra("crop") : state.getFloatArray("crop");
         if (initial != null && initial.length == 4) crop.setSelection(new RectF(initial[0], initial[1], initial[2], initial[3]));
         reset = state != null && state.getBoolean("reset");
-        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(Ui.DARK_BACKGROUND);
-        root.addView(Ui.text(this, I18n.t(R.string.ui_margin_cropping), 20, Ui.DARK_TEXT));
+        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(Ui.BACKGROUND);
+        root.addView(Ui.text(this, I18n.t(R.string.ui_margin_cropping), 20, Ui.TEXT_PRIMARY));
         root.addView(crop, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout controls = new LinearLayout(this); controls.setOrientation(LinearLayout.VERTICAL);
         int[] names = {R.string.ui_left, R.string.ui_top, R.string.ui_right, R.string.ui_bottom};
         for (int i=0; i<4; i++) {
             final int edge=i;
             LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
-            row.addView(Ui.text(this,I18n.t(names[i]),14,Ui.DARK_TEXT),new LinearLayout.LayoutParams(Ui.dp(this,64),-2));
-            SeekBar bar = new SeekBar(this); edges[i]=bar; bar.setMax(100); bar.setContentDescription(I18n.t(names[i])); Ui.styleSeekBar(bar,true);
+            row.addView(Ui.text(this,I18n.t(names[i]),14,Ui.TEXT_PRIMARY),new LinearLayout.LayoutParams(Ui.dp(this,64),-2));
+            SeekBar bar = new SeekBar(this); edges[i]=bar; bar.setMax(100); bar.setContentDescription(I18n.t(names[i])); Ui.styleSeekBar(bar);
             bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 public void onProgressChanged(SeekBar view,int value,boolean user) { if(user) {reset=false; crop.setEdge(edge,value/100f); syncEdges();} }
                 public void onStartTrackingTouch(SeekBar view) { }
@@ -62,7 +62,7 @@ public final class CropActivity extends BaseActivity {
         for(int i=0;i<4;i++) if(edges[i]!=null) edges[i].setProgress(Math.round(values[i]*100));
     }
     private void addAction(LinearLayout row,int label,Runnable action) {
-        Button button=Ui.button(this,I18n.t(label),Ui.ButtonStyle.DARK_SECONDARY);
+        Button button=Ui.button(this,I18n.t(label),Ui.ButtonStyle.RAISED_SECONDARY);
         button.setOnClickListener(v -> action.run());row.addView(button,new LinearLayout.LayoutParams(0,-2,1));
     }
     @Override protected void onSaveInstanceState(Bundle state) {

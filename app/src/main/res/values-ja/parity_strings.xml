@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ui_blue_light">ブルーライト軽減</string>
-    <string name="ui_light_theme">明色</string>
-    <string name="ui_dark_theme">暗色</string>
+    <string name="ui_light_theme">ライト</string>
+    <string name="ui_dark_theme">ダーク</string>
     <string name="ui_archive_error">圧縮ファイルを読めません（RAR5・暗号化・分割形式は非対応の場合があります）。</string>
     <string name="ui_top">上</string>
     <string name="ui_bottom">下</string>

@@ -19,13 +19,43 @@ import java.util.zip.ZipOutputStream;
 /** Run only against the isolated .validation application ID, never a user's installed library. */
 public final class ParityInstrumentation extends Instrumentation {
     private int checks;
-    @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); start(); }
+    private String suite;
+    @Override public void onCreate(Bundle arguments) {
+        super.onCreate(arguments);
+        suite=arguments==null ? "all" : arguments.getString("suite","all");
+        start();
+    }
     @Override public void onStart() {
         Bundle result=new Bundle();
         try {
             Context context=getTargetContext();
             if (!context.getPackageName().endsWith(".validation")) throw new AssertionError("Refusing to modify non-validation app");
-            AppState.prefs(context).edit().clear().commit();
+            if (!java.util.Arrays.asList("all","data","network","formats","reader","themes").contains(suite))
+                throw new IllegalArgumentException("Unknown suite: "+suite+" (all, data, network, formats, reader, themes)");
+            File fixtures=new File(context.getFilesDir(),"parity-fixtures");
+            if (!fixtures.isDirectory() && !fixtures.mkdirs()) throw new java.io.IOException("Fixture directory");
+            for(String group:new String[]{"data","network","formats","reader","themes"}) {
+                if (!suite.equals("all") && !suite.equals(group)) continue;
+                AppState.prefs(context).edit().clear().commit();
+                AppState.put(context,"language","ja"); I18n.configure(context);
+                AppState.put(context,"theme",2); Ui.configure(context);
+                int before=checks;
+                switch(group) {
+                    case "data": checkData(context); checkReferenceImport(context,fixtures); checkTransfers(context); break;
+                    case "network": checkNetwork(); checkFtp(fixtures); break;
+                    case "formats": checkFormats(context,fixtures); break;
+                    case "reader": checkReader(context,fixtures); break;
+                    case "themes": checkThemes(context); break;
+                }
+                result.putInt(group,checks-before);
+            }
+            result.putString("stream","PASS ["+suite+"]: "+checks+" checks\n"); finish(Activity.RESULT_OK,result);
+        } catch(Throwable error) {
+            result.putString("stream","FAIL ["+suite+"]: "+error+"\n"+android.util.Log.getStackTraceString(error));
+            finish(Activity.RESULT_CANCELED,result);
+        }
+    }
+    private void checkData(Context context) throws Exception {
             Uri book=Uri.parse("content://test/book");
             check(AppState.key(book).equals("98315341b0207c5ee81a54f42667fa511c3658df49095599f262b74d6ce922ad"),"URI keys retain the existing SHA-256 storage identity");
             AppState.addRecent(context,book,"book.cbz","CBZ"); AppState.updateReadingProgress(context,book,3,10);
@@ -44,6 +74,40 @@ public final class ParityInstrumentation extends Instrumentation {
             AppState.relocate(context,renamed,book,"book.cbz");
             AppState.put(context,"theme",2); AppState.resetSettings(context);
             check(AppState.number(context,"theme",0)==0 && AppState.getPosition(context,book)==2,"Settings reset preserves reading data");
+            String hash=String.join("",java.util.Collections.nCopies(64,"a"));
+            JSONObject merged=new JSONObject().put(hash,new JSONObject().put("page",3).put("total",10).put("updated",20));
+            ReadingSync.merge(merged,new JSONObject().put(hash,new JSONObject().put("page",1).put("total",10).put("updated",10)));
+            check(merged.getJSONObject(hash).getInt("page")==3,"Older remote progress cannot overwrite newer progress");
+            ReadingSync.merge(merged,new JSONObject().put(hash,new JSONObject().put("page",9).put("total",10).put("updated",30)));
+            check(merged.getJSONObject(hash).getInt("page")==9,"Newer progress merges");
+            ReadingSync.merge(merged,new JSONObject().put("bad",new JSONObject().put("page",-1)));
+            check(!merged.has("bad"),"Reject malformed sync records");
+            AppState.identifyForSync(context,AppState.recents(context).get(0),hash);
+            long recentTime=AppState.recents(context).get(0).timestamp;
+            AppState.applySyncedProgress(context,merged);
+            check(AppState.getPosition(context,book)==9 && AppState.recents(context).get(0).position==9,"Sync updates both saved and recent positions");
+            check(AppState.recents(context).get(0).timestamp==recentTime && AppState.syncRecords(context).getJSONObject(hash).getLong("updated")==30,"Import preserves timestamps instead of creating a local edit");
+            check(AppState.hasBookmark(context,book,2) && AppState.bookmarkMemo(context,book,2).equals("preserved"),"Sync preserves bookmarks and notes");
+            File cache=BookCache.directory(context,"thumbs"), old=new File(cache,"old.jpg"), recent=new File(cache,"recent.jpg");
+            try(FileOutputStream out=new FileOutputStream(old)){out.write(new byte[20]);} old.setLastModified(1000);
+            try(FileOutputStream out=new FileOutputStream(recent)){out.write(new byte[20]);}
+            BookCache.trim(cache,20,0); check(!old.exists() && recent.exists(),"LRU cache trimming");
+            BookCache.clear(context,"thumbs"); check(!recent.exists(),"Cache deletion");
+            AppState.put(context,"sync_enabled",true);AppState.prefs(context).edit().putString("sync.records","{}").apply();
+            AppState.clearReadingData(context);
+            check(!AppState.enabled(context,"sync_enabled",false) && !AppState.prefs(context).contains("sync.records"),"Reading data deletion disables sync and removes local sync records");
+    }
+    private void checkNetwork() {
+            boolean rejected=false; try{NetworkStorage.validatePath("books/../private");}catch(IllegalArgumentException expected){rejected=true;}
+            check(rejected,"Network paths cannot escape their root");
+    }
+    private void checkReader(Context context, File fixtures) throws Exception {
+            // Connect before opening windows; standalone runs have no earlier UI suite to do this.
+            getUiAutomation();
+            waitForIdleSync();
+            check(AppState.direction(context)==AppState.DIRECTION_RTL,"Unset reading direction defaults to manga right-to-left order");
+            AppState.setDirection(context,AppState.DIRECTION_LTR);
+            check(AppState.direction(context)==AppState.DIRECTION_LTR,"Explicit left-to-right preference is preserved");
             AppState.put(context,"filter_contrast",true);
             Bitmap tonal=Bitmap.createBitmap(new int[]{0xff404040,0xff808080,0xffc0c0c0},3,1,Bitmap.Config.ARGB_8888);
             Bitmap adjusted=ImageProcessing.apply(context,tonal,3,100);
@@ -63,32 +127,6 @@ public final class ParityInstrumentation extends Instrumentation {
             adjusted=ImageProcessing.apply(context,tonal,6,100);
             check(adjusted.getWidth()==6 && adjusted.getPixel(3,1)==0xff555555,"Lanczos4 preserves constant colors");adjusted.recycle();tonal.recycle();
             AppState.put(context,"filter_upscale",false);
-            String hash=String.join("",java.util.Collections.nCopies(64,"a"));
-            JSONObject merged=new JSONObject().put(hash,new JSONObject().put("page",3).put("total",10).put("updated",20));
-            ReadingSync.merge(merged,new JSONObject().put(hash,new JSONObject().put("page",1).put("total",10).put("updated",10)));
-            check(merged.getJSONObject(hash).getInt("page")==3,"Older remote progress cannot overwrite newer progress");
-            ReadingSync.merge(merged,new JSONObject().put(hash,new JSONObject().put("page",9).put("total",10).put("updated",30)));
-            check(merged.getJSONObject(hash).getInt("page")==9,"Newer progress merges");
-            ReadingSync.merge(merged,new JSONObject().put("bad",new JSONObject().put("page",-1)));
-            check(!merged.has("bad"),"Reject malformed sync records");
-            AppState.identifyForSync(context,AppState.recents(context).get(0),hash);
-            long recentTime=AppState.recents(context).get(0).timestamp;
-            AppState.applySyncedProgress(context,merged);
-            check(AppState.getPosition(context,book)==9 && AppState.recents(context).get(0).position==9,"Sync updates both saved and recent positions");
-            check(AppState.recents(context).get(0).timestamp==recentTime && AppState.syncRecords(context).getJSONObject(hash).getLong("updated")==30,"Import preserves timestamps instead of creating a local edit");
-            check(AppState.hasBookmark(context,book,2) && AppState.bookmarkMemo(context,book,2).equals("preserved"),"Sync preserves bookmarks and notes");
-            boolean rejected=false; try{NetworkStorage.validatePath("books/../private");}catch(IllegalArgumentException expected){rejected=true;}
-            check(rejected,"Network paths cannot escape their root");
-            File cache=BookCache.directory(context,"thumbs"), old=new File(cache,"old.jpg"), recent=new File(cache,"recent.jpg");
-            try(FileOutputStream out=new FileOutputStream(old)){out.write(new byte[20]);} old.setLastModified(1000);
-            try(FileOutputStream out=new FileOutputStream(recent)){out.write(new byte[20]);}
-            BookCache.trim(cache,20,0); check(!old.exists() && recent.exists(),"LRU cache trimming");
-            BookCache.clear(context,"thumbs"); check(!recent.exists(),"Cache deletion");
-            AppState.put(context,"language","ja"); I18n.configure(context);
-            AppState.put(context,"theme",2); Ui.configure(context);
-            File fixtures=new File(context.getFilesDir(),"parity-fixtures");
-            if (!fixtures.isDirectory() && !fixtures.mkdirs()) throw new java.io.IOException("Fixture directory");
-            checkReferenceImport(context,fixtures);
             check(ViewerActivity.adjacentPage(0,true,3)==1 && ViewerActivity.adjacentPage(0,false,3)==-1,"Page navigation respects the first-page boundary");
             check(!ViewerActivity.usesDualPageLayout(AppState.PAGE_AUTO,android.content.res.Configuration.ORIENTATION_PORTRAIT)
                     && ViewerActivity.usesDualPageLayout(AppState.PAGE_AUTO,android.content.res.Configuration.ORIENTATION_LANDSCAPE),"Automatic spread follows orientation");
@@ -98,8 +136,6 @@ public final class ParityInstrumentation extends Instrumentation {
             int[] tallPdf=PageSource.pdfBitmapSize(1,100_000,1080,2_000_000);
             check(tallPdf[0]<=8192 && tallPdf[1]<=8192 && (long)tallPdf[0]*tallPdf[1]<=2_000_000,"Extreme PDF dimensions stay within texture and pixel limits");
             checkReaderGestures(context);
-            checkFtp(fixtures);
-            checkParityAdditions(context, fixtures);
             Bitmap cropBitmap=Bitmap.createBitmap(20,20,Bitmap.Config.ARGB_8888);
             runOnMainSync(() -> {
                 CropView crop=new CropView(context,cropBitmap); crop.setEdge(0,.25f);crop.setEdge(2,.1f);
@@ -128,8 +164,41 @@ public final class ParityInstrumentation extends Instrumentation {
             }
             AppState.prefs(context).edit().clear().commit(); AppState.put(context,"language","ja"); AppState.put(context,"theme",2);
             ViewerActivity viewer=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(Uri.fromFile(zip)).putExtra(ViewerActivity.EXTRA_TITLE,zip.getName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            runOnMainSync(() -> {
+                AppState.put(context,"page_both_next",true);
+                AppState.put(context,"page_reverse",true);
+                invoke(viewer,"updatePageButtons");
+                check(((android.view.View)field(viewer,"leftPageButton")).getContentDescription().equals(I18n.t(R.string.ui_previous_page))
+                        && ((android.view.View)field(viewer,"rightPageButton")).getContentDescription().equals(I18n.t(R.string.ui_previous_page)),
+                        "Page arrow descriptions follow both-next and reverse overrides");
+                AppState.put(context,"page_both_next",false);
+                AppState.put(context,"page_reverse",false);
+                invoke(viewer,"updatePageButtons");
+            });
             awaitReady(() -> (Boolean)field(viewer,"initialized"),"ZIP reader initialized");
             awaitReady(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"ZIP first page decoded");
+            boolean wasFullscreen=(Boolean)field(viewer,"fullScreen");
+            SettingsActivity readerSettings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            runOnMainSync(() -> {
+                AppState.setFitMode(context,AppState.FIT_WIDTH);
+                AppState.setDoubleTapScale(context,250);
+                AppState.setKeepScreenOn(context,false);
+                AppState.setBrightness(context,42);
+                readerSettings.finish();
+            });
+            await(() -> (Integer)field(field(viewer,"imageView"),"fitMode")==AppState.FIT_WIDTH
+                    && (Float)field(field(viewer,"imageView"),"doubleTapScale")==2.5f
+                    && Math.abs(viewer.getWindow().getAttributes().screenBrightness-.42f)<.001f
+                    && (viewer.getWindow().getAttributes().flags & android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)==0,
+                    "Returning from settings reapplies reader preferences");
+            check((Boolean)field(viewer,"fullScreen")==wasFullscreen,"Returning from settings preserves fullscreen state");
+            runOnMainSync(() -> {
+                AppState.setFitMode(context,AppState.FIT_SCREEN);
+                AppState.setDoubleTapScale(context,180);
+                AppState.setKeepScreenOn(context,true);
+                AppState.setBrightness(context,-1);
+                invoke(viewer,"applyReaderPreferences");
+            });
             runOnMainSync(() -> { AppState.setPageLayout(context,AppState.PAGE_DUAL); AppState.put(context,"filter_contrast",true); invoke(viewer,"refreshReader"); });
             await(() -> {
                 android.graphics.drawable.Drawable drawable = ((ZoomImageView)field(viewer,"imageView")).getDrawable();
@@ -148,9 +217,24 @@ public final class ParityInstrumentation extends Instrumentation {
             await(() -> !((androidx.drawerlayout.widget.DrawerLayout)drawer).isDrawerVisible((android.view.View)field(viewer,"drawerPanel")),"Back closes the drawer without closing the reader");
             runOnMainSync(() -> { AppState.setReadingFlow(context,1); invoke(viewer,"refreshReader"); });
             awaitReady(() -> ((ContinuousReader)field(viewer,"continuous")).getChildCount()>0,"Continuous pages rendered");
+            runOnMainSync(() -> { AppState.setDirection(context,AppState.DIRECTION_LTR); invoke(viewer,"showReaderMenu"); });
+            awaitReady(() -> clickText("表示・読み方"), "Open display category from reader menu");
+            awaitReady(() -> clickText("読み方"), "Open reading mode");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_reading_direction)), "Open direction control");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_left)), "Change direction through the menu");
+            check(AppState.readingFlow(context)==AppState.FLOW_VERTICAL && AppState.direction(context)==1,
+                    "Direction changes preserve vertical scrolling");
+            awaitReady(() -> ((android.view.View)field(viewer,"loading")).getVisibility()==android.view.View.GONE, "Direction change finished rendering");
+            waitForIdleSync();
             runOnMainSync(() -> ((ContinuousReader)field(viewer,"continuous")).setSelection(3));
             await(() -> (Integer)field(viewer,"page")==3,"Continuous scrolling updates position");
 
+            runOnMainSync(() -> invoke(viewer,"showReaderMenu"));
+            awaitReady(() -> clickText("この本の操作"), "Open book actions");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_reset_reading_position)), "Open reset confirmation");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_cancel)), "Cancel reading position reset");
+            check((Integer)field(viewer,"page")==3 && AppState.getPosition(context,Uri.fromFile(zip))==3,
+                    "Cancelling position reset preserves current and saved page");
             java.nio.file.Files.deleteIfExists(AppState.coverFile(context,Uri.fromFile(zip)).toPath());
             runOnMainSync(() -> invoke(viewer,"saveCurrentPageCover"));
             await(() -> AppState.coverFile(context,Uri.fromFile(zip)).isFile(),"Continuous page can be saved as cover");
@@ -209,7 +293,7 @@ public final class ParityInstrumentation extends Instrumentation {
             awaitReady(() -> ((android.widget.GridView)field(lightLibrary,"gridView")).getChildCount()>0,"Light-theme grid has visible books");
             android.view.View firstCell=((android.widget.GridView)field(lightLibrary,"gridView")).getChildAt(0);
             int labelColor=((android.widget.TextView)field(firstCell.getTag(),"name")).getCurrentTextColor();
-            check(androidx.core.graphics.ColorUtils.calculateContrast(labelColor,AppState.number(context,"grid_color",0xff303030))>=4.5,"Grid filename contrast follows selected background");
+            check(androidx.core.graphics.ColorUtils.calculateContrast(labelColor,AppState.number(context,"grid_color",Ui.BACKGROUND))>=4.5,"Grid filename contrast follows selected background");
             java.util.concurrent.atomic.AtomicInteger selected=new java.util.concurrent.atomic.AtomicInteger();
 
             runOnMainSync(() -> {
@@ -219,12 +303,42 @@ public final class ParityInstrumentation extends Instrumentation {
             });
             check(selected.get()==2,"Menu dispatch does not depend on translated labels");
             runOnMainSync(lightLibrary::finish); waitForIdleSync();
-            AppState.put(context,"sync_enabled",true);AppState.prefs(context).edit().putString("sync.records","{}").apply();
-            AppState.clearReadingData(context);
-            check(!AppState.enabled(context,"sync_enabled",false) && !AppState.prefs(context).contains("sync.records"),"Reading data deletion disables sync and removes local sync records");
-            result.putString("stream","PASS: "+checks+" checks\n"); finish(Activity.RESULT_OK,result);
-        } catch(Throwable error) { result.putString("stream","FAIL: "+error+"\n"+android.util.Log.getStackTraceString(error));finish(Activity.RESULT_CANCELED,result); }
     }
+    private void checkThemes(Context context) throws Exception {
+        int original = AppState.number(context,"theme",0);
+        AppState.put(context,"theme",1); Ui.configure(context);
+        check(Ui.light,"Legacy light theme ID retains its meaning");
+        AppState.put(context,"theme",2); Ui.configure(context);
+        check(!Ui.light && Ui.themeStyle==R.style.AppTheme,"Legacy dark theme ID retains its meaning");
+        for (int theme=1;theme<Ui.THEMES.length;theme++) {
+            AppState.put(context,"theme",theme); Ui.configure(context);
+            boolean contrast = androidx.core.graphics.ColorUtils.calculateContrast(Ui.TEXT_PRIMARY,Ui.SURFACE)>=4.5
+                    && androidx.core.graphics.ColorUtils.calculateContrast(Ui.TEXT_SECONDARY,Ui.BACKGROUND)>=4.5
+                    && androidx.core.graphics.ColorUtils.calculateContrast(Ui.BRAND,Ui.SURFACE_RAISED)>=4.5
+                    && androidx.core.graphics.ColorUtils.calculateContrast(Ui.ON_BRAND,Ui.BRAND)>=4.5
+                    && androidx.core.graphics.ColorUtils.calculateContrast(Ui.TEXT_PRIMARY,Ui.TOOLBAR)>=4.5;
+            android.util.TypedValue accent=new android.util.TypedValue();
+            new android.view.ContextThemeWrapper(context,Ui.themeStyle).getTheme().resolveAttribute(android.R.attr.colorAccent,accent,true);
+            check(contrast && accent.data==Ui.BRAND,"Theme "+theme+" has readable controls and matching native accent");
+        }
+        AppState.put(context,"theme",-1); Ui.configure(context);
+        check(Ui.themeIndex(context)==0,"Unknown theme safely follows the system");
+        AppState.put(context,"theme",original); Ui.configure(context);
+        SettingsActivity settings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        ActivityMonitor monitor=addMonitor(SettingsActivity.class.getName(),null,false);
+        try {
+            runOnMainSync(() -> invoke(settings,"showThemePicker"));
+            awaitReady(() -> clickText(I18n.t(R.string.ui_theme_orange)),"Select orange in the actual theme picker");
+            Activity changed=waitForMonitorWithTimeout(monitor,10000);
+            check(changed!=null && AppState.number(context,"theme",0)==8 && Ui.BRAND==Ui.themeAccent(context,8),
+                    "Selecting a theme saves it and recreates settings with the selected palette");
+            runOnMainSync(() -> invoke(changed,"showThemePicker"));
+            awaitReady(() -> clickText(I18n.t(R.string.ui_cancel)),"Cancel theme picker");
+            check(AppState.number(context,"theme",0)==8,"Cancelling the picker preserves the selected theme");
+            runOnMainSync(changed::finish);
+        } finally { removeMonitor(monitor); AppState.put(context,"theme",original); Ui.configure(context); }
+    }
+
     private void checkReferenceImport(Context context,File fixtures) throws Exception {
         File xml=new File(fixtures,"basedata.xml");
         java.nio.file.Files.write(xml.toPath(),"<map><boolean name=\"set_img_filter_gray_yn\" value=\"true\"/><int name=\"set_img_doubleTap_mode\" value=\"2\"/><string name=\"account\">ignore</string></map>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -302,7 +416,7 @@ public final class ParityInstrumentation extends Instrumentation {
         }
     }
 
-    private void checkParityAdditions(Context context, File fixtures) throws Exception {
+    private void checkFormats(Context context, File fixtures) throws Exception {
         checkAdvancedFormats(context,fixtures);
         File rar = new File(fixtures, "stored.cbr");
         try (java.io.InputStream in = getContext().getAssets().open("stored.rar"); FileOutputStream out = new FileOutputStream(rar)) { DocumentTransfer.copyAndHash(in, out, null); }
@@ -323,6 +437,11 @@ public final class ParityInstrumentation extends Instrumentation {
             image=source.decode(1,1080); check(image.getWidth()==30 && image.getPixel(0,0)==0xff2468ab,"7z LZMA2 image decoded"); image.recycle();
             image=source.decode(0,1080); check(image.getHeight()==40,"7z reverse navigation"); image.recycle();
         }
+    }
+    private void checkTransfers(Context context) throws Exception {
+        Bitmap image=Bitmap.createBitmap(1,1,Bitmap.Config.ARGB_8888);
+        java.io.ByteArrayOutputStream png=new java.io.ByteArrayOutputStream();
+        image.compress(Bitmap.CompressFormat.PNG,100,png); image.recycle();
         Uri newBook=Uri.parse("content://test/cropped");
         android.graphics.RectF crop=new android.graphics.RectF(.1f,.2f,.8f,.9f); AppState.setCrop(context,newBook,crop);
         boolean invalid=false;try{AppState.setCrop(context,newBook,new android.graphics.RectF(-1,0,1,1));}catch(IllegalArgumentException expected){invalid=true;}check(invalid,"Reject invalid saved crop");

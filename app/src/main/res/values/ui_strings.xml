@@ -42,9 +42,7 @@
     <string name="ui_page_number_tap_to_jump" formatted="false">"Page number. Tap to jump"</string>
     <string name="ui_single_page" formatted="false">"Single page"</string>
     <string name="ui_sync_data_is_too_large" formatted="false">"Sync data is too large"</string>
-    <string name="ui_next_menu_page" formatted="false">"Next menu page"</string>
     <string name="ui_favorites" formatted="false">"Favorites"</string>
-    <string name="ui_3_tap_for_next" formatted="false">" / 3. Tap for next"</string>
     <string name="ui_left" formatted="false">"Left"</string>
     <string name="ui_scroll_animation" formatted="false">"Scroll animation"</string>
     <string name="ui_add_hardware_key" formatted="false">"Add hardware key"</string>
@@ -58,7 +56,6 @@
     <string name="ui_passive_ftp_off_active" formatted="false">"Passive FTP (off: active)"</string>
     <string name="ui_columns" formatted="false">"Columns"</string>
     <string name="ui_auto_two_pages_in_landscape" formatted="false">"Auto (two pages in landscape)"</string>
-    <string name="ui_right_vertical" formatted="false">"Right + Vertical"</string>
     <string name="ui_position" formatted="false">"Position"</string>
     <string name="ui_zoom" formatted="false">"Zoom"</string>
     <string name="ui_name" formatted="false">"Name"</string>
@@ -105,7 +102,6 @@
     <string name="ui_cannot_read_cache" formatted="false">"Cannot read cache"</string>
     <string name="ui_stretch_to_fill_screen" formatted="false">"Stretch to fill screen"</string>
     <string name="ui_key_binding_saved" formatted="false">"Key binding saved"</string>
-    <string name="ui_more_reading_settings" formatted="false">"More reading settings"</string>
     <string name="ui_screen_rotation" formatted="false">"Screen rotation"</string>
     <string name="ui_disabled" formatted="false">"Disabled"</string>
     <string name="ui_open" formatted="false">"Open"</string>
@@ -213,7 +209,6 @@
     <string name="ui_cannot_delete_folder" formatted="false">"Cannot delete folder"</string>
     <string name="ui_set_zip_file_cache_retention_period" formatted="false">"Set zip-file cache retention period"</string>
     <string name="ui_reset_settings" formatted="false">"Reset Settings"</string>
-    <string name="ui_first_menu_page" formatted="false">"First menu page"</string>
     <string name="ui_change_list_type" formatted="false">"Change list type"</string>
     <string name="ui_sharpen_filter" formatted="false">"Sharpen Filter"</string>
     <string name="ui_both_buttons_move_forward" formatted="false">"Both buttons move forward"</string>
@@ -252,7 +247,6 @@
     <string name="ui_browse_folders" formatted="false">"Browse folders"</string>
     <string name="ui_wait_for_the_page_to_load_before_saving" formatted="false">"Wait for the page to load before saving"</string>
     <string name="ui_display_the_file_list_scrollbar_on_the_left_side" formatted="false">"Display the file list scrollbar on the left side"</string>
-    <string name="ui_show_next_reader_menu" formatted="false">"Show next reader menu"</string>
     <string name="ui_enter_a_host_name" formatted="false">"Enter a host name"</string>
     <string name="ui_sync_your_resume_page_using_google_drive" formatted="false">"Sync your resume page using Google Drive"</string>
     <string name="ui_cannot_open_pdf" formatted="false">"Cannot open PDF."</string>
@@ -309,12 +303,10 @@
     <string name="ui_no_results" formatted="false">"No results"</string>
     <string name="ui_double_tap" formatted="false">"Double tap"</string>
     <string name="ui_icon" formatted="false">"Icon"</string>
-    <string name="ui_left_vertical" formatted="false">"Left + Vertical"</string>
     <string name="ui_right_page_button" formatted="false">"Right page button"</string>
     <string name="ui_go_to_page" formatted="false">"Go to page"</string>
     <string name="ui_reading_direction" formatted="false">"Reading direction"</string>
     <string name="ui_open_the_next_file" formatted="false">"Open the next file"</string>
-    <string name="ui_page_navigation" formatted="false">"Page navigation"</string>
     <string name="ui_lock_landscape" formatted="false">"Lock landscape"</string>
     <string name="ui_saved_directories" formatted="false">"Saved directories"</string>
     <string name="ui_show_a_dividing_line_between_dual_pages" formatted="false">"Show a dividing line between dual pages"</string>
@@ -329,7 +321,6 @@
     <string name="ui_fixed" formatted="false">"Fixed"</string>
     <string name="ui_cannot_create_cache" formatted="false">"Cannot create cache"</string>
     <string name="ui_page_button_area" formatted="false">"Page button area"</string>
-    <string name="ui_reader_menu_1_3" formatted="false">"Reader menu 1 / 3"</string>
     <string name="ui_cannot_modify_connection_root" formatted="false">"Cannot modify connection root"</string>
     <string name="ui_passwd" formatted="false">"Passwd"</string>
     <string name="ui_clear_all_histories" formatted="false">"Clear all histories"</string>
@@ -356,7 +347,6 @@
     <string name="ui_first_page" formatted="false">"First page"</string>
     <string name="ui_theme" formatted="false">"Theme"</string>
     <string name="ui_delete" formatted="false">"Delete"</string>
-    <string name="ui_invert_colors" formatted="false">"Invert colors"</string>
     <string name="ui_supports_pdf_cbz_zip_and_images" formatted="false">"Supports PDF, ZIP/CBZ, RAR/CBR, 7z and images."</string>
     <string name="ui_rename" formatted="false">"Rename"</string>
     <string name="ui_cannot_move_between_connections" formatted="false">"Cannot move between connections"</string>
@@ -365,13 +355,11 @@
     <string name="ui_actions" formatted="false">"Actions"</string>
     <string name="ui_cannot_connect" formatted="false">"Cannot connect"</string>
     <string name="ui_folder_access_was_revoked" formatted="false">"Folder access was revoked."</string>
-    <string name="ui_restore_colors" formatted="false">"Restore colors"</string>
     <string name="ui_reverse_volume_keys" formatted="false">"Reverse volume keys"</string>
     <string name="ui_restore_default_cover" formatted="false">"Restore default cover"</string>
     <string name="ui_cannot_save_cache" formatted="false">"Cannot save cache"</string>
     <string name="ui_sync_failed_check_your_connection_and_google_drive_permissions" formatted="false">"Sync failed. Check your connection and Google Drive permissions."</string>
     <string name="ui_delete_all_saved_reading_positions" formatted="false">"Delete all saved reading positions?"</string>
-    <string name="ui_more" formatted="false">"More"</string>
     <string name="ui_done" formatted="false">"Done"</string>
     <string name="ui_the_archive_exceeds_the_limit_of_20_000_pages" formatted="false">"The archive exceeds the limit of 20,000 pages."</string>
     <string name="ui_first_page_2" formatted="false">"First page"</string>
@@ -379,7 +367,6 @@
     <string name="ui_open_last_book" formatted="false">"Open last book"</string>
     <string name="ui_port_blank_for_default" formatted="false">"Port (blank for default)"</string>
     <string name="ui_punch_hole_display_landscape" formatted="false">"Punch hole display - landscape"</string>
-    <string name="ui_zoom_2" formatted="false">"Zoom"</string>
     <string name="ui_set_thumbnails_storage" formatted="false">"Set thumbnails storage"</string>
     <string name="ui_background" formatted="false">"Background"</string>
     <string name="ui_resume_from_this_page" formatted="false">" Resume from this page?"</string>
@@ -401,4 +388,24 @@
     <string name="ui_cannot_open_a_folder_as_a_file" formatted="false">"Cannot open a folder as a file"</string>
     <string name="ui_reading_position" formatted="false">"Reading position: "</string>
     <string name="ui_bookmarked_books" formatted="false">"Bookmarked books"</string>
+    <string name="ui_find_page">Find a page</string>
+    <string name="ui_display_reading">Display and reading</string>
+    <string name="ui_book_actions">Book actions</string>
+    <string name="ui_control_settings">Controls</string>
+    <string name="ui_page_list_style">Page list display</string>
+    <string name="ui_reading_mode">Reading mode</string>
+    <string name="ui_scroll_mode">Scrolling mode</string>
+    <string name="ui_crop_settings">Margins and cropping</string>
+    <string name="ui_crop_all_books">Trim margins by percentage (all books)</string>
+    <string name="ui_crop_this_book">Select crop area (this book)</string>
+    <string name="ui_reset_position_confirm">Return to the first page and reset the saved reading position? Bookmarks will be kept.</string>
+    <string name="ui_bookmark_actions">Bookmarks</string>
+    <string name="ui_theme_red">Red</string>
+    <string name="ui_theme_blue">Blue</string>
+    <string name="ui_theme_green">Green</string>
+    <string name="ui_theme_purple">Purple</string>
+    <string name="ui_theme_pink">Pink</string>
+    <string name="ui_theme_orange">Orange</string>
+    <string name="ui_theme_gray">Gray</string>
+    <string name="ui_theme_system">Follow system</string>
 </resources>

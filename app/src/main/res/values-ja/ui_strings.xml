@@ -42,9 +42,7 @@
     <string name="ui_page_number_tap_to_jump" formatted="false">"ページ番号。タップして移動"</string>
     <string name="ui_single_page" formatted="false">"単ページ"</string>
     <string name="ui_sync_data_is_too_large" formatted="false">"同期データが大きすぎます"</string>
-    <string name="ui_next_menu_page" formatted="false">"次のメニューページ"</string>
     <string name="ui_favorites" formatted="false">"お気に入り"</string>
-    <string name="ui_3_tap_for_next" formatted="false">" / 3。タップで次へ"</string>
     <string name="ui_left" formatted="false">"左へ"</string>
     <string name="ui_scroll_animation" formatted="false">"スクロールアニメーション"</string>
     <string name="ui_add_hardware_key" formatted="false">"ハードウェアキーを追加"</string>
@@ -58,7 +56,6 @@
     <string name="ui_passive_ftp_off_active" formatted="false">"FTP passive（オフでactive）"</string>
     <string name="ui_columns" formatted="false">"カラム"</string>
     <string name="ui_auto_two_pages_in_landscape" formatted="false">"自動（横画面は見開き）"</string>
-    <string name="ui_right_vertical" formatted="false">"下へ(右)"</string>
     <string name="ui_position" formatted="false">"位置"</string>
     <string name="ui_zoom" formatted="false">"ズーム"</string>
     <string name="ui_name" formatted="false">"表示名"</string>
@@ -105,7 +102,6 @@
     <string name="ui_cannot_read_cache" formatted="false">"キャッシュを読み取れません"</string>
     <string name="ui_stretch_to_fill_screen" formatted="false">"画面いっぱいに伸縮"</string>
     <string name="ui_key_binding_saved" formatted="false">"割り当てを保存しました"</string>
-    <string name="ui_more_reading_settings" formatted="false">"その他の読書設定"</string>
     <string name="ui_screen_rotation" formatted="false">"画面回転"</string>
     <string name="ui_disabled" formatted="false">"無効"</string>
     <string name="ui_open" formatted="false">"開く"</string>
@@ -213,7 +209,6 @@
     <string name="ui_cannot_delete_folder" formatted="false">"フォルダを削除できません"</string>
     <string name="ui_set_zip_file_cache_retention_period" formatted="false">"圧縮ファイルのキャッシュ保存期間の設定"</string>
     <string name="ui_reset_settings" formatted="false">"設定の初期化"</string>
-    <string name="ui_first_menu_page" formatted="false">"最初のメニューページ"</string>
     <string name="ui_change_list_type" formatted="false">"一覧の表示形式を切り替え"</string>
     <string name="ui_sharpen_filter" formatted="false">"シャープフィルタ"</string>
     <string name="ui_both_buttons_move_forward" formatted="false">"両方のボタンで次へ進む"</string>
@@ -252,7 +247,6 @@
     <string name="ui_browse_folders" formatted="false">"フォルダを見る"</string>
     <string name="ui_wait_for_the_page_to_load_before_saving" formatted="false">"ページの読み込み後に保存してください"</string>
     <string name="ui_display_the_file_list_scrollbar_on_the_left_side" formatted="false">"ファイルリストのスクロールバーを左側に表示します"</string>
-    <string name="ui_show_next_reader_menu" formatted="false">"次の読書メニューを表示"</string>
     <string name="ui_enter_a_host_name" formatted="false">"ホスト名を入力してください"</string>
     <string name="ui_sync_your_resume_page_using_google_drive" formatted="false">"Google Driveを使用して、ページ再開の履歴を同期します"</string>
     <string name="ui_cannot_open_pdf" formatted="false">"PDFを開けません。"</string>
@@ -309,12 +303,10 @@
     <string name="ui_no_results" formatted="false">"見つかりません"</string>
     <string name="ui_double_tap" formatted="false">"ダブルタップ"</string>
     <string name="ui_icon" formatted="false">"アイコン"</string>
-    <string name="ui_left_vertical" formatted="false">"下へ(左)"</string>
     <string name="ui_right_page_button" formatted="false">"右側のページ操作"</string>
     <string name="ui_go_to_page" formatted="false">"ページへ移動"</string>
     <string name="ui_reading_direction" formatted="false">"ページ送り方向"</string>
     <string name="ui_open_the_next_file" formatted="false">"次のファイルを開く"</string>
-    <string name="ui_page_navigation" formatted="false">"ページ移動"</string>
     <string name="ui_lock_landscape" formatted="false">"横向きに固定"</string>
     <string name="ui_saved_directories" formatted="false">"登録ディレクトリ"</string>
     <string name="ui_show_a_dividing_line_between_dual_pages" formatted="false">"見開きページ間の分割線を表示"</string>
@@ -329,7 +321,6 @@
     <string name="ui_fixed" formatted="false">"固定"</string>
     <string name="ui_cannot_create_cache" formatted="false">"キャッシュを作成できません"</string>
     <string name="ui_page_button_area" formatted="false">"ページボタン領域"</string>
-    <string name="ui_reader_menu_1_3" formatted="false">"読書メニュー 1 / 3"</string>
     <string name="ui_cannot_modify_connection_root" formatted="false">"接続ルートは変更できません"</string>
     <string name="ui_passwd" formatted="false">"パスワード"</string>
     <string name="ui_clear_all_histories" formatted="false">"全ての履歴を削除します"</string>
@@ -356,7 +347,6 @@
     <string name="ui_first_page" formatted="false">"最初のページです"</string>
     <string name="ui_theme" formatted="false">"テーマ"</string>
     <string name="ui_delete" formatted="false">"削除"</string>
-    <string name="ui_invert_colors" formatted="false">"色を反転"</string>
     <string name="ui_supports_pdf_cbz_zip_and_images" formatted="false">"PDF・ZIP/CBZ・RAR/CBR・7z・画像に対応しています。"</string>
     <string name="ui_rename" formatted="false">"名前の変更"</string>
     <string name="ui_cannot_move_between_connections" formatted="false">"接続先をまたぐ移動はできません"</string>
@@ -365,13 +355,11 @@
     <string name="ui_actions" formatted="false">"操作"</string>
     <string name="ui_cannot_connect" formatted="false">"接続できません"</string>
     <string name="ui_folder_access_was_revoked" formatted="false">"フォルダへのアクセス許可が失われました。"</string>
-    <string name="ui_restore_colors" formatted="false">"色反転を戻す"</string>
     <string name="ui_reverse_volume_keys" formatted="false">"音量キーを反転"</string>
     <string name="ui_restore_default_cover" formatted="false">"表紙を初期状態に戻す"</string>
     <string name="ui_cannot_save_cache" formatted="false">"キャッシュを保存できません"</string>
     <string name="ui_sync_failed_check_your_connection_and_google_drive_permissions" formatted="false">"同期に失敗しました。接続とGoogle Driveの許可を確認してください。"</string>
     <string name="ui_delete_all_saved_reading_positions" formatted="false">"復帰位置をすべて削除しますか？"</string>
-    <string name="ui_more" formatted="false">"その他"</string>
     <string name="ui_done" formatted="false">"完了しました"</string>
     <string name="ui_the_archive_exceeds_the_limit_of_20_000_pages" formatted="false">"圧縮ファイルのページ数が多すぎます（上限20,000ページ）。"</string>
     <string name="ui_first_page_2" formatted="false">"最初のページ"</string>
@@ -379,7 +367,6 @@
     <string name="ui_open_last_book" formatted="false">"前回の作品を直接開く"</string>
     <string name="ui_port_blank_for_default" formatted="false">"ポート（空欄で標準）"</string>
     <string name="ui_punch_hole_display_landscape" formatted="false">"ホール・ディスプレイ - 横向き"</string>
-    <string name="ui_zoom_2" formatted="false">"拡大固定"</string>
     <string name="ui_set_thumbnails_storage" formatted="false">"サムネイルのキャッシュ容量の設定"</string>
     <string name="ui_background" formatted="false">"背景"</string>
     <string name="ui_resume_from_this_page" formatted="false">" ページから再開しますか？"</string>
@@ -401,4 +388,24 @@
     <string name="ui_cannot_open_a_folder_as_a_file" formatted="false">"フォルダは開けません"</string>
     <string name="ui_reading_position" formatted="false">"復帰位置: "</string>
     <string name="ui_bookmarked_books" formatted="false">"しおりのある作品"</string>
+    <string name="ui_find_page">ページを探す</string>
+    <string name="ui_display_reading">表示・読み方</string>
+    <string name="ui_book_actions">この本の操作</string>
+    <string name="ui_control_settings">操作設定</string>
+    <string name="ui_page_list_style">ページ一覧の表示方式</string>
+    <string name="ui_reading_mode">読み方</string>
+    <string name="ui_scroll_mode">スクロール方式</string>
+    <string name="ui_crop_settings">余白・トリミング</string>
+    <string name="ui_crop_all_books">余白を割合で切り取る（すべての本）</string>
+    <string name="ui_crop_this_book">切り取り範囲を指定（この本）</string>
+    <string name="ui_reset_position_confirm">先頭ページに戻り、保存した読書位置をリセットしますか？しおりは残ります。</string>
+    <string name="ui_bookmark_actions">しおり</string>
+    <string name="ui_theme_red">赤</string>
+    <string name="ui_theme_blue">青</string>
+    <string name="ui_theme_green">緑</string>
+    <string name="ui_theme_purple">紫</string>
+    <string name="ui_theme_pink">ピンク</string>
+    <string name="ui_theme_orange">オレンジ</string>
+    <string name="ui_theme_gray">グレー</string>
+    <string name="ui_theme_system">システムに合わせる</string>
 </resources>

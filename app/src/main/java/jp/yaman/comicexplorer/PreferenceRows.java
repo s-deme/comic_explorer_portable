@@ -18,12 +18,12 @@ public final class PreferenceRows {
         this.activity = activity;
         content = new LinearLayout(activity);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setBackgroundColor(Ui.DARK_BACKGROUND);
+        content.setBackgroundColor(Ui.BACKGROUND);
     }
     public void section(String name) {
-        TextView title = Ui.text(activity, name, 12, Ui.LIBRARY_ACCENT);
+        TextView title = Ui.text(activity, name, 12, Ui.BRAND);
         title.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 12), 0, Ui.dp(activity, 8));
-        title.setBackgroundColor(Ui.DARK_SURFACE_RAISED);
+        title.setBackgroundColor(Ui.SURFACE_RAISED);
         content.addView(title);
     }
     public LinearLayout action(String title, String summary, Runnable action) {
@@ -32,10 +32,10 @@ public final class PreferenceRows {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setMinimumHeight(Ui.dp(activity, 56));
         row.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 12), Ui.dp(activity, 16), Ui.dp(activity, 12));
-        TextView label = Ui.text(activity, title, 16, Ui.DARK_TEXT);
+        TextView label = Ui.text(activity, title, 16, Ui.TEXT_PRIMARY);
         row.addView(label);
         if (summary != null && !summary.isEmpty()) {
-            TextView detail = Ui.text(activity, summary, 13, Ui.DARK_MUTED);
+            TextView detail = Ui.text(activity, summary, 13, Ui.TEXT_SECONDARY);
             detail.setPadding(0, Ui.dp(activity, 4), 0, 0);
             row.addView(detail);
         }
@@ -57,7 +57,7 @@ public final class PreferenceRows {
         }
         row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
         CheckBox box = new CheckBox(activity);
-        Ui.styleDarkCheckable(box);
+        Ui.stylePaddedCheckable(box);
         box.setContentDescription(title);
         box.setChecked(AppState.enabled(activity, key, fallback));
         box.setOnCheckedChangeListener((button, checked) -> { AppState.put(activity, key, checked); changed.run(); });
@@ -77,9 +77,9 @@ public final class PreferenceRows {
     }
     public void compactCheck(String title, String key, boolean fallback, Runnable changed) {
         CheckBox box = new CheckBox(activity);
-        box.setText(title); box.setTextColor(Ui.DARK_TEXT); box.setTextSize(16);
+        box.setText(title); box.setTextColor(Ui.TEXT_PRIMARY); box.setTextSize(16);
         box.setMinHeight(Ui.dp(activity, 48)); box.setPadding(Ui.dp(activity, 12), 0, Ui.dp(activity, 12), 0);
-        Ui.styleDarkCheckable(box); box.setChecked(AppState.enabled(activity, key, fallback));
+        Ui.stylePaddedCheckable(box); box.setChecked(AppState.enabled(activity, key, fallback));
         box.setOnCheckedChangeListener((button, checked) -> { AppState.put(activity, key, checked); changed.run(); });
         content.addView(box, new LinearLayout.LayoutParams(-1, -2));
     }
@@ -93,9 +93,9 @@ public final class PreferenceRows {
         for (int i = 0; i < options.length; i++) {
             android.widget.RadioButton button = new android.widget.RadioButton(activity);
             button.setId(android.view.View.generateViewId()); button.setTag(values[i]);
-            button.setText(options[i]); button.setTextColor(Ui.DARK_TEXT);
+            button.setText(options[i]); button.setTextColor(Ui.TEXT_PRIMARY);
             if (inRow) {
-                TextView label=Ui.text(activity,options[i],14,Ui.DARK_TEXT);label.setGravity(Gravity.CENTER);
+                TextView label=Ui.text(activity,options[i],14,Ui.TEXT_PRIMARY);label.setGravity(Gravity.CENTER);
                 label.setPadding(0,Ui.dp(activity,8),0,0);labels.addView(label,new LinearLayout.LayoutParams(0,-2,1));
                 button.setText("");button.setContentDescription(options[i]);button.setMinWidth(0);
                 button.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
@@ -105,7 +105,7 @@ public final class PreferenceRows {
             }
             button.setMinHeight(Ui.dp(activity, 48));
             button.setPadding(Ui.dp(activity, inRow ? 4 : 12), 0, Ui.dp(activity, inRow ? 0 : 12), 0);
-            Ui.styleDarkCheckable(button);
+            Ui.stylePaddedCheckable(button);
             group.addView(button, inRow ? new LinearLayout.LayoutParams(0, -2, 1) : new LinearLayout.LayoutParams(-1, -2));
             if (values[i] == selected) group.check(button.getId());
         }
@@ -116,14 +116,14 @@ public final class PreferenceRows {
         content.addView(group);
     }
     public void slider(String title, String key, int fallback, int min, int max, String suffix, Runnable changed) {
-        TextView label = Ui.text(activity, "", 15, Ui.DARK_TEXT);
+        TextView label = Ui.text(activity, "", 15, Ui.TEXT_PRIMARY);
         label.setPadding(Ui.dp(activity, 16), Ui.dp(activity, 12), Ui.dp(activity, 16), 0);
         SeekBar bar = new SeekBar(activity);
         bar.setMin(min); bar.setMax(max);
         bar.setProgress(Math.max(min, Math.min(max, AppState.number(activity, key, fallback))));
         label.setText(title + ": " + bar.getProgress() + suffix);
         bar.setContentDescription(title);
-        Ui.styleSeekBar(bar, true);
+        Ui.styleSeekBar(bar);
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar view, int value, boolean user) { label.setText(title + ": " + value + suffix); }
             @Override public void onStartTrackingTouch(SeekBar view) { }

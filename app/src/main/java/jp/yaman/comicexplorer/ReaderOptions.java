@@ -1,6 +1,11 @@
 package jp.yaman.comicexplorer;
 
 import android.app.Activity;
+import android.content.pm.ActivityInfo;
+import android.view.WindowManager;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.SeekBar;
 import android.app.AlertDialog;
 import android.view.KeyEvent;
 import android.widget.EditText;
@@ -9,6 +14,81 @@ import android.widget.Toast;
 public final class ReaderOptions {
     public static final String[] ENCODINGS = {"UTF-8", "Shift_JIS", "IBM437", "GB18030", "Big5", "EUC-KR", "windows-1252"};
     private ReaderOptions() { }
+
+    public static void direction(Activity activity, Runnable changed) {
+        String[] choices = {I18n.t(R.string.ui_right), I18n.t(R.string.ui_left)};
+        Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_reading_direction))
+                .setSingleChoiceItems(choices, AppState.direction(activity), (dialog, selected) -> {
+                    AppState.setDirection(activity, selected);
+                    dialog.dismiss();
+                    changed.run();
+                }));
+    }
+
+    public static void orientation(Activity activity) {
+        String[] choices = {I18n.t(R.string.ui_auto_rotate), I18n.t(R.string.ui_lock_portrait), I18n.t(R.string.ui_lock_landscape)};
+        Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_screen_rotation)).setItems(choices, (dialog, selected) -> {
+            activity.setRequestedOrientation(selected == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : selected == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        }));
+    }
+
+    public static void brightness(Activity activity, java.util.function.IntConsumer preview) {
+        LinearLayout content = new LinearLayout(activity);
+        content.setPadding(Ui.dp(activity, 24), Ui.dp(activity, 6), Ui.dp(activity, 24), Ui.dp(activity, 4));
+        content.setOrientation(LinearLayout.VERTICAL);
+        TextView value = Ui.text(activity, "", 16, Ui.TEXT_PRIMARY);
+        int current = AppState.brightness(activity);
+        value.setText(current < 0 ? I18n.t(R.string.ui_system_brightness) : current + "%");
+        content.addView(value);
+        SeekBar slider = new SeekBar(activity);
+        slider.setMax(100);
+        slider.setProgress(current < 0 ? 50 : current);
+        Ui.styleSeekBar(slider);
+        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) { value.setText(progress + "%"); preview.accept(progress); }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { }
+        });
+        content.addView(slider);
+        android.widget.CheckBox keep = new android.widget.CheckBox(activity);
+        keep.setText(I18n.t(R.string.ui_keep_screen_on)); Ui.stylePaddedCheckable(keep); keep.setChecked(AppState.keepScreenOn(activity));
+        keep.setOnCheckedChangeListener((button, checked) -> { AppState.setKeepScreenOn(activity, checked); if (checked) activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); else activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); });
+        content.addView(keep);
+        Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_brightness)).setView(content).setNegativeButton(I18n.t(R.string.ui_system_settings), (dialog, which) -> {
+            AppState.setBrightness(activity, -1);
+            preview.accept(-1);
+        }).setPositiveButton(I18n.t(R.string.ui_save), (dialog, which) -> AppState.setBrightness(activity, slider.getProgress())));
+    }
+
+    public static void fit(Activity activity, Runnable changed) {
+        String[] choices = {I18n.t(R.string.ui_image_fit_to_screen), I18n.t(R.string.ui_fit_width), I18n.t(R.string.ui_fit_height), I18n.t(R.string.ui_stretch_to_fill_screen)};
+        Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_fit_screen)).setSingleChoiceItems(choices, AppState.fitMode(activity), (dialog, chosen) -> {
+            AppState.setFitMode(activity, chosen);
+            changed.run();
+            dialog.dismiss();
+        }));
+    }
+
+    public static void readingFlow(Activity activity, Runnable changed) {
+        Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_scroll_mode))
+                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_horizontal_swipe), I18n.t(R.string.ui_continuous_vertical_scrolling)}, AppState.readingFlow(activity), (dialog, selected) -> {
+                    AppState.setReadingFlow(activity, selected);
+                    changed.run();
+                    dialog.dismiss();
+                }));
+    }
+
+    public static void pageLayout(Activity activity, Runnable changed) {
+        Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_page_layout))
+                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_single_page), I18n.t(R.string.ui_two_pages), I18n.t(R.string.ui_auto_two_pages_in_landscape)}, AppState.pageLayout(activity), (dialog, selected) -> {
+                    AppState.setPageLayout(activity, selected);
+                    dialog.dismiss();
+                    changed.run();
+                }));
+    }
+
     public static void resume(Activity activity) {
         PreferenceRows rows = new PreferenceRows(activity);
         String[] modes = {I18n.t(R.string.ui_ask), I18n.t(R.string.ui_resume_page), I18n.t(R.string.ui_first_page_2)};
@@ -24,13 +104,13 @@ public final class ReaderOptions {
         rows.check(I18n.t(R.string.ui_show_filename), null, "grid_name", true, changed);
         rows.check(I18n.t(R.string.ui_square), null, "grid_square", false, changed);
         rows.slider(I18n.t(R.string.ui_columns), "grid_columns", 4, 1, 10, "", changed);
-        rows.action(I18n.t(R.string.ui_background), String.format("#%06X", AppState.number(activity, "grid_color", 0xff303030) & 0xFFFFFF), () -> color(activity, "grid_color", changed));
+        rows.action(I18n.t(R.string.ui_background), String.format("#%06X", AppState.number(activity, "grid_color", Ui.BACKGROUND) & 0xFFFFFF), () -> color(activity, "grid_color", changed));
         rows.show(I18n.t(R.string.ui_list_type));
     }
     public static void color(Activity activity, String key, Runnable changed) {
         android.widget.LinearLayout layout = new android.widget.LinearLayout(activity); layout.setOrientation(android.widget.LinearLayout.VERTICAL); layout.setPadding(Ui.dp(activity, 16), 0, Ui.dp(activity, 16), 0);
         EditText input = new EditText(activity); input.setSingleLine(true); input.setHint("#RRGGBB");
-        input.setText(String.format("#%06X", AppState.number(activity, key, key.equals("grid_color") ? 0xff303030 : Ui.DARK_BACKGROUND) & 0xFFFFFF));
+        input.setText(String.format("#%06X", AppState.number(activity, key, Ui.BACKGROUND) & 0xFFFFFF));
         input.setContentDescription(I18n.t(R.string.ui_background_color));
         int[] colors = {0xFF000000, 0xFF212121, 0xFF555555, 0xFFFFFFFF, 0xFFEF5350, 0xFFFFA726, 0xFFFFEE58, 0xFF689F38, 0xFF26A69A, 0xFF42A5F5, 0xFF7E57C2, 0xFFEC407A};
         for (int row = 0; row < 3; row++) {

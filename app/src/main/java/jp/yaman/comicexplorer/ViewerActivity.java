@@ -6,7 +6,6 @@ import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 
 import android.graphics.Canvas;
@@ -103,14 +102,14 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private View chromeTop;
     private View chromeBottom;
     private LinearLayout readerMenuRow;
-    private TextView readerMenuIndicator;
     private View errorPanel;
     private ProgressBar loading;
     private SeekBar pageSlider;
-    private Button quickBookmarkButton;
-    private Button leftPageButton;
-    private Button rightPageButton;
-    private int readerMenuPage;
+    private ImageButton quickBookmarkButton;
+    private ImageButton leftPageButton;
+    private ImageButton rightPageButton;
+    private ImageButton autoPageButton;
+    private ImageButton fullscreenButton;
     private ContinuousReader continuous;
     private FrameLayout pageCanvas;
     private androidx.drawerlayout.widget.DrawerLayout readerDrawer;
@@ -122,9 +121,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private Runnable disposeDrawer;
 
     private android.graphics.RectF customCrop;
-    private float menuTouchX;
-    private float menuTouchY;
-    private boolean swipingMenu;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -133,8 +129,8 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         int maxKb = manager == null ? 20 * 1024 : Math.min(32 * 1024, manager.getMemoryClass() * 1024 / 6);
         pageCache = new BitmapMemoryCache(Math.max(8 * 1024, maxKb));
         maxBitmapPixels = Math.max(2 * 1024 * 1024, maxKb * 1024 / 4);
-        getWindow().setStatusBarColor(Ui.DARK_BACKGROUND);
-        getWindow().setNavigationBarColor(Ui.DARK_BACKGROUND);
+        getWindow().setStatusBarColor(Ui.BACKGROUND);
+        getWindow().setNavigationBarColor(Ui.BACKGROUND);
         sourceUri = getIntent().getData();
         if (sourceUri == null) { finish(); return; }
         customCrop = AppState.crop(this, sourceUri);
@@ -142,29 +138,34 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         if (title == null || title.trim().isEmpty()) title = "Comic Explorer";
         imageUris = getIntent().getParcelableArrayListExtra(EXTRA_IMAGE_URIS);
         buildUi();
-        applyDarkSystemBarIcons();
         applyReaderPreferences();
+        if (AppState.startFullscreen(this)) {
+            fullScreen = true;
+            imageView.post(this::applyFullscreen);
+        }
+
+        refreshReaderActions();
         initializeSource();
     }
 
     private void buildUi() {
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Ui.DARK_BACKGROUND);
+        root.setBackgroundColor(Ui.BACKGROUND);
 
         LinearLayout topChrome = new LinearLayout(this);
         topChrome.setOrientation(LinearLayout.VERTICAL);
-        topChrome.setBackgroundColor(Ui.DARK_SURFACE);
+        topChrome.setBackgroundColor(Ui.TOOLBAR);
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setPadding(dp(4), 0, dp(4), 0);
-        top.setBackgroundColor(Ui.DARK_SURFACE);
+        top.setBackgroundColor(Ui.TOOLBAR);
         ImageButton close = new ImageButton(this);
         close.setImageResource(R.drawable.ic_arrow_back);
         close.setContentDescription(I18n.t(R.string.ui_close_book));
-        Ui.styleToolbarButton(close, Ui.DARK_SURFACE);
+        Ui.styleToolbarButton(close, Ui.TOOLBAR);
         close.setOnClickListener(view -> finish());
         top.addView(close, new LinearLayout.LayoutParams(dp(48), dp(56)));
-        TextView titleText = text(title, 16, Ui.DARK_TEXT);
+        TextView titleText = text(title, 16, Ui.TEXT_PRIMARY);
         titleText.setGravity(Gravity.CENTER_VERTICAL);
         titleText.setSingleLine(true);
         titleText.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -172,12 +173,12 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         top.addView(titleText, new LinearLayout.LayoutParams(0, dp(56), 1f));
         ImageButton more = new ImageButton(this);
         more.setImageResource(R.drawable.ic_toolbar_more);
-        more.setContentDescription(I18n.t(R.string.ui_show_next_reader_menu));
-        Ui.styleToolbarButton(more, Ui.DARK_SURFACE);
+        more.setContentDescription(I18n.t(R.string.ui_reader_menu));
+        Ui.styleToolbarButton(more, Ui.TOOLBAR);
         more.setOnClickListener(view -> showReaderMenu());
         top.addView(more, new LinearLayout.LayoutParams(dp(48), dp(56)));
         topChrome.addView(top, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
-        topChrome.addView(buildReaderMenu(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(72)));
+        topChrome.addView(buildReaderMenu(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
         chromeTop = topChrome;
 
         FrameLayout canvas = new FrameLayout(this);
@@ -191,8 +192,8 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         }, this);
         continuous.setVisibility(View.GONE);
         canvas.addView(continuous, new FrameLayout.LayoutParams(-1, -1));
-        leftPageButton = readerAction("−", I18n.t(R.string.ui_left_page_button));
-        rightPageButton = readerAction("＋", I18n.t(R.string.ui_right_page_button));
+        leftPageButton = Ui.iconButton(this, R.drawable.ic_reader_page_left, I18n.t(R.string.ui_left_page_button));
+        rightPageButton = Ui.iconButton(this, R.drawable.ic_reader_page_right, I18n.t(R.string.ui_right_page_button));
         Ui.styleReaderPageButton(leftPageButton);
         Ui.styleReaderPageButton(rightPageButton);
         leftPageButton.setOnClickListener(view -> pageButton(false));
@@ -202,7 +203,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         canvas.addView(leftPageButton, leftPageParams);
         canvas.addView(rightPageButton, rightPageParams);
         loading = new ProgressBar(this);
-        loading.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.READER_ACCENT));
+        loading.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.BRAND));
         FrameLayout.LayoutParams loadingParams = new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER);
         canvas.addView(loading, loadingParams);
         LinearLayout error = new LinearLayout(this);
@@ -210,12 +211,12 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         error.setGravity(Gravity.CENTER);
         error.setPadding(dp(24), dp(24), dp(24), dp(24));
         Ui.styleDarkPanel(error);
-        errorText = text("", 16, Ui.DARK_TEXT);
+        errorText = text("", 16, Ui.TEXT_PRIMARY);
         errorText.setGravity(Gravity.CENTER);
         errorText.setLineSpacing(0, 1.08f);
         error.addView(errorText);
         Button retry = button(I18n.t(R.string.ui_retry), I18n.t(R.string.ui_reload_file));
-        Ui.styleButton(retry, Ui.ButtonStyle.DARK_PRIMARY);
+        Ui.styleButton(retry, Ui.ButtonStyle.PRIMARY);
         retry.setOnClickListener(view -> { if (initialized) loadPage(page, false); else initializeSource(); });
         LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48));
         retryParams.setMargins(0, dp(16), 0, 0);
@@ -229,21 +230,21 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
 
         LinearLayout bottom = new LinearLayout(this);
         bottom.setOrientation(LinearLayout.VERTICAL);
-        bottom.setBackgroundColor(Ui.DARK_SURFACE);
+        bottom.setBackgroundColor(Ui.SURFACE);
 
         LinearLayout sliderRow = new LinearLayout(this);
         sliderRow.setGravity(Gravity.CENTER_VERTICAL);
         sliderRow.setPadding(dp(8), 0, dp(8), 0);
-        pageText = text(I18n.t(R.string.ui_loading), 13, Ui.DARK_TEXT);
+        pageText = text(I18n.t(R.string.ui_loading), 13, Ui.TEXT_PRIMARY);
         pageText.setGravity(Gravity.CENTER);
-        Ui.styleDarkChip(pageText, false);
+        Ui.styleChip(pageText, false);
         pageText.setContentDescription(I18n.t(R.string.ui_page_number_tap_to_jump));
         pageText.setOnClickListener(view -> showPageJump());
         sliderRow.addView(pageText, new LinearLayout.LayoutParams(dp(88), dp(36)));
         pageSlider = new SeekBar(this);
         pageSlider.setMax(0);
         pageSlider.setContentDescription(I18n.t(R.string.ui_page_slider));
-        Ui.styleSeekBar(pageSlider, true);
+        Ui.styleSeekBar(pageSlider);
         pageSlider.setMinimumHeight(dp(40));
         pageSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
@@ -264,7 +265,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         readerDrawer = new androidx.drawerlayout.widget.DrawerLayout(this);
         readerDrawer.addView(root, new androidx.drawerlayout.widget.DrawerLayout.LayoutParams(-1, -1));
         drawerPanel = new FrameLayout(this);
-        drawerPanel.setBackgroundColor(android.graphics.Color.WHITE);
+        drawerPanel.setBackgroundColor(Ui.SURFACE);
         readerDrawer.addView(drawerPanel, new androidx.drawerlayout.widget.DrawerLayout.LayoutParams(dp(96), -1, Gravity.LEFT));
         readerDrawer.setDrawerTitle(Gravity.LEFT, I18n.t(R.string.ui_page_thumbnails));
         readerDrawer.setDrawerLockMode(androidx.drawerlayout.widget.DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
@@ -284,69 +285,37 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             }
         });
         setContentView(readerDrawer);
-        Ui.applySystemBarInsets(this, readerDrawer);
+        Ui.applySystemBarInsets(this, root);
     }
 
     private View buildReaderMenu() {
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setBackgroundColor(Ui.DARK_SURFACE_RAISED);
         readerMenuRow = new LinearLayout(this);
         readerMenuRow.setGravity(Gravity.CENTER_VERTICAL);
-        panel.addView(readerMenuRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
-        readerMenuIndicator = text("", 9, Ui.READER_ACCENT);
-        readerMenuIndicator.setGravity(Gravity.CENTER);
-        readerMenuIndicator.setContentDescription(I18n.t(R.string.ui_reader_menu_1_3));
-        readerMenuIndicator.setOnClickListener(view -> showReaderMenu());
-        panel.addView(readerMenuIndicator, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(16)));
-        showReaderMenuPage(0);
-        panel.setOnTouchListener((view, event) -> {
-            if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) { menuTouchX = event.getX(); return true; }
-            if (event.getAction() == android.view.MotionEvent.ACTION_UP && Math.abs(event.getX() - menuTouchX) > dp(48)) {
-                showReaderMenuPage((readerMenuPage + (event.getX() < menuTouchX ? 1 : 2)) % 3); return true;
-            }
-            return true;
+        readerMenuRow.setBackgroundColor(Ui.SURFACE_RAISED);
+        addReaderMenuAction(R.drawable.ic_reader_pages, I18n.t(R.string.ui_page_thumbnails), view -> showPageList());
+        quickBookmarkButton = addReaderMenuAction(R.drawable.ic_reader_bookmark, I18n.t(R.string.ui_bookmark_this_page), view -> toggleBookmark());
+        addReaderMenuAction(R.drawable.ic_reader_brightness, I18n.t(R.string.ui_brightness), view -> showBrightnessDialog());
+        fullscreenButton = addReaderMenuAction(R.drawable.ic_reader_fullscreen, I18n.t(R.string.ui_enter_fullscreen), view -> toggleFullscreen());
+        autoPageButton = addReaderMenuAction(R.drawable.ic_reader_auto_page, I18n.t(R.string.ui_auto_page_turn), view -> {
+            if (autoDelayMs > 0) stopAutoPage(); else showAutoPageDialog();
         });
-        return panel;
+        refreshReaderActions();
+        return readerMenuRow;
     }
 
-    private void showReaderMenuPage(int target) {
-        readerMenuPage = target;
-        readerMenuRow.removeAllViews();
-        quickBookmarkButton = null;
-        if (target == 0) {
-            addReaderMenuAction("⇆", I18n.t(R.string.ui_reading_direction), view -> showDirectionDialog());
-            addReaderMenuAction("↻", I18n.t(R.string.ui_screen_rotation), view -> showOrientationDialog());
-            addReaderMenuAction("▥", I18n.t(R.string.ui_page_layout), view -> showPageLayoutDialog());
-            addReaderMenuAction("□", I18n.t(R.string.ui_fit_screen), view -> showFitDialog());
-            addReaderMenuAction("◐", I18n.t(R.string.ui_brightness), view -> showBrightnessDialog());
-        } else if (target == 1) {
-            addReaderMenuAction("◎", I18n.t(R.string.ui_zoom_2), view -> showZoomDialog());
-            addReaderMenuAction("◒", I18n.t(R.string.ui_image_filters), view -> showFilterDialog());
-            addReaderMenuAction("↕", I18n.t(R.string.ui_page_navigation), view -> showReadingFlowDialog());
-            quickBookmarkButton = addReaderMenuAction("☆", I18n.t(R.string.ui_bookmark_this_page), view -> toggleBookmark());
-            addReaderMenuAction("☷", I18n.t(R.string.ui_bookmarks_2), view -> showBookmarks());
-            refreshQuickBookmark();
-        } else {
-            addReaderMenuAction("▣", I18n.t(R.string.ui_save_screen_as_image), view -> capturePage());
-            addReaderMenuAction("#", I18n.t(R.string.ui_go_to_page), view -> showPageJump());
-            addReaderMenuAction("⛶", fullScreen ? I18n.t(R.string.ui_exit_fullscreen) : I18n.t(R.string.ui_enter_fullscreen), view -> { toggleFullscreen(); showReaderMenuPage(2); });
-            addReaderMenuAction(autoDelayMs > 0 ? "Ⅱ" : "▶", autoDelayMs > 0 ? I18n.t(R.string.ui_stop_auto_page_turn) : I18n.t(R.string.ui_auto_page_turn), view -> {
-                if (autoDelayMs > 0) { stopAutoPage(); showReaderMenuPage(2); }
-                else showAutoPageDialog();
-            });
-            addReaderMenuAction("⋮", I18n.t(R.string.ui_more_reading_settings), view -> showMoreReaderSettings());
-        }
-        Button next = readerAction(target < 2 ? "›" : "‹", target < 2 ? I18n.t(R.string.ui_next_menu_page) : I18n.t(R.string.ui_first_menu_page));
-        next.setOnClickListener(view -> showReaderMenuPage(target < 2 ? target + 1 : 0));
-        readerMenuRow.addView(next, new LinearLayout.LayoutParams(dp(48), dp(56)));
-        readerMenuIndicator.setText(target == 0 ? "●  ○  ○" : target == 1 ? "○  ●  ○" : "○  ○  ●");
-        readerMenuIndicator.setContentDescription(I18n.t(R.string.ui_reader_menu) + (target + 1) + I18n.t(R.string.ui_3_tap_for_next));
+    private void refreshReaderActions() {
+        refreshQuickBookmark();
+        if (autoPageButton != null) Ui.updateIconButton(autoPageButton,
+                autoDelayMs > 0 ? R.drawable.ic_reader_stop : R.drawable.ic_reader_auto_page,
+                I18n.t(autoDelayMs > 0 ? R.string.ui_stop_auto_page_turn : R.string.ui_auto_page_turn),
+                autoDelayMs > 0, Ui.TEXT_PRIMARY);
+        if (fullscreenButton != null) Ui.updateIconButton(fullscreenButton,
+                fullScreen ? R.drawable.ic_reader_fullscreen_exit : R.drawable.ic_reader_fullscreen,
+                I18n.t(fullScreen ? R.string.ui_exit_fullscreen : R.string.ui_enter_fullscreen), fullScreen, Ui.TEXT_PRIMARY);
     }
 
-    private Button addReaderMenuAction(String symbol, String description, View.OnClickListener listener) {
-        Button button = readerAction(symbol, description);
-        button.setTooltipText(description);
+    private ImageButton addReaderMenuAction(int symbol, String description, View.OnClickListener listener) {
+        ImageButton button = Ui.iconButton(this, symbol, description);
         button.setOnClickListener(listener);
         readerMenuRow.addView(button, new LinearLayout.LayoutParams(0, dp(56), 1f));
         return button;
@@ -354,6 +323,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
 
     private void applyReaderPreferences() {
         if (AppState.keepScreenOn(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         pageLayout = AppState.pageLayout(this);
         dualPageDivider = AppState.dualPageDivider(this);
 
@@ -365,10 +335,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         imageView.setFilterMode(AppState.FILTER_NONE);
         updatePageButtons();
         applyBrightness(AppState.brightness(this));
-        if (AppState.startFullscreen(this)) {
-            fullScreen = true;
-            imageView.post(this::applyFullscreen);
-        }
     }
 
     private void updatePageButtons() {
@@ -396,9 +362,10 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         leftPageButton.setLayoutParams(left); rightPageButton.setLayoutParams(right);
         leftPageButton.requestLayout();
         rightPageButton.requestLayout();
-        boolean rtl = AppState.direction(this) == AppState.DIRECTION_RTL;
-        leftPageButton.setContentDescription(rtl ? I18n.t(R.string.ui_next_page) : I18n.t(R.string.ui_previous_page));
-        rightPageButton.setContentDescription(rtl ? I18n.t(R.string.ui_previous_page) : I18n.t(R.string.ui_next_page));
+        leftPageButton.setContentDescription(pageButtonForward(false) ? I18n.t(R.string.ui_next_page) : I18n.t(R.string.ui_previous_page));
+        rightPageButton.setContentDescription(pageButtonForward(true) ? I18n.t(R.string.ui_next_page) : I18n.t(R.string.ui_previous_page));
+        leftPageButton.setTooltipText(leftPageButton.getContentDescription());
+        rightPageButton.setTooltipText(rightPageButton.getContentDescription());
     }
 
     private void initializeSource() {
@@ -651,8 +618,10 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private void refreshQuickBookmark() {
         if (quickBookmarkButton == null) return;
         boolean marked = initialized && AppState.hasBookmark(this, sourceUri, page);
-        quickBookmarkButton.setText(marked ? "★" : "☆");
-        quickBookmarkButton.setContentDescription(marked ? I18n.t(R.string.ui_remove_this_bookmark) : I18n.t(R.string.ui_bookmark_this_page));
+        Ui.updateIconButton(quickBookmarkButton,
+                marked ? R.drawable.ic_reader_bookmark_on : R.drawable.ic_reader_bookmark,
+                I18n.t(marked ? R.string.ui_remove_this_bookmark : R.string.ui_bookmark_this_page),
+                marked, marked ? Ui.BRAND : Ui.TEXT_PRIMARY);
     }
 
     private void showPageJump() {
@@ -672,39 +641,103 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     }
 
     private void showReaderMenu() {
-        showReaderMenuPage((readerMenuPage + 1) % 3);
+        Ui.Actions menu = new Ui.Actions();
+        if (initialized) {
+            menu.add(I18n.t(R.string.ui_find_page), this::showPageNavigation);
+            menu.add(I18n.t(R.string.ui_bookmark_actions), this::showBookmarkActions);
+        }
+        menu.add(I18n.t(R.string.ui_display_reading), this::showDisplaySettings);
+        if (initialized) menu.add(I18n.t(R.string.ui_book_actions), this::showBookActions);
+        menu.add(I18n.t(R.string.ui_control_settings), this::showControlSettings);
+        menu.show(this, I18n.t(R.string.ui_reader_menu));
     }
 
-    private void showMoreReaderSettings() {
+    private void showPageNavigation() {
         Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(R.string.ui_page_thumbnails), this::showPageList);
+        menu.add(I18n.t(R.string.ui_chapters), () -> showPageBrowser(true));
+        menu.add(I18n.t(R.string.ui_go_to_page), this::showPageJump);
+        menu.show(this, I18n.t(R.string.ui_find_page));
+    }
+
+    private void showPageList() {
+        if (!initialized) return;
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(R.string.ui_page_thumbnails), () -> showPageBrowser(false));
+        menu.add(I18n.t(R.string.ui_page_strip), () -> showPageBrowser(false, true));
+        menu.show(this, I18n.t(R.string.ui_page_list_style));
+    }
+
+    private void showBookmarkActions() {
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(AppState.hasBookmark(this, sourceUri, page) ? R.string.ui_remove_this_bookmark : R.string.ui_bookmark_this_page), this::toggleBookmark);
+        menu.add(I18n.t(R.string.ui_bookmarks_2), this::showBookmarks);
         menu.add(I18n.t(R.string.ui_edit_bookmark_note), this::showBookmarkMemo);
-        menu.add(AppState.enabled(this, "filter_invert", false) ? I18n.t(R.string.ui_restore_colors) : I18n.t(R.string.ui_invert_colors), () -> {
-            AppState.put(this, "filter_invert", !AppState.enabled(this, "filter_invert", false)); refreshReader();
+        menu.show(this, I18n.t(R.string.ui_bookmark_actions));
+    }
+
+    private void showDisplaySettings() {
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(R.string.ui_reading_mode), this::showReadingSettings);
+        menu.add(I18n.t(R.string.ui_page_layout), this::showPageLayoutDialog);
+        menu.add(I18n.t(R.string.ui_fit_screen), this::showFitDialog);
+        menu.add(I18n.t(R.string.ui_screen_rotation), this::showOrientationDialog);
+        menu.add(I18n.t(R.string.ui_brightness), this::showBrightnessDialog);
+        menu.add(I18n.t(R.string.ui_image_filters), this::showFilterDialog);
+        menu.add(I18n.t(R.string.ui_crop_settings), this::showCropSettings);
+        menu.show(this, I18n.t(R.string.ui_display_reading));
+    }
+
+    private void showReadingSettings() {
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(R.string.ui_reading_direction), this::showDirectionDialog);
+        menu.add(I18n.t(R.string.ui_scroll_mode), this::showReadingFlowDialog);
+        if (vertical()) menu.add(I18n.t(R.string.ui_page_spacing), () -> {
+            PreferenceRows rows = new PreferenceRows(this);
+            rows.slider(I18n.t(R.string.ui_page_spacing), "page_gap", 0, 0, 100, " dp", this::refreshReader);
+            rows.show(I18n.t(R.string.ui_page_spacing));
         });
-        menu.add(I18n.t(R.string.ui_crop_page_margins), this::showCropDialog);
+        menu.show(this, I18n.t(R.string.ui_reading_mode));
+    }
+
+    private void showCropSettings() {
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(R.string.ui_crop_all_books), this::showCropDialog);
+        if (initialized) menu.add(I18n.t(R.string.ui_crop_this_book), this::showCropEditor);
+        menu.show(this, I18n.t(R.string.ui_crop_settings));
+    }
+
+    private void showBookActions() {
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(R.string.ui_save_screen_as_image), this::capturePage);
         menu.add(I18n.t(R.string.ui_set_current_page_as_cover), this::saveCurrentPageCover);
         if (AppState.hasCover(this, sourceUri)) menu.add(I18n.t(R.string.ui_restore_default_cover), () -> {
             AppState.removeCover(this, sourceUri);
             Toast.makeText(this, I18n.t(R.string.ui_cover_restored), Toast.LENGTH_SHORT).show();
         });
-        menu.add(I18n.t(R.string.ui_reset_reading_position), () -> {
-            AppState.clearPosition(this, sourceUri); goToPage(0);
-            Toast.makeText(this, I18n.t(R.string.ui_reading_position_reset), Toast.LENGTH_SHORT).show();
-        });
-        menu.add(I18n.t(R.string.ui_settings), () -> startActivity(new Intent(this, SettingsActivity.class)));
+        ArrayList<Uri> books = getIntent().getParcelableArrayListExtra(EXTRA_BOOK_URIS);
+        ArrayList<String> titles = getIntent().getStringArrayListExtra(EXTRA_BOOK_TITLES);
+        if (books != null && titles != null && books.size() == titles.size()
+                && books.indexOf(sourceUri) >= 0 && books.indexOf(sourceUri) + 1 < books.size())
+            menu.add(I18n.t(R.string.ui_open_the_next_file), () -> nextBook(true));
+        menu.add(I18n.t(R.string.ui_reset_reading_position), () -> Ui.show(new AlertDialog.Builder(this)
+                .setTitle(I18n.t(R.string.ui_reset_reading_position)).setMessage(I18n.t(R.string.ui_reset_position_confirm))
+                .setNegativeButton(I18n.t(R.string.ui_cancel), null)
+                .setPositiveButton(I18n.t(R.string.ui_reset_reading_position), (dialog, which) -> {
+                    stopAutoPage();
+                    AppState.clearPosition(this, sourceUri); goToPage(0);
+                    Toast.makeText(this, I18n.t(R.string.ui_reading_position_reset), Toast.LENGTH_SHORT).show();
+                })));
+        menu.show(this, I18n.t(R.string.ui_book_actions));
+    }
+
+    private void showControlSettings() {
+        Ui.Actions menu = new Ui.Actions();
         menu.add(I18n.t(R.string.ui_page_button_area), () -> ReaderOptions.pageButtons(this, this::refreshReader));
         menu.add(I18n.t(R.string.ui_hardware_key), () -> ReaderOptions.hardware(this, () -> { }));
-        menu.add(I18n.t(R.string.ui_page_spacing), () -> {
-            PreferenceRows rows = new PreferenceRows(this);
-            rows.slider(I18n.t(R.string.ui_page_spacing), "page_gap", 0, 0, 100, " dp", this::refreshReader);
-            rows.show(I18n.t(R.string.ui_page_spacing));
-        });
-        menu.add(I18n.t(R.string.ui_page_thumbnails), () -> showPageBrowser(false));
-        menu.add(I18n.t(R.string.ui_chapters), () -> showPageBrowser(true));
-        menu.add(I18n.t(R.string.ui_page_strip), () -> showPageBrowser(false, true));
-        menu.add(I18n.t(R.string.ui_margin_cropping), this::showCropEditor);
-        menu.add(I18n.t(R.string.ui_open_the_next_file), () -> nextBook(true));
-        menu.show(this, I18n.t(R.string.ui_more));
+        menu.add(I18n.t(R.string.ui_double_tap_zoom), this::showZoomDialog);
+        menu.add(I18n.t(R.string.ui_settings), () -> startActivity(new Intent(this, SettingsActivity.class)));
+        menu.show(this, I18n.t(R.string.ui_control_settings));
     }
 
     private void saveCurrentPageCover() {
@@ -760,24 +793,9 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
                 }));
     }
 
-    private void showPageLayoutDialog() {
-        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_page_layout))
-                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_single_page), I18n.t(R.string.ui_two_pages), I18n.t(R.string.ui_auto_two_pages_in_landscape)}, pageLayout, (dialog, selected) -> {
-                    pageLayout = selected;
-                    AppState.setPageLayout(this, selected);
-                    dialog.dismiss();
-                    refreshReader();
-                }));
-    }
+    private void showPageLayoutDialog() { ReaderOptions.pageLayout(this, this::refreshReader); }
 
-    private void showReadingFlowDialog() {
-        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_page_navigation))
-                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_horizontal_swipe), I18n.t(R.string.ui_continuous_vertical_scrolling)}, AppState.readingFlow(this), (dialog, selected) -> {
-                    AppState.setReadingFlow(this, selected);
-                    refreshReader();
-                    dialog.dismiss();
-                }));
-    }
+    private void showReadingFlowDialog() { ReaderOptions.readingFlow(this, this::refreshReader); }
 
     private void showFilterDialog() { ReaderOptions.filters(this, this::refreshReader); }
 
@@ -798,63 +816,13 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
                 }));
     }
 
-    private void showFitDialog() {
-        String[] choices = {I18n.t(R.string.ui_image_fit_to_screen), I18n.t(R.string.ui_fit_width), I18n.t(R.string.ui_fit_height), I18n.t(R.string.ui_stretch_to_fill_screen)};
-        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_fit_screen)).setSingleChoiceItems(choices, AppState.fitMode(this), (dialog, chosen) -> {
-            AppState.setFitMode(this, chosen);
-            imageView.setFitMode(chosen);
-            dialog.dismiss();
-        }));
-    }
+    private void showFitDialog() { ReaderOptions.fit(this, () -> imageView.setFitMode(AppState.fitMode(this))); }
 
-    private void showBrightnessDialog() {
-        LinearLayout content = new LinearLayout(this);
-        content.setPadding(dp(24), dp(6), dp(24), dp(4));
-        content.setOrientation(LinearLayout.VERTICAL);
-        TextView value = text("", 16, Ui.TEXT_PRIMARY);
-        int current = AppState.brightness(this);
-        value.setText(current < 0 ? I18n.t(R.string.ui_system_brightness) : current + "%");
-        content.addView(value);
-        SeekBar slider = new SeekBar(this);
-        slider.setMax(100);
-        slider.setProgress(current < 0 ? 50 : current);
-        Ui.styleSeekBar(slider, false);
-        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) { value.setText(progress + "%"); applyBrightness(progress); }
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
-            @Override public void onStopTrackingTouch(SeekBar seekBar) { }
-        });
-        content.addView(slider);
-        android.widget.CheckBox keep = new android.widget.CheckBox(this);
-        keep.setText(I18n.t(R.string.ui_keep_screen_on)); Ui.styleDarkCheckable(keep); keep.setChecked(AppState.keepScreenOn(this));
-        keep.setOnCheckedChangeListener((button, checked) -> { AppState.setKeepScreenOn(this, checked); if (checked) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); });
-        content.addView(keep);
-        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_brightness)).setView(content).setNegativeButton(I18n.t(R.string.ui_system_settings), (dialog, which) -> {
-            AppState.setBrightness(this, -1);
-            applyBrightness(-1);
-        }).setPositiveButton(I18n.t(R.string.ui_save), (dialog, which) -> AppState.setBrightness(this, slider.getProgress())));
-    }
+    private void showBrightnessDialog() { ReaderOptions.brightness(this, this::applyBrightness); }
 
-    private void showOrientationDialog() {
-        String[] choices = {I18n.t(R.string.ui_auto_rotate), I18n.t(R.string.ui_lock_portrait), I18n.t(R.string.ui_lock_landscape)};
-        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_screen_rotation)).setItems(choices, (dialog, selected) -> {
-            setRequestedOrientation(selected == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : selected == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
-        }));
-    }
+    private void showOrientationDialog() { ReaderOptions.orientation(this); }
 
-    private void showDirectionDialog() {
-        String[] choices = {I18n.t(R.string.ui_right), I18n.t(R.string.ui_left), I18n.t(R.string.ui_right_vertical), I18n.t(R.string.ui_left_vertical)};
-        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_reading_direction))
-                .setSingleChoiceItems(choices, AppState.direction(this) + (vertical() ? 2 : 0), (dialog, selected) -> {
-                    AppState.setDirection(this, selected % 2);
-                    AppState.setReadingFlow(this, selected >= 2 ? 1 : 0);
-                    updatePageButtons();
-                    dialog.dismiss();
-                    refreshReader();
-                }));
-    }
+    private void showDirectionDialog() { ReaderOptions.direction(this, this::refreshReader); }
 
     private void showBookmarks() {
         Set<Integer> pages = AppState.bookmarks(this, sourceUri);
@@ -867,7 +835,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             String memo = AppState.bookmarkMemo(this, sourceUri, bookmarkedPage);
             labels[index] = (bookmarkedPage + 1) + I18n.t(R.string.ui_pages_2) + (memo.isEmpty() ? "" : "  •  " + memo);
         }
-        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_add_bookmark)).setItems(labels, (ignored, selected) -> goToPage(ordered.get(selected)))
+        AlertDialog dialog = Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_bookmarks_2)).setItems(labels, (ignored, selected) -> goToPage(ordered.get(selected)))
                 .setNegativeButton(I18n.t(R.string.ui_delete_all), (ignored, which) -> { AppState.clearBookmarks(this, sourceUri); refreshQuickBookmark(); }));
         Ui.styleButton(dialog.getButton(AlertDialog.BUTTON_NEGATIVE), Ui.ButtonStyle.DANGER);
     }
@@ -878,13 +846,14 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             autoDelayMs = new int[]{5000, 10000, 15000}[selected];
             autoHandler.removeCallbacks(autoPage);
             autoHandler.postDelayed(autoPage, autoDelayMs);
-            if (readerMenuPage == 2) showReaderMenuPage(2);
+            refreshReaderActions();
         }));
     }
 
     private void stopAutoPage() {
         autoDelayMs = 0;
         autoHandler.removeCallbacks(autoPage);
+        refreshReaderActions();
     }
 
     private void capturePage() {
@@ -895,7 +864,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         }
         Bitmap capture = Bitmap.createBitmap(visiblePage.getWidth(), visiblePage.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(capture);
-        canvas.drawColor(Ui.DARK_BACKGROUND);
+        canvas.drawColor(Ui.BACKGROUND);
         visiblePage.draw(canvas);
         worker.execute(() -> {
             Uri output = null;
@@ -936,7 +905,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         updatePageButtons();
     }
 
-    private void toggleFullscreen() { fullScreen = !fullScreen; applyFullscreen(); }
+    private void toggleFullscreen() { fullScreen = !fullScreen; applyFullscreen(); refreshReaderActions(); }
 
     private void applyFullscreen() {
         Window window = getWindow();
@@ -961,7 +930,8 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             int fullscreenFlags = View.SYSTEM_UI_FLAG_FULLSCREEN
                     | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                     | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-            window.getDecorView().setSystemUiVisibility(layoutFlags | (fullScreen ? fullscreenFlags : 0));
+            int iconFlags = Ui.light ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR : 0;
+            window.getDecorView().setSystemUiVisibility(layoutFlags | iconFlags | (fullScreen ? fullscreenFlags : 0));
         }
         window.getDecorView().requestApplyInsets();
     }
@@ -969,16 +939,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus && fullScreen) applyFullscreen();
-    }
-
-    private void applyDarkSystemBarIcons() {
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
-            WindowInsetsController controller = getWindow().getInsetsController();
-            if (controller != null) controller.setSystemBarsAppearance(0,
-                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
-        } else {
-            getWindow().getDecorView().setSystemUiVisibility(0);
-        }
     }
 
     private void showLoading(boolean show) { loading.setVisibility(show ? View.VISIBLE : View.GONE); }
@@ -991,20 +951,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     @Override public void onTap(float normalizedX) {
         if (!initialized) return;
         toggleChrome();
-    }
-
-    @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
-        if (readerDrawer != null && readerDrawer.isDrawerVisible(drawerPanel)) return super.dispatchTouchEvent(event);
-        if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
-            int[] location = new int[2]; if (chromeTop != null) chromeTop.getLocationOnScreen(location);
-            menuTouchX = event.getX(); menuTouchY = event.getY();
-            swipingMenu = chromeVisible && chromeTop != null && event.getRawY() >= location[1] && event.getRawY() < location[1]+chromeTop.getHeight();
-        }
-        if (event.getAction() == android.view.MotionEvent.ACTION_UP && swipingMenu && Math.abs(event.getX()-menuTouchX)>dp(48) && Math.abs(event.getY()-menuTouchY)<dp(48)) {
-            showReaderMenuPage((readerMenuPage+(event.getX()<menuTouchX ? 1 : 2))%3);
-            android.view.MotionEvent cancel=android.view.MotionEvent.obtain(event);cancel.setAction(android.view.MotionEvent.ACTION_CANCEL);super.dispatchTouchEvent(cancel);cancel.recycle();return true;
-        }
-        return super.dispatchTouchEvent(event);
     }
 
     @Override public void onSwipe(int direction) {
@@ -1043,19 +989,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         boolean savedDivider = AppState.dualPageDivider(this);
         int savedCropPercent = AppState.cropPercent(this);
         boolean reloadLayout = initialized && (savedLayout != pageLayout || savedDivider != dualPageDivider || savedCropPercent != cropPercent);
-        pageLayout = savedLayout;
-        dualPageDivider = savedDivider;
-
-        cropPercent = savedCropPercent;
-        imageView.setFitMode(AppState.fitMode(this));
-        imageView.setDoubleTapScale(AppState.doubleTapScale(this) / 100f);
-        imageView.setDoubleTapMode(AppState.doubleTapMode(this));
-        imageView.setVerticalPaging(AppState.readingFlow(this) == AppState.FLOW_VERTICAL);
-        imageView.setFilterMode(AppState.FILTER_NONE);
-        updatePageButtons();
-        applyBrightness(AppState.brightness(this));
-        if (AppState.keepScreenOn(this)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        applyReaderPreferences();
         if (reloadLayout) refreshReader();
         if (autoDelayMs > 0) autoHandler.postDelayed(autoPage, autoDelayMs);
     }
@@ -1111,10 +1045,13 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         if (vertical()) continuous.reset(totalPages, page);
         invalidatePages(); updatePageButtons(); loadPage(usesDualPageLayout() ? page - page % 2 : page, false); applyFullscreen();
     }
-    private void pageButton(boolean right) {
+    private boolean pageButtonForward(boolean right) {
         boolean forward = AppState.enabled(this, "page_both_next", false) || right != (AppState.direction(this) == AppState.DIRECTION_RTL);
         if (AppState.enabled(this, "page_reverse", false)) forward = !forward;
-        if (forward) forward(); else back();
+        return forward;
+    }
+    private void pageButton(boolean right) {
+        if (pageButtonForward(right)) forward(); else back();
     }
     private void nextBook(boolean forward) {
         ArrayList<Uri> books = getIntent().getParcelableArrayListExtra(EXTRA_BOOK_URIS);
@@ -1160,12 +1097,12 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
                 if (strip) cell.setLayoutParams(new android.widget.Gallery.LayoutParams(dp(thumbnailWidth), -1));
                 android.widget.ImageView thumbnail = new android.widget.ImageView(ViewerActivity.this); thumbnail.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
                 if (!chapters) cell.addView(thumbnail, new LinearLayout.LayoutParams(-1, dp(strip ? thumbnailHeight : 130)));
-                TextView label = text(chapters ? labels.get(position) : Integer.toString(indices.get(position) + 1), 12, (chapters || strip) ? Ui.DARK_TEXT : android.graphics.Color.BLACK);
+                TextView label = text(chapters ? labels.get(position) : Integer.toString(indices.get(position) + 1), 12, Ui.TEXT_PRIMARY);
                 label.setGravity(chapters ? Gravity.CENTER_VERTICAL : Gravity.CENTER);
                 label.setMinHeight(dp(chapters ? 48 : 24));
                 cell.addView(label); cell.setContentDescription(labels.get(position));
                 boolean current = indices.get(position) <= page && (position + 1 == indices.size() || indices.get(position + 1) > page);
-                cell.setBackgroundColor(chapters || strip ? (current ? Ui.DARK_SURFACE_RAISED : Ui.DARK_SURFACE) : (current ? 0xffdddddd : 0xffffffff));
+                cell.setBackgroundColor(current ? Ui.BRAND_CONTAINER : Ui.SURFACE);
                 cell.setSelected(current);
                 if (chapters) return cell;
                 worker.execute(() -> {
@@ -1185,7 +1122,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             disposeDrawer = () -> closed[0] = true;
             drawerChapters = chapters;
             drawerPanel.removeAllViews(); drawerPanel.addView(grid, new FrameLayout.LayoutParams(-1, -1));
-            drawerPanel.setBackgroundColor(chapters ? Ui.DARK_SURFACE : android.graphics.Color.WHITE);
+            drawerPanel.setBackgroundColor(Ui.SURFACE);
             androidx.drawerlayout.widget.DrawerLayout.LayoutParams params = (androidx.drawerlayout.widget.DrawerLayout.LayoutParams)drawerPanel.getLayoutParams();
             params.width = Math.min(dp(chapters ? (wide ? 450 : 280) : thumbnailWidth), Math.round(getResources().getDisplayMetrics().widthPixels * .88f));
             drawerPanel.setLayoutParams(params);
@@ -1195,13 +1132,13 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             if (open) readerDrawer.openDrawer(drawerPanel);
             return;
         }
-        LinearLayout drawer = new LinearLayout(this); drawer.setOrientation(LinearLayout.VERTICAL); drawer.setBackgroundColor(Ui.DARK_SURFACE);
+        LinearLayout drawer = new LinearLayout(this); drawer.setOrientation(LinearLayout.VERTICAL); drawer.setBackgroundColor(Ui.SURFACE);
         android.widget.Gallery gallery = new android.widget.Gallery(this); gallery.setSpacing(dp(8)); gallery.setAdapter((android.widget.BaseAdapter)grid.getAdapter());
         drawer.addView(gallery, new LinearLayout.LayoutParams(-1, 0, 1));
         android.app.Dialog dialog = new android.app.Dialog(this); dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        Button close = Ui.button(this, I18n.t(R.string.ui_close), Ui.ButtonStyle.DARK_GHOST); close.setOnClickListener(v -> dialog.dismiss()); drawer.addView(close);
+        Button close = Ui.button(this, I18n.t(R.string.ui_close), Ui.ButtonStyle.SURFACE_GHOST); close.setOnClickListener(v -> dialog.dismiss()); drawer.addView(close);
         dialog.setContentView(drawer); dialog.show();
-        dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Ui.DARK_SURFACE));
+        dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Ui.SURFACE));
         dialog.getWindow().setGravity(Gravity.BOTTOM); dialog.getWindow().setLayout(-1, dp(thumbnailHeight + 88));
         gallery.setSelection(selected); dialog.setOnDismissListener(d -> closed[0] = true);
         gallery.setOnItemClickListener((parent, view, position, id) -> { goToPage(indices.get(position)); ((android.widget.BaseAdapter)grid.getAdapter()).notifyDataSetChanged(); });
@@ -1283,16 +1220,8 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     }
 
     private Button button(String label, String description) {
-        Button button = Ui.button(this, label, Ui.ButtonStyle.DARK_SECONDARY);
+        Button button = Ui.button(this, label, Ui.ButtonStyle.RAISED_SECONDARY);
         button.setContentDescription(description);
-        return button;
-    }
-
-    private Button readerAction(String label, String description) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setContentDescription(description);
-        Ui.styleReaderAction(button);
         return button;
     }
 

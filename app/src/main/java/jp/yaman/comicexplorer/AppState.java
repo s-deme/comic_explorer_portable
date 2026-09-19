@@ -455,7 +455,7 @@ public final class AppState {
     }
 
     public static int direction(Context context) {
-        return number(context, "direction", DIRECTION_LTR);
+        return number(context, "direction", DIRECTION_RTL);
     }
 
     public static void setDirection(Context context, int direction) {
