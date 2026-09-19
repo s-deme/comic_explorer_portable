@@ -38,13 +38,7 @@ public final class BookCache {
         File temp = File.createTempFile("download-", ".part", dir);
         try {
             try (InputStream input = context.getContentResolver().openInputStream(uri); FileOutputStream output = new FileOutputStream(temp)) {
-                if (input == null) throw new IOException(I18n.t(R.string.ui_cannot_open_file_2));
-                byte[] buffer = new byte[65536]; int count;
-                while ((count = input.read(buffer)) != -1) {
-                    if (Thread.currentThread().isInterrupted()) throw new IOException(I18n.t(R.string.ui_canceled));
-                    if (dir.getUsableSpace() < count + 16 * 1024 * 1024L) throw new IOException(I18n.t(R.string.ui_not_enough_free_space));
-                    output.write(buffer, 0, count);
-                }
+                StreamCopy.copy(input, output, temp);
                 output.getFD().sync();
             }
             if (!temp.renameTo(file)) throw new IOException(I18n.t(R.string.ui_cannot_save_cache));

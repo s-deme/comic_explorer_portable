@@ -87,13 +87,19 @@ final class DocumentTransfer {
             return;
         }
         List<LibraryEntry> before = LibraryDirectoryReader.read(context.getContentResolver(), source.uri, source.uri, false);
-        List<LibraryEntry> after = LibraryDirectoryReader.read(context.getContentResolver(), destination, destination, false);
+        Map<String, LibraryEntry> after = childrenByName(destination);
         if (before.size() != after.size()) throw new IOException(I18n.t(R.string.ui_verification_failed));
         for (LibraryEntry child : before) {
-            LibraryEntry match = null; for (LibraryEntry candidate : after) if (candidate.name.equals(child.name) && candidate.directory == child.directory) { match = candidate; break; }
-            if (match == null) throw new IOException(I18n.t(R.string.ui_verification_failed));
+            LibraryEntry match = after.remove(child.name);
+            if (match == null || match.directory != child.directory) throw new IOException(I18n.t(R.string.ui_verification_failed));
             verifyTree(child, match.uri, depth + 1);
         }
+    }
+    private Map<String, LibraryEntry> childrenByName(Uri directory) throws IOException {
+        Map<String, LibraryEntry> children = new HashMap<>();
+        for (LibraryEntry child : LibraryDirectoryReader.read(context.getContentResolver(), directory, directory, false))
+            if (children.put(child.name, child) != null) throw new IOException(I18n.t(R.string.ui_verification_failed));
+        return children;
     }
     private InputStream openFresh(Uri uri) throws Exception {
         if (!uri.getAuthority().equals(context.getPackageName() + ".network")) return context.getContentResolver().openInputStream(uri);
@@ -109,10 +115,10 @@ final class DocumentTransfer {
         if (depth > 64) throw new IOException(I18n.t(R.string.ui_transfer_limit));
         result.put(source, destination);
         if (!source.directory) return;
-        List<LibraryEntry> children = LibraryDirectoryReader.read(context.getContentResolver(), destination, destination, false);
+        Map<String, LibraryEntry> children = childrenByName(destination);
         for (LibraryEntry item : LibraryDirectoryReader.read(context.getContentResolver(), source.uri, source.uri, false)) {
-            LibraryEntry match = null; for (LibraryEntry child : children) if (child.name.equals(item.name)) { match = child; break; }
-            if (match == null) throw new IOException(I18n.t(R.string.ui_verification_failed));
+            LibraryEntry match = children.remove(item.name);
+            if (match == null || match.directory != item.directory) throw new IOException(I18n.t(R.string.ui_verification_failed));
             mapTree(item, match.uri, result, depth + 1);
         }
     }
@@ -154,12 +160,8 @@ final class DocumentTransfer {
     }
     static byte[] copyAndHash(InputStream input, OutputStream output, File space) throws Exception {
         if (input == null) throw new IOException(I18n.t(R.string.ui_cannot_open_file_2));
-        MessageDigest digest = MessageDigest.getInstance("SHA-256"); byte[] buffer = new byte[65536]; int count;
-        while ((count = input.read(buffer)) != -1) {
-            if (Thread.currentThread().isInterrupted()) throw new IOException(I18n.t(R.string.ui_canceled));
-            if (space != null && space.getParentFile().getUsableSpace() < count + 16 * 1024 * 1024L) throw new IOException(I18n.t(R.string.ui_not_enough_free_space));
-            digest.update(buffer, 0, count); if (output != null) output.write(buffer, 0, count);
-        }
+        MessageDigest digest = org.apache.commons.codec.digest.DigestUtils.getSha256Digest();
+        StreamCopy.copy(new java.security.DigestInputStream(input, digest), output, space);
         return digest.digest();
     }
     private void validateDestination(Uri source, Uri target, boolean directory) throws Exception {

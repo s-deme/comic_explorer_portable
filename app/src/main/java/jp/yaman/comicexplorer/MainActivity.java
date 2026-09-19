@@ -3,8 +3,6 @@ package jp.yaman.comicexplorer;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -13,7 +11,6 @@ import android.provider.OpenableColumns;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.format.DateFormat;
-import android.util.Size;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -58,8 +55,7 @@ public final class MainActivity extends BaseActivity {
     private static final int SORT_SIZE = 2;
 
     private final ExecutorService folderWorker = Executors.newSingleThreadExecutor();
-    private final ExecutorService thumbnailWorker = Executors.newFixedThreadPool(2);
-    private final BitmapMemoryCache thumbnails = new BitmapMemoryCache(12 * 1024);
+    private final LibraryThumbnails thumbnails = new LibraryThumbnails(this);
     private final Collator collator = Collator.getInstance(Locale.getDefault());
     private final ArrayList<LibraryEntry> allRows = new ArrayList<>();
     private final ArrayList<LibraryEntry> visibleRows = new ArrayList<>();
@@ -147,7 +143,7 @@ public final class MainActivity extends BaseActivity {
 
     @Override protected void onRestart() {
         super.onRestart();
-        thumbnails.evictAll();
+        thumbnails.clear();
         if (mode == MODE_LIBRARY || mode == MODE_GALLERY) adapter.notifyDataSetChanged(); else loadSavedItems();
     }
 
@@ -522,37 +518,17 @@ public final class MainActivity extends BaseActivity {
     }
 
     private void showAppMenu() {
-        ArrayList<String> labels = new ArrayList<>();
-        ArrayList<Integer> actions = new ArrayList<>();
-        labels.add(I18n.t(R.string.ui_refresh));
-        actions.add(0);
-        labels.add(I18n.t(R.string.ui_open_file));
-        actions.add(4);
-        labels.add(I18n.t(R.string.ui_favorites));
-        actions.add(5);
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(R.string.ui_refresh), this::refresh);
+        menu.add(I18n.t(R.string.ui_open_file), this::chooseFile);
+        menu.add(I18n.t(R.string.ui_favorites), () -> selectMode(MODE_FAVORITES));
         if (mode == MODE_LIBRARY) {
-            labels.add(I18n.t(R.string.ui_select_folder_again));
-            actions.add(1);
-            if (treeUri != null && directoryUri != null && !directoryUri.equals(treeUri)) {
-                labels.add(I18n.t(R.string.ui_parent_folder));
-                actions.add(2);
-            }
+            menu.add(I18n.t(R.string.ui_select_folder_again), this::chooseFolder);
+            if (treeUri != null && directoryUri != null && !directoryUri.equals(treeUri))
+                menu.add(I18n.t(R.string.ui_parent_folder), this::goUp);
         }
-        labels.add(I18n.t(R.string.ui_settings));
-        actions.add(3);
-        Ui.show(new AlertDialog.Builder(this)
-                .setTitle(I18n.t(R.string.ui_menu))
-                .setItems(labels.toArray(new String[0]), (dialog, selected) -> {
-                    switch (actions.get(selected)) {
-                        case 0: refresh(); break;
-                        case 1: chooseFolder(); break;
-                        case 2: goUp(); break;
-                        case 3: startActivity(new Intent(this, SettingsActivity.class)); break;
-                        case 4: chooseFile(); break;
-                        case 5: selectMode(MODE_FAVORITES); break;
-                        default: break;
-                    }
-                }));
+        menu.add(I18n.t(R.string.ui_settings), () -> startActivity(new Intent(this, SettingsActivity.class)));
+        menu.show(this, I18n.t(R.string.ui_menu));
     }
 
     private void openExternal(Uri uri) {
@@ -753,32 +729,29 @@ public final class MainActivity extends BaseActivity {
             return;
         }
         boolean favorite = AppState.isFavorite(this, item.uri);
-        ArrayList<String> actions = new ArrayList<>();
-        actions.add(favorite ? I18n.t(R.string.ui_remove_from_favorites) : I18n.t(R.string.ui_add_to_favorites));
-        actions.add(I18n.t(R.string.ui_clear_reading_position));
-        actions.add(I18n.t(R.string.ui_details));
-        actions.add(I18n.t(R.string.ui_file_operations));
-        if (mode == MODE_RECENTS) actions.add(I18n.t(R.string.ui_remove_from_history));
-        if (!AppState.bookmarks(this, item.uri).isEmpty()) actions.add(I18n.t(R.string.ui_delete_all_bookmarks_2));
-        if (AppState.hasCover(this, item.uri)) actions.add(I18n.t(R.string.ui_restore_default_cover));
-        Ui.show(new AlertDialog.Builder(this).setTitle(item.name).setItems(actions.toArray(new String[0]), (dialog, which) -> {
-            if (I18n.t(R.string.ui_file_operations).equals(actions.get(which))) { fileMenu(item); return; }
-            if (which == 0) {
-                setFavorite(item, !favorite);
-                Toast.makeText(this, !favorite ? I18n.t(R.string.ui_added_to_favorites) : I18n.t(R.string.ui_removed_from_favorites), Toast.LENGTH_SHORT).show();
-            } else if (which == 1) {
-                AppState.clearPosition(this, item.uri);
-                Toast.makeText(this, I18n.t(R.string.ui_reading_position_cleared), Toast.LENGTH_SHORT).show();
-                adapter.notifyDataSetChanged();
-            } else if (which == 2) showDetails(item);
-            else if (I18n.t(R.string.ui_remove_from_history).equals(actions.get(which))) { AppState.removeRecent(this, item.uri); loadSavedItems(); }
-            else if (I18n.t(R.string.ui_restore_default_cover).equals(actions.get(which))) {
-                AppState.removeCover(this, item.uri);
-                thumbnails.evictAll();
-                adapter.notifyDataSetChanged();
-            }
-            else { AppState.clearBookmarks(this, item.uri); if (mode == MODE_BOOKMARKS) loadSavedItems(); else adapter.notifyDataSetChanged(); }
-        }));
+        Ui.Actions menu = new Ui.Actions();
+        menu.add(I18n.t(favorite ? R.string.ui_remove_from_favorites : R.string.ui_add_to_favorites), () -> {
+            setFavorite(item, !favorite);
+            Toast.makeText(this, I18n.t(!favorite ? R.string.ui_added_to_favorites : R.string.ui_removed_from_favorites), Toast.LENGTH_SHORT).show();
+        });
+        menu.add(I18n.t(R.string.ui_clear_reading_position), () -> {
+            AppState.clearPosition(this, item.uri);
+            Toast.makeText(this, I18n.t(R.string.ui_reading_position_cleared), Toast.LENGTH_SHORT).show();
+            adapter.notifyDataSetChanged();
+        });
+        menu.add(I18n.t(R.string.ui_details), () -> showDetails(item));
+        menu.add(I18n.t(R.string.ui_file_operations), () -> fileMenu(item));
+        if (mode == MODE_RECENTS) menu.add(I18n.t(R.string.ui_remove_from_history), () -> { AppState.removeRecent(this, item.uri); loadSavedItems(); });
+        if (!AppState.bookmarks(this, item.uri).isEmpty()) menu.add(I18n.t(R.string.ui_delete_all_bookmarks_2), () -> {
+            AppState.clearBookmarks(this, item.uri);
+            if (mode == MODE_BOOKMARKS) loadSavedItems(); else adapter.notifyDataSetChanged();
+        });
+        if (AppState.hasCover(this, item.uri)) menu.add(I18n.t(R.string.ui_restore_default_cover), () -> {
+            AppState.removeCover(this, item.uri);
+            thumbnails.clear();
+            adapter.notifyDataSetChanged();
+        });
+        menu.show(this, item.name);
     }
 
     private void setFavorite(LibraryEntry item, boolean favorite) {
@@ -985,8 +958,7 @@ public final class MainActivity extends BaseActivity {
     @Override protected void onDestroy() {
         directoryLoadToken++;
         folderWorker.shutdownNow();
-        thumbnailWorker.shutdownNow();
-        thumbnails.evictAll();
+        thumbnails.close();
         super.onDestroy();
     }
     @Override protected void onSaveInstanceState(Bundle state) {
@@ -1070,73 +1042,13 @@ public final class MainActivity extends BaseActivity {
             holder.progress.setText(!hasProgress ? "" : total > 0
                     ? (saved + 1) + " / " + total + "  " + Math.round((saved + 1) * 100f / total) + "%"
                     : (saved + 1) + " p");
-            bindThumbnail(holder.thumbnail, holder.formatMark, item);
+            thumbnails.bind(holder.thumbnail, holder.formatMark, item);
             convertView.setContentDescription(item.name + "、" + holder.detail.getText() + (holder.progress.getText().length() > 0 ? "、" + holder.progress.getText() : ""));
             return convertView;
         }
 
-        private void bindThumbnail(ImageView view, TextView formatMark, LibraryEntry item) {
-            view.setTag(item.uri.toString());
-            view.setImageDrawable(null);
-            view.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            formatMark.setVisibility(View.GONE);
-            if (item.directory) { view.setImageResource(R.drawable.ic_folder); return; }
-            if (AppState.number(MainActivity.this, "list_type", 1) == 0) { view.setImageResource(ComicFile.isImage(item.name, item.mime) ? R.drawable.ic_image_file : R.drawable.ic_archive); return; }
-            formatMark.setText(item.kind);
-            formatMark.setVisibility(View.VISIBLE);
-            java.io.File customCover = AppState.coverFile(MainActivity.this, item.uri);
-            if (customCover.isFile()) {
-                view.setImageResource(R.drawable.ic_archive);
-                String key = "cover:" + item.uri;
-                Bitmap cached = thumbnails.get(key);
-                if (cached != null) { view.setScaleType(ImageView.ScaleType.CENTER_CROP); view.setImageBitmap(cached); return; }
-                thumbnailWorker.execute(() -> {
-                    Bitmap bitmap = BitmapFactory.decodeFile(customCover.getAbsolutePath());
-                    if (bitmap == null) return;
-                    runOnUiThread(() -> {
-                        if (isFinishing()) return;
-                        thumbnails.put(key, bitmap);
-                        if (item.uri.toString().equals(view.getTag())) {
-                            view.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                            view.setImageBitmap(bitmap);
-                        }
-                    });
-                });
-                return;
-            }
-            view.setImageResource(R.drawable.ic_image_file);
-            String key = item.uri + "#" + item.modified + ":" + item.size;
-            Bitmap cached = thumbnails.get(key);
-            if (cached != null) { view.setScaleType(ImageView.ScaleType.CENTER_CROP); view.setImageBitmap(cached); return; }
-            thumbnailWorker.execute(() -> {
-                try {
-                    Bitmap bitmap = BookCache.thumbnail(MainActivity.this, key);
-                    if (bitmap == null) {
-                        if (ComicFile.isImage(item.name, item.mime)) bitmap = getContentResolver().loadThumbnail(item.uri, new Size(dp(112), dp(144)), null);
-                        else bitmap = bookThumbnail(item);
-                        if (bitmap != null) BookCache.thumbnail(MainActivity.this, key, bitmap);
-                    }
-                    if (bitmap == null) return;
-                    Bitmap result = bitmap;
-                    runOnUiThread(() -> {
-                        if (isFinishing()) return;
-                        thumbnails.put(key, result);
-                        if (item.uri.toString().equals(view.getTag())) {
-                            view.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                            view.setImageBitmap(result);
-                        }
-                    });
-                } catch (Exception ignored) { }
-            });
-        }
     }
 
-    private Bitmap bookThumbnail(LibraryEntry item) throws Exception {
-        try (PageSource source = new PageSource(this, item.uri, item.name, null,
-                java.nio.charset.Charset.forName(ReaderOptions.ENCODINGS[Math.max(0, Math.min(ReaderOptions.ENCODINGS.length-1, AppState.archiveEncoding(this)))]), 240 * 480)) {
-            return source.decode(0, 240);
-        }
-    }
     private static final class Holder {
         final ImageView thumbnail; final TextView formatMark; final TextView name; final TextView detail; final TextView progress;
         final boolean grid;

@@ -118,7 +118,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private boolean requestingBookAccess;
     private FrameLayout drawerPanel;
     private boolean drawerChapters;
-    private Runnable disposeDrawer;
+    private PageBrowserAdapter drawerAdapter;
 
     private android.graphics.RectF customCrop;
 
@@ -1010,7 +1010,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
 
     @Override protected void onDestroy() {
         destroyed = true;
-        if (disposeDrawer != null) disposeDrawer.run();
+        if (drawerAdapter != null) drawerAdapter.close();
         if (continuous != null) continuous.stop();
         loadToken++;
         stopAutoPage();
@@ -1072,54 +1072,17 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private void showPageBrowser(boolean chapters, boolean strip) { showPageBrowser(chapters, strip, true); }
     private void showPageBrowser(boolean chapters, boolean strip, boolean open) {
         if (!initialized) return;
-        ArrayList<Integer> indices = new ArrayList<>(); ArrayList<String> labels = new ArrayList<>();
-        String previous = null;
-        if(chapters && !pageSource.chapters.isEmpty()) {
-            for(PageSource.Chapter chapter:pageSource.chapters){indices.add(chapter.page);labels.add(chapter.title);}
-        } else for (int i = 0; i < totalPages; i++) {
-            String name = pageSource.pageName(i);
-            String chapter = name.contains("/") ? name.substring(0, name.lastIndexOf('/')) : I18n.t(R.string.ui_first_chapter);
-            if (!chapters || !chapter.equals(previous)) { indices.add(i); labels.add(chapters ? chapter : (i+1) + " · " + name); }
-            previous = chapter;
-        }
         boolean wide = getResources().getConfiguration().smallestScreenWidthDp >= 600;
         int thumbnailWidth = wide ? 128 : 96, thumbnailHeight = wide ? 61 : 47;
         android.widget.ListView grid = new android.widget.ListView(this);
         grid.setChoiceMode(android.widget.ListView.CHOICE_MODE_SINGLE);
         grid.setDividerHeight(0); grid.setVerticalScrollBarEnabled(false);
-        final boolean[] closed = {false};
-        grid.setAdapter(new android.widget.BaseAdapter() {
-            @Override public int getCount() { return indices.size(); }
-            @Override public Object getItem(int i) { return indices.get(i); }
-            @Override public long getItemId(int i) { return indices.get(i); }
-            @Override public View getView(int position, View recycled, ViewGroup parent) {
-                LinearLayout cell = new LinearLayout(ViewerActivity.this); cell.setOrientation(LinearLayout.VERTICAL); cell.setPadding(dp(4), dp(4), dp(4), dp(4));
-                if (strip) cell.setLayoutParams(new android.widget.Gallery.LayoutParams(dp(thumbnailWidth), -1));
-                android.widget.ImageView thumbnail = new android.widget.ImageView(ViewerActivity.this); thumbnail.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-                if (!chapters) cell.addView(thumbnail, new LinearLayout.LayoutParams(-1, dp(strip ? thumbnailHeight : 130)));
-                TextView label = text(chapters ? labels.get(position) : Integer.toString(indices.get(position) + 1), 12, Ui.TEXT_PRIMARY);
-                label.setGravity(chapters ? Gravity.CENTER_VERTICAL : Gravity.CENTER);
-                label.setMinHeight(dp(chapters ? 48 : 24));
-                cell.addView(label); cell.setContentDescription(labels.get(position));
-                boolean current = indices.get(position) <= page && (position + 1 == indices.size() || indices.get(position + 1) > page);
-                cell.setBackgroundColor(current ? Ui.BRAND_CONTAINER : Ui.SURFACE);
-                cell.setSelected(current);
-                if (chapters) return cell;
-                worker.execute(() -> {
-                    if (destroyed || closed[0]) return;
-                    try {
-                        Bitmap page = decodeSinglePage(indices.get(position)); int[] size = coverSize(page.getWidth(), page.getHeight());
-                        Bitmap small = Bitmap.createScaledBitmap(page, size[0], size[1], true); if (small != page) page.recycle();
-                        runOnUiThread(() -> { if (!destroyed && !closed[0]) thumbnail.setImageBitmap(small); else small.recycle(); });
-                    } catch (Exception | OutOfMemoryError ignored) { }
-                });
-                return cell;
-            }
-        });
-        int selected = 0; for (int i = 0; i < indices.size(); i++) if (indices.get(i) <= page) selected = i;
+        PageBrowserAdapter browser = new PageBrowserAdapter(chapters, strip, thumbnailWidth, thumbnailHeight);
+        grid.setAdapter(browser);
+        int selected = browser.selected();
         if (!strip) {
-            if (disposeDrawer != null) disposeDrawer.run();
-            disposeDrawer = () -> closed[0] = true;
+            if (drawerAdapter != null) drawerAdapter.close();
+            drawerAdapter = browser;
             drawerChapters = chapters;
             drawerPanel.removeAllViews(); drawerPanel.addView(grid, new FrameLayout.LayoutParams(-1, -1));
             drawerPanel.setBackgroundColor(Ui.SURFACE);
@@ -1128,7 +1091,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             drawerPanel.setLayoutParams(params);
             readerDrawer.setDrawerTitle(Gravity.LEFT, I18n.t(chapters ? R.string.ui_chapters : R.string.ui_page_thumbnails));
             grid.setItemChecked(selected, true); grid.setSelection(selected);
-            grid.setOnItemClickListener((parent, view, position, id) -> { goToPage(indices.get(position)); readerDrawer.closeDrawer(drawerPanel); });
+            grid.setOnItemClickListener((parent, view, position, id) -> { goToPage(browser.getItem(position)); readerDrawer.closeDrawer(drawerPanel); });
             if (open) readerDrawer.openDrawer(drawerPanel);
             return;
         }
@@ -1140,8 +1103,65 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         dialog.setContentView(drawer); dialog.show();
         dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Ui.SURFACE));
         dialog.getWindow().setGravity(Gravity.BOTTOM); dialog.getWindow().setLayout(-1, dp(thumbnailHeight + 88));
-        gallery.setSelection(selected); dialog.setOnDismissListener(d -> closed[0] = true);
-        gallery.setOnItemClickListener((parent, view, position, id) -> { goToPage(indices.get(position)); ((android.widget.BaseAdapter)grid.getAdapter()).notifyDataSetChanged(); });
+        gallery.setSelection(selected); dialog.setOnDismissListener(d -> browser.close());
+        gallery.setOnItemClickListener((parent, view, position, id) -> { goToPage(browser.getItem(position)); browser.notifyDataSetChanged(); });
+    }
+
+    /** Owns one browser's entries and cancels queued thumbnails when it is replaced. */
+    private final class PageBrowserAdapter extends android.widget.BaseAdapter implements AutoCloseable {
+        private final ArrayList<Integer> indices = new ArrayList<>();
+        private final ArrayList<String> labels = new ArrayList<>();
+        private final PageSource owner = pageSource;
+        private final boolean chapters, strip;
+        private final int thumbnailWidth, thumbnailHeight;
+        private volatile boolean closed;
+
+        PageBrowserAdapter(boolean chapters, boolean strip, int thumbnailWidth, int thumbnailHeight) {
+            this.chapters = chapters; this.strip = strip;
+            this.thumbnailWidth = thumbnailWidth; this.thumbnailHeight = thumbnailHeight;
+            String previous = null;
+            if(chapters && !owner.chapters.isEmpty()) {
+                for(PageSource.Chapter chapter:owner.chapters){indices.add(chapter.page);labels.add(chapter.title);}
+            } else for (int i = 0; i < totalPages; i++) {
+                String name = owner.pageName(i);
+                String chapter = name.contains("/") ? name.substring(0, name.lastIndexOf('/')) : I18n.t(R.string.ui_first_chapter);
+                if (!chapters || !chapter.equals(previous)) { indices.add(i); labels.add(chapters ? chapter : (i+1) + " · " + name); }
+                previous = chapter;
+            }
+        }
+
+        int selected() {
+            int selected = 0;
+            for (int i = 0; i < indices.size(); i++) if (indices.get(i) <= page) selected = i;
+            return selected;
+        }
+        @Override public void close() { closed = true; }
+        @Override public int getCount() { return indices.size(); }
+        @Override public Integer getItem(int i) { return indices.get(i); }
+        @Override public long getItemId(int i) { return indices.get(i); }
+        @Override public View getView(int position, View recycled, ViewGroup parent) {
+            LinearLayout cell = new LinearLayout(ViewerActivity.this); cell.setOrientation(LinearLayout.VERTICAL); cell.setPadding(dp(4), dp(4), dp(4), dp(4));
+            if (strip) cell.setLayoutParams(new android.widget.Gallery.LayoutParams(dp(thumbnailWidth), -1));
+            android.widget.ImageView thumbnail = new android.widget.ImageView(ViewerActivity.this); thumbnail.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            if (!chapters) cell.addView(thumbnail, new LinearLayout.LayoutParams(-1, dp(strip ? thumbnailHeight : 130)));
+            TextView label = text(chapters ? labels.get(position) : Integer.toString(indices.get(position) + 1), 12, Ui.TEXT_PRIMARY);
+            label.setGravity(chapters ? Gravity.CENTER_VERTICAL : Gravity.CENTER);
+            label.setMinHeight(dp(chapters ? 48 : 24));
+            cell.addView(label); cell.setContentDescription(labels.get(position));
+            boolean current = indices.get(position) <= page && (position + 1 == indices.size() || indices.get(position + 1) > page);
+            cell.setBackgroundColor(current ? Ui.BRAND_CONTAINER : Ui.SURFACE);
+            cell.setSelected(current);
+            if (chapters) return cell;
+            worker.execute(() -> {
+                if (destroyed || closed || pageSource != owner) return;
+                try {
+                    Bitmap page = decodeSinglePage(indices.get(position)); int[] size = coverSize(page.getWidth(), page.getHeight());
+                    Bitmap small = Bitmap.createScaledBitmap(page, size[0], size[1], true); if (small != page) page.recycle();
+                    runOnUiThread(() -> { if (!destroyed && !closed && pageSource == owner) thumbnail.setImageBitmap(small); else small.recycle(); });
+                } catch (Exception | OutOfMemoryError ignored) { }
+            });
+            return cell;
+        }
     }
 
     @Override public void onBackPressed() {

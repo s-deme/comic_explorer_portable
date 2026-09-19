@@ -131,7 +131,7 @@ final class PageSource implements AutoCloseable {
                     else {temp=java.io.File.createTempFile("gif-page-",".gif",context.getCacheDir());extraArchive.extract(archiveEntries.get(index),temp);input=new java.io.FileInputStream(temp);}
                     if(input==null)throw new IOException("Missing GIF");
                     try(InputStream limited=new BoundedInputStream(input,MAX_ARCHIVE_ENTRY_BYTES);java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream()) {
-                        byte[] buffer=new byte[65536];int length;while((length=limited.read(buffer))!=-1)bytes.write(buffer,0,length);
+                        StreamCopy.copy(limited, bytes, null);
                         byte[] encoded=bytes.toByteArray();movie=android.graphics.Movie.decodeByteArray(encoded,0,encoded.length);
                     }
                     if(movie==null || movie.width()<1 || movie.height()<1)throw new IOException("Invalid GIF");
@@ -143,14 +143,14 @@ final class PageSource implements AutoCloseable {
             Bitmap frame=Bitmap.createBitmap(Math.max(1,movie.width()/sample),Math.max(1,movie.height()/sample),Bitmap.Config.ARGB_8888);
             android.graphics.Canvas canvas=new android.graphics.Canvas(frame);canvas.scale(1f/sample,1f/sample);movie.draw(canvas,0,0);return frame;
         }
-        if (!images.isEmpty()) return decodeUri(images.get(index));
+        if (!images.isEmpty()) return decodeImage(images.get(index), null);
         if (pdf != null) return renderPdfPage(index, screenWidth);
         if (extraArchive != null) {
             java.io.File temporary = java.io.File.createTempFile("archive-page-", ".image", context.getCacheDir());
-            try { extraArchive.extract(archiveEntries.get(index), temporary); return decodeUri(Uri.fromFile(temporary)); }
+            try { extraArchive.extract(archiveEntries.get(index), temporary); return decodeImage(Uri.fromFile(temporary), null); }
             finally { temporary.delete(); }
         }
-        return decodeArchivePage(archiveEntries.get(index));
+        return decodeImage(null, archiveEntries.get(index));
     }
     @Override public void close() throws IOException {
         if (closed) return;
@@ -183,31 +183,27 @@ final class PageSource implements AutoCloseable {
         return entries;
     }
 
-    private Bitmap decodeUri(Uri uri) throws IOException {
+    private Bitmap decodeImage(Uri uri, String target) throws IOException {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
-        InputStream first = context.getContentResolver().openInputStream(uri);
-        if (first == null) throw new IOException(I18n.t(R.string.ui_cannot_open_image));
-        try (InputStream stream = first) { BitmapFactory.decodeStream(stream, null, bounds); }
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IOException(I18n.t(R.string.ui_the_image_is_invalid_or_unsupported));
-        InputStream second = context.getContentResolver().openInputStream(uri);
-        if (second == null) throw new IOException(I18n.t(R.string.ui_cannot_open_image));
-        try (InputStream stream = second) { return BitmapFactory.decodeStream(stream, null, decodeOptions(bounds.outWidth, bounds.outHeight)); }
+        try (InputStream input = openImage(uri, target)) { BitmapFactory.decodeStream(input, null, bounds); }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0)
+            throw new IOException(I18n.t(uri == null ? R.string.ui_invalid_image_in_archive : R.string.ui_the_image_is_invalid_or_unsupported));
+        try (InputStream input = openImage(uri, target)) {
+            return BitmapFactory.decodeStream(input, null, decodeOptions(bounds.outWidth, bounds.outHeight));
+        }
     }
 
-    private Bitmap decodeArchivePage(String target) throws IOException {
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        decodeArchiveEntry(target, bounds);
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IOException(I18n.t(R.string.ui_invalid_image_in_archive));
-        return decodeArchiveEntry(target, decodeOptions(bounds.outWidth, bounds.outHeight));
-    }
-
-    private Bitmap decodeArchiveEntry(String target, BitmapFactory.Options options) throws IOException {
+    private InputStream openImage(Uri uri, String target) throws IOException {
+        if (uri != null) {
+            InputStream input = context.getContentResolver().openInputStream(uri);
+            if (input == null) throw new IOException(I18n.t(R.string.ui_cannot_open_image));
+            return input;
+        }
         ZipArchiveEntry entry = archive.getEntry(target);
         if (entry == null) throw new IOException(I18n.t(R.string.ui_page_not_found_in_archive));
         if (entry.getSize() > MAX_ARCHIVE_ENTRY_BYTES) throw new IOException(I18n.t(R.string.ui_image_exceeds_the_48_mb_limit));
-        try (InputStream input = archive.getInputStream(entry)) { return BitmapFactory.decodeStream(new BoundedInputStream(input, MAX_ARCHIVE_ENTRY_BYTES), null, options); }
+        return new BoundedInputStream(archive.getInputStream(entry), MAX_ARCHIVE_ENTRY_BYTES);
     }
 
     private Bitmap renderPdfPage(int index, int screenWidth) throws IOException {

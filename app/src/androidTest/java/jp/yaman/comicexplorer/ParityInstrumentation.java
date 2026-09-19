@@ -56,6 +56,22 @@ public final class ParityInstrumentation extends Instrumentation {
         }
     }
     private void checkData(Context context) throws Exception {
+            byte[] payload=new byte[150000]; new java.util.Random(7).nextBytes(payload);
+            java.io.ByteArrayOutputStream copied=new java.io.ByteArrayOutputStream();
+            byte[] copyHash=DocumentTransfer.copyAndHash(new java.io.ByteArrayInputStream(payload),copied,null);
+            check(java.util.Arrays.equals(payload,copied.toByteArray()) && java.util.Arrays.equals(copyHash,java.security.MessageDigest.getInstance("SHA-256").digest(payload)),"Shared copy preserves multi-buffer bytes and verification hash");
+            boolean canceled=false;
+            try { Thread.currentThread().interrupt(); StreamCopy.copy(new java.io.ByteArrayInputStream(payload),copied,null); }
+            catch(java.io.IOException expected) { canceled=true; }
+            finally { Thread.interrupted(); }
+            check(canceled,"Shared copy rejects interrupted work");
+            boolean noSpace=false;
+            java.io.File full=new java.io.File("unused") {
+                @Override public java.io.File getParentFile() { return new java.io.File("unused") { @Override public long getUsableSpace() { return 0; } }; }
+            };
+            try { StreamCopy.copy(new java.io.ByteArrayInputStream(payload),copied,full); }
+            catch(java.io.IOException expected) { noSpace=true; }
+            check(noSpace,"Shared copy retains disk-space reserve");
             Uri book=Uri.parse("content://test/book");
             check(AppState.key(book).equals("98315341b0207c5ee81a54f42667fa511c3658df49095599f262b74d6ce922ad"),"URI keys retain the existing SHA-256 storage identity");
             AppState.addRecent(context,book,"book.cbz","CBZ"); AppState.updateReadingProgress(context,book,3,10);
@@ -155,6 +171,14 @@ public final class ParityInstrumentation extends Instrumentation {
             try(FileOutputStream output=new FileOutputStream(pdf)){document.writeTo(output);}document.close();
             PageSource source=new PageSource(context,Uri.fromFile(zip),zip.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2_000_000);
             check(source.pageCount()==6 && source.pageName(3).equals("chapter2/page4.png"),"Extracted source preserves natural page order and chapter names");
+            File loose=new File(fixtures,"decode-parity.png");
+            Bitmap archiveBitmap=source.decode(0,1080);
+            try(FileOutputStream output=new FileOutputStream(loose)) { archiveBitmap.compress(Bitmap.CompressFormat.PNG,100,output); }
+            try(PageSource imageSource=new PageSource(context,Uri.fromFile(loose),loose.getName(),new ArrayList<>(java.util.Collections.singletonList(Uri.fromFile(loose))),java.nio.charset.StandardCharsets.UTF_8,2_000_000)) {
+                Bitmap looseBitmap=imageSource.decode(0,1080);
+                check(looseBitmap.sameAs(archiveBitmap),"URI and archive image paths decode identical pixels"); looseBitmap.recycle();
+            }
+            archiveBitmap.recycle();
             source.close();source.close();boolean closed=false;
             try{source.decode(0,1080);}catch(java.io.IOException expected){closed=true;}
             check(closed,"Closed source rejects further decoding; close is idempotent");
@@ -177,6 +201,14 @@ public final class ParityInstrumentation extends Instrumentation {
             });
             awaitReady(() -> (Boolean)field(viewer,"initialized"),"ZIP reader initialized");
             awaitReady(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"ZIP first page decoded");
+            runOnMainSync(() -> {
+                android.widget.BaseAdapter previous=(android.widget.BaseAdapter)field(viewer,"drawerAdapter");
+                browser(viewer,true,false);
+                android.widget.BaseAdapter chapters=(android.widget.BaseAdapter)field(viewer,"drawerAdapter");
+                check((Boolean)field(previous,"closed") && chapters.getCount()==2 && chapters.getItem(1).equals(3),"Replacing page browser cancels old work and retains chapter boundaries");
+                browser(viewer,false,false);
+                ((androidx.drawerlayout.widget.DrawerLayout)field(viewer,"readerDrawer")).closeDrawers();
+            });
             boolean wasFullscreen=(Boolean)field(viewer,"fullScreen");
             SettingsActivity readerSettings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             runOnMainSync(() -> {
@@ -302,8 +334,38 @@ public final class ParityInstrumentation extends Instrumentation {
                 dialog.getListView().performItemClick(null,1,1);dialog.dismiss();
             });
             check(selected.get()==2,"Menu dispatch does not depend on translated labels");
+            checkLibraryThumbnails(lightLibrary,Uri.fromFile(zip));
+            LibraryEntry actionItem=new LibraryEntry(Uri.fromFile(zip),"sample.cbz",null,"CBZ",false,0,0);
+            AppState.setBookmark(context,actionItem.uri,1,true,actionItem.name,actionItem.kind);
+            runOnMainSync(() -> {
+                try { java.lang.reflect.Method method=MainActivity.class.getDeclaredMethod("showActions",LibraryEntry.class);method.setAccessible(true);method.invoke(lightLibrary,actionItem); }
+                catch(Exception error) { throw new RuntimeException(error); }
+            });
+            awaitReady(() -> clickText(I18n.t(R.string.ui_delete_all_bookmarks_2)),"Select conditional bookmark action");
+            check(AppState.bookmarks(context,actionItem.uri).isEmpty() && AppState.hasCover(context,actionItem.uri),"Conditional library actions clear bookmarks without removing cover");
             runOnMainSync(lightLibrary::finish); waitForIdleSync();
     }
+    private void checkLibraryThumbnails(Activity activity,Uri uri) throws Exception {
+        LibraryThumbnails loader=new LibraryThumbnails(activity);
+        android.widget.ImageView view=new android.widget.ImageView(activity);
+        android.widget.TextView badge=new android.widget.TextView(activity);
+        LibraryEntry item=new LibraryEntry(uri,"sample.cbz",null,"CBZ",false,0,0);
+        try {
+            runOnMainSync(() -> loader.bind(view,badge,item));
+            await(() -> view.getScaleType()==android.widget.ImageView.ScaleType.CENTER_CROP,"Custom cover loads through shared thumbnail pipeline");
+            java.util.concurrent.ExecutorService worker=(java.util.concurrent.ExecutorService)field(loader,"worker");
+            java.util.concurrent.CountDownLatch ready=new java.util.concurrent.CountDownLatch(2),release=new java.util.concurrent.CountDownLatch(1);
+            for(int i=0;i<2;i++)worker.execute(() -> { ready.countDown();try {release.await();}catch(InterruptedException error){Thread.currentThread().interrupt();} });
+            try {
+                if(!ready.await(5,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("Thumbnail workers ready");
+                runOnMainSync(() -> {loader.clear();loader.bind(view,badge,item);loader.clear();});
+            } finally {release.countDown();}
+            worker.shutdown();if(!worker.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("Thumbnail workers drained");
+            waitForIdleSync();
+            check(view.getScaleType()==android.widget.ImageView.ScaleType.CENTER_INSIDE && ((BitmapMemoryCache)field(loader,"cache")).size()==0,"Invalidated thumbnail work cannot restore an old cover or cache entry");
+        } finally {runOnMainSync(loader::close);}
+    }
+
     private void checkThemes(Context context) throws Exception {
         int original = AppState.number(context,"theme",0);
         AppState.put(context,"theme",1); Ui.configure(context);
