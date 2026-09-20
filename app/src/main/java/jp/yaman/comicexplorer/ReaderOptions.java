@@ -3,6 +3,8 @@ package jp.yaman.comicexplorer;
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.view.WindowManager;
+import android.view.Gravity;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.SeekBar;
@@ -131,16 +133,76 @@ public final class ReaderOptions {
             AppState.put(activity, key, android.graphics.Color.parseColor(input.getText().toString())); changed.run(); dialog.dismiss();
         });
     }
+    static FrameLayout.LayoutParams[] pageButtonLayouts(int type, int position, int size, int screenWidth, int screenHeight, int thickness) {
+        boolean horizontal = position < 2;
+        int edge = position == 0 ? Gravity.BOTTOM : position == 1 ? Gravity.TOP : position == 2 ? Gravity.LEFT : Gravity.RIGHT;
+        int first = edge | (horizontal ? Gravity.LEFT : Gravity.TOP);
+        int second = edge | (horizontal ? Gravity.RIGHT : Gravity.BOTTOM);
+        int width = horizontal ? (type == 1 ? screenWidth / 2 : size) : thickness;
+        int height = horizontal ? thickness : (type == 1 ? Math.max(size, screenHeight/2) : size);
+        if (type == 2) { first = Gravity.LEFT | Gravity.CENTER_VERTICAL; second = Gravity.RIGHT | Gravity.CENTER_VERTICAL; width = thickness; height = size; }
+        if (type == 3) { first = edge | Gravity.CENTER; second = edge | Gravity.CENTER; }
+        FrameLayout.LayoutParams left = new FrameLayout.LayoutParams(width, height, first);
+        FrameLayout.LayoutParams right = new FrameLayout.LayoutParams(width, height, second);
+        if (type == 3) { if (horizontal) { left.rightMargin = size; right.leftMargin = size; } else { left.bottomMargin = size; right.topMargin = size; } }
+        return new FrameLayout.LayoutParams[]{left, right};
+    }
+
     public static void pageButtons(Activity activity, Runnable changed) {
         PreferenceRows rows = new PreferenceRows(activity);
-        rows.check(I18n.t(R.string.ui_enable), null, "page_buttons", true, changed);
+        String[] types = {I18n.t(R.string.ui_page_type_corners), I18n.t(R.string.ui_page_type_split),
+                I18n.t(R.string.ui_page_type_sides), I18n.t(R.string.ui_page_type_center)};
+        rows.section(I18n.t(R.string.ui_page_button_preview));
+        android.view.View preview = new android.view.View(activity) {
+            final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            final android.graphics.Rect screen = new android.graphics.Rect(), bounds = new android.graphics.Rect();
+            final android.graphics.Path arrow = new android.graphics.Path();
+            @Override protected void onMeasure(int widthSpec, int heightSpec) {
+                int height = activity.getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 64 : 180;
+                setMeasuredDimension(MeasureSpec.getSize(widthSpec), resolveSize(Ui.dp(activity,height),heightSpec));
+            }
+            @Override protected void onDraw(android.graphics.Canvas canvas) {
+                super.onDraw(canvas);
+                int width = activity.getResources().getDisplayMetrics().widthPixels;
+                int height = activity.getResources().getDisplayMetrics().heightPixels;
+                float scale = Math.min((getWidth()-Ui.dp(activity,16))/(float)width, (getHeight()-Ui.dp(activity,16))/(float)height);
+                canvas.save();
+                canvas.translate((getWidth()-width*scale)/2, (getHeight()-height*scale)/2); canvas.scale(scale,scale);
+                paint.setColor(Ui.SURFACE_RAISED); canvas.drawRect(0,0,width,height,paint);
+                paint.setColor(Ui.OUTLINE); paint.setStyle(android.graphics.Paint.Style.STROKE); paint.setStrokeWidth(Ui.dp(activity,2));
+                canvas.drawRect(0,0,width,height,paint); paint.setStyle(android.graphics.Paint.Style.FILL);
+                if(AppState.pageButtons(activity)) {
+                    FrameLayout.LayoutParams[] layouts = pageButtonLayouts(AppState.number(activity,"page_type",0),
+                            AppState.number(activity,"page_position",0), Ui.dp(activity,AppState.number(activity,"page_button_height",96)), width,height,Ui.dp(activity,48));
+                    screen.set(0,0,width,height);
+                    for(int i=0;i<layouts.length;i++) {
+                        FrameLayout.LayoutParams layout=layouts[i];
+                        Gravity.apply(layout.gravity,layout.width,layout.height,screen,bounds);
+                        bounds.offset(layout.leftMargin-layout.rightMargin,layout.topMargin-layout.bottomMargin);
+                        paint.setColor(Ui.BRAND); paint.setAlpha(Math.round(AppState.pageButtonOpacity(activity)*2.55f));
+                        canvas.drawRect(bounds,paint);
+                        paint.setColor(Ui.TEXT_PRIMARY); paint.setAlpha(Math.round(AppState.pageButtonOpacity(activity)*2.55f)); paint.setStyle(android.graphics.Paint.Style.STROKE); paint.setStrokeWidth(Ui.dp(activity,3));
+                        float x=bounds.exactCenterX(), y=bounds.exactCenterY(), d=Ui.dp(activity,8), sign=i==0 ? -1 : 1;
+                        arrow.reset();
+                        arrow.moveTo(x-sign*d/2,y-d); arrow.lineTo(x+sign*d/2,y); arrow.lineTo(x-sign*d/2,y+d);
+                        canvas.drawPath(arrow,paint); paint.setStyle(android.graphics.Paint.Style.FILL);
+                    }
+                }
+                canvas.restore();
+            }
+        };
+        preview.setImportantForAccessibility(android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        rows.content.addView(preview,new LinearLayout.LayoutParams(-1,-2));
+        Runnable update=() -> {preview.invalidate();changed.run();};
+        rows.section(I18n.t(R.string.ui_type));
+        rows.radio(types,new int[]{0,1,2,3},"page_type",0,false,update);
+        rows.choice(I18n.t(R.string.ui_position), new String[]{I18n.t(R.string.ui_bottom), I18n.t(R.string.ui_top), I18n.t(R.string.ui_left), I18n.t(R.string.ui_right)}, "page_position", 0, update);
+        rows.check(I18n.t(R.string.ui_enable), null, "page_buttons", true, update);
         rows.check("+,+", I18n.t(R.string.ui_both_buttons_move_forward), "page_both_next", false, changed);
         rows.check(I18n.t(R.string.ui_reverse), null, "page_reverse", false, changed);
         rows.check(I18n.t(R.string.ui_fixed), I18n.t(R.string.ui_keep_buttons_visible_with_menus), "page_fixed", true, changed);
-        rows.choice(I18n.t(R.string.ui_type), new String[]{"Type0", "Type1", "Type2", "Type3"}, "page_type", 0, changed);
-        rows.choice(I18n.t(R.string.ui_position), new String[]{I18n.t(R.string.ui_bottom), I18n.t(R.string.ui_top), I18n.t(R.string.ui_left), I18n.t(R.string.ui_right)}, "page_position", 0, changed);
-        rows.slider(I18n.t(R.string.ui_opacity), "page_button_opacity", 70, 0, 100, "%", changed);
-        rows.slider(I18n.t(R.string.ui_size), "page_button_height", 96, 48, 160, " dp", changed);
+        rows.slider(I18n.t(R.string.ui_opacity), "page_button_opacity", 70, 0, 100, "%", update);
+        rows.slider(I18n.t(R.string.ui_size), "page_button_height", 96, 48, 160, " dp", update);
         rows.check(I18n.t(R.string.ui_scroll_animation), null, "scroll_smooth", true, changed);
         rows.slider(I18n.t(R.string.ui_scroll_overlap), "scroll_overlap", 23, 0, 100, " sp", changed);
         rows.show(I18n.t(R.string.ui_page_button_area));
@@ -185,14 +247,18 @@ public final class ReaderOptions {
     private static void tagOptions(PreferenceRows rows,int first,String key) {
         for(int i=first;i<rows.content.getChildCount();i++)rows.content.getChildAt(i).setTag(key);
     }
+    static int keyAction(Activity activity, int code) {
+        int action = AppState.number(activity, "key." + code, 0);
+        return action >= 0 && action <= 4 ? action : 0;
+    }
     public static void hardware(Activity activity, Runnable changed) {
         PreferenceRows rows = new PreferenceRows(activity);
         rows.check(I18n.t(R.string.ui_use_volume_keys), null, "volume_navigation", false, changed);
         rows.check(I18n.t(R.string.ui_reverse_volume_keys), null, "reverse_volume_navigation", false, changed);
-        String[] actions = {I18n.t(R.string.ui_disabled), I18n.t(R.string.ui_previous_page), I18n.t(R.string.ui_next_page), I18n.t(R.string.ui_menu), I18n.t(R.string.ui_add_bookmark), I18n.t(R.string.ui_fullscreen)};
+        String[] actions = {I18n.t(R.string.ui_disabled), I18n.t(R.string.ui_previous_page), I18n.t(R.string.ui_next_page), I18n.t(R.string.ui_menu), I18n.t(R.string.ui_add_bookmark)};
         for (String key : AppState.prefs(activity).getAll().keySet()) if (key.startsWith("setting.key.")) {
             int code = Integer.parseInt(key.substring("setting.key.".length()));
-            rows.action(KeyEvent.keyCodeToString(code), actions[Math.max(0, Math.min(5, AppState.number(activity, "key." + code, 0)))], () -> {
+            rows.action(KeyEvent.keyCodeToString(code), actions[keyAction(activity, code)], () -> {
                 Ui.show(new AlertDialog.Builder(activity).setTitle(KeyEvent.keyCodeToString(code)).setItems(new String[]{I18n.t(R.string.ui_change), I18n.t(R.string.ui_delete)}, (d, i) -> {
                     if (i == 1) { AppState.prefs(activity).edit().remove(key).apply(); changed.run(); }
                     else bind(activity, code, actions, changed);

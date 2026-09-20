@@ -77,7 +77,6 @@
     <string name="ui_storage" formatted="false">"Хранилище"</string>
     <string name="ui_directory" formatted="false">"Файлы"</string>
     <string name="ui_keep_screen_on" formatted="false">"Не выключать экран"</string>
-    <string name="ui_full_screen" formatted="false">"Полный экран"</string>
     <string name="ui_icon" formatted="false">"Иконки"</string>
     <string name="ui_open_the_next_file" formatted="false">"открыть следующий файл"</string>
     <string name="ui_show_a_dividing_line_between_dual_pages" formatted="false">"Показывать разделительную линию между двумя страницами"</string>
@@ -162,7 +161,6 @@
     <string name="ui_delete_history_by_time_range" formatted="false">"Удалить историю за период"</string>
     <string name="ui_try_a_different_name" formatted="false">"Попробуйте другое имя."</string>
     <string name="ui_cannot_replace_the_existing_cover" formatted="false">"Не удалось заменить обложку."</string>
-    <string name="ui_hide_status_and_navigation_bars" formatted="false">"Скрыть строки состояния и навигации"</string>
     <string name="ui_reader_menu" formatted="false">"Меню чтения "</string>
     <string name="ui_sync_with_google_drive" formatted="false">"Синхронизация с Google Drive"</string>
     <string name="ui_only_folders_can_be_created" formatted="false">"Можно создавать только папки"</string>
@@ -241,7 +239,6 @@
     <string name="ui_show_saved_directories" formatted="false">"Показать сохранённые каталоги"</string>
     <string name="ui_ascending_2" formatted="false">"По возрастанию"</string>
     <string name="ui_network_connections" formatted="false">"Сетевые подключения"</string>
-    <string name="ui_exit_fullscreen" formatted="false">"Выйти из полноэкранного режима"</string>
     <string name="ui_chapters" formatted="false">"Главы"</string>
     <string name="ui_enter_a_valid_name" formatted="false">"Введите допустимое имя"</string>
     <string name="ui_name_2" formatted="false">"Имя"</string>
@@ -298,7 +295,6 @@
     <string name="ui_details" formatted="false">"Сведения"</string>
     <string name="ui_crop_page_margins" formatted="false">"Обрезать поля страницы"</string>
     <string name="ui_cannot_open_ftp_file" formatted="false">"Не удалось открыть файл FTP"</string>
-    <string name="ui_enter_fullscreen" formatted="false">"Включить полноэкранный режим"</string>
     <string name="ui_google_authorization_did_not_complete" formatted="false">"Авторизация Google не завершена"</string>
     <string name="ui_removed_from_favorites" formatted="false">"Убрано из избранного"</string>
     <string name="ui_long_press_a_folder_to_save_it" formatted="false">"Удерживайте папку, чтобы сохранить её."</string>
@@ -375,7 +371,6 @@
     <string name="ui_resume_from_this_page" formatted="false">" Продолжить с этой страницы?"</string>
     <string name="ui_reload_file" formatted="false">"Перезагрузить файл"</string>
     <string name="ui_last_page" formatted="false">"Последняя страница"</string>
-    <string name="ui_fullscreen" formatted="false">"Полный экран"</string>
     <string name="ui_cannot_start_google_authorization" formatted="false">"Не удалось начать авторизацию Google"</string>
     <string name="ui_save_screen_as_image" formatted="false">"Сохранить экран как изображение"</string>
     <string name="ui_retry" formatted="false">"Повторить"</string>
@@ -389,14 +384,8 @@
     <string name="ui_reading_position" formatted="false">"Позиция чтения: "</string>
     <string name="ui_bookmarked_books" formatted="false">"Книги с закладками"</string>
     <string name="ui_find_page">Найти страницу</string>
-    <string name="ui_display_reading">Отображение и чтение</string>
     <string name="ui_book_actions">Действия с книгой</string>
-    <string name="ui_control_settings">Управление</string>
-    <string name="ui_page_list_style">Вид списка страниц</string>
-    <string name="ui_reading_mode">Режим чтения</string>
     <string name="ui_scroll_mode">Режим прокрутки</string>
-    <string name="ui_crop_settings">Поля и обрезка</string>
-    <string name="ui_crop_all_books">Обрезать поля в процентах (все книги)</string>
     <string name="ui_crop_this_book">Выбрать область обрезки (эта книга)</string>
     <string name="ui_reset_position_confirm">Вернуться на первую страницу и сбросить сохранённую позицию чтения? Закладки сохранятся.</string>
     <string name="ui_bookmark_actions">Закладки</string>
@@ -408,4 +397,9 @@
     <string name="ui_theme_orange">Оранжевая</string>
     <string name="ui_theme_gray">Серая</string>
     <string name="ui_theme_system">Как в системе</string>
+    <string name="ui_page_button_preview">Предпросмотр экрана</string>
+    <string name="ui_page_type_corners">По концам выбранного края</string>
+    <string name="ui_page_type_split">Две половины выбранного края</string>
+    <string name="ui_page_type_sides">По центру слева и справа (фиксировано)</string>
+    <string name="ui_page_type_center">Рядом по центру выбранного края</string>
 </resources>

@@ -30,7 +30,6 @@
     <string name="ui_album_delete_notice">Delete this album? Original images will remain.</string>
     <string name="ui_album_empty">Add images from the gallery or file picker.</string>
     <string name="ui_add_images">Add images</string>
-    <string name="ui_page_strip">Page thumbnail strip</string>
     <string name="ui_reference_import">Import from ComicScreen</string>
     <string name="ui_reference_import_detail">Choose a copy of DB_DATA.db or basedata.xml. Original files and accounts are not changed.</string>
     <string name="ui_reference_import_summary">Settings: %1$d; history: %2$d; bookmarks/favorites: %3$d; skipped: %4$d.\nSupported settings will replace current values. Existing reading data is kept. History displays the newest 100 entries. Book access permission may need to be granted again. Albums and accounts are not imported.</string>

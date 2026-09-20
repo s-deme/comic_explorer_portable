@@ -56,7 +56,7 @@
     <string name="ui_passive_ftp_off_active" formatted="false">"FTP passive（オフでactive）"</string>
     <string name="ui_columns" formatted="false">"カラム"</string>
     <string name="ui_auto_two_pages_in_landscape" formatted="false">"自動（横画面は見開き）"</string>
-    <string name="ui_position" formatted="false">"位置"</string>
+    <string name="ui_position" formatted="false">配置する辺</string>
     <string name="ui_zoom" formatted="false">"ズーム"</string>
     <string name="ui_name" formatted="false">"表示名"</string>
     <string name="ui_add_connection" formatted="false">"接続先を追加"</string>
@@ -83,7 +83,6 @@
     <string name="ui_delete_history_by_time_range" formatted="false">"履歴を期間指定で消去"</string>
     <string name="ui_try_a_different_name" formatted="false">"別の名前で検索してください。"</string>
     <string name="ui_cannot_replace_the_existing_cover" formatted="false">"既存の表紙を置き換えられません。"</string>
-    <string name="ui_hide_status_and_navigation_bars" formatted="false">"ステータスバー・ナビゲーションバーを隠す"</string>
     <string name="ui_reverse" formatted="false">"反転"</string>
     <string name="ui_reader_menu" formatted="false">"読書メニュー "</string>
     <string name="ui_refresh" formatted="false">"更新"</string>
@@ -141,7 +140,7 @@
     <string name="ui_long_press_a_book_to_add_it" formatted="false">"作品を長押しして追加できます。"</string>
     <string name="ui_cache_size" formatted="false">"キャッシュ容量"</string>
     <string name="ui_untitled" formatted="false">"名称なし"</string>
-    <string name="ui_type" formatted="false">"タイプ"</string>
+    <string name="ui_type" formatted="false">ボタンの配置</string>
     <string name="ui_first_chapter" formatted="false">"最初の章"</string>
     <string name="ui_ftp_transfer_did_not_complete" formatted="false">"FTP転送が完了しませんでした"</string>
     <string name="ui_no_history" formatted="false">"履歴はありません"</string>
@@ -184,7 +183,6 @@
     <string name="ui_show_saved_directories" formatted="false">"登録したディレクトリを表示"</string>
     <string name="ui_ascending_2" formatted="false">"昇順にする"</string>
     <string name="ui_network_connections" formatted="false">"ネットワーク接続"</string>
-    <string name="ui_exit_fullscreen" formatted="false">"全画面を解除"</string>
     <string name="ui_chapters" formatted="false">"章一覧"</string>
     <string name="ui_enter_a_valid_name" formatted="false">"有効な名前を入力してください"</string>
     <string name="ui_name_2" formatted="false">"名前順"</string>
@@ -263,7 +261,6 @@
     <string name="ui_crop_page_margins" formatted="false">"ページ余白を切り取る"</string>
     <string name="ui_cannot_open_ftp_file" formatted="false">"FTPファイルを開けません"</string>
     <string name="ui_show_a_dividing_line_between_scroll_pages" formatted="false">"スクロールページ間の分割線を表示"</string>
-    <string name="ui_enter_fullscreen" formatted="false">"全画面にする"</string>
     <string name="ui_google_authorization_did_not_complete" formatted="false">"Google認証を完了できませんでした"</string>
     <string name="ui_removed_from_favorites" formatted="false">"お気に入りから外しました"</string>
     <string name="ui_long_press_a_folder_to_save_it" formatted="false">"フォルダを長押しして登録できます。"</string>
@@ -297,7 +294,6 @@
     <string name="ui_keep_screen_on" formatted="false">"画面をオフにしない"</string>
     <string name="ui_change_sort_order" formatted="false">"並び順を変更"</string>
     <string name="ui_question_mark" formatted="false">"しますか？"</string>
-    <string name="ui_full_screen" formatted="false">"フルスクリーン"</string>
     <string name="ui_cannot_create_cover_directory" formatted="false">"表紙の保存先を作成できません。"</string>
     <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">画面タップでメニューを表示。スワイプまたはページボタンでページを移動します。</string>
     <string name="ui_no_results" formatted="false">"見つかりません"</string>
@@ -373,7 +369,6 @@
     <string name="ui_reload_file" formatted="false">"ファイルを再度読み込む"</string>
     <string name="ui_close" formatted="false">"閉じる"</string>
     <string name="ui_last_page" formatted="false">"最後のページです"</string>
-    <string name="ui_fullscreen" formatted="false">"全画面"</string>
     <string name="ui_cannot_start_google_authorization" formatted="false">"Google認証を開始できません"</string>
     <string name="ui_save_screen_as_image" formatted="false">"画面を画像として保存"</string>
     <string name="ui_retry" formatted="false">"再試行"</string>
@@ -389,14 +384,8 @@
     <string name="ui_reading_position" formatted="false">"復帰位置: "</string>
     <string name="ui_bookmarked_books" formatted="false">"しおりのある作品"</string>
     <string name="ui_find_page">ページを探す</string>
-    <string name="ui_display_reading">表示・読み方</string>
     <string name="ui_book_actions">この本の操作</string>
-    <string name="ui_control_settings">操作設定</string>
-    <string name="ui_page_list_style">ページ一覧の表示方式</string>
-    <string name="ui_reading_mode">読み方</string>
     <string name="ui_scroll_mode">スクロール方式</string>
-    <string name="ui_crop_settings">余白・トリミング</string>
-    <string name="ui_crop_all_books">余白を割合で切り取る（すべての本）</string>
     <string name="ui_crop_this_book">切り取り範囲を指定（この本）</string>
     <string name="ui_reset_position_confirm">先頭ページに戻り、保存した読書位置をリセットしますか？しおりは残ります。</string>
     <string name="ui_bookmark_actions">しおり</string>
@@ -408,4 +397,9 @@
     <string name="ui_theme_orange">オレンジ</string>
     <string name="ui_theme_gray">グレー</string>
     <string name="ui_theme_system">システムに合わせる</string>
+    <string name="ui_page_button_preview">画面サンプル</string>
+    <string name="ui_page_type_corners">両端に配置</string>
+    <string name="ui_page_type_split">端いっぱいに広げる</string>
+    <string name="ui_page_type_sides">左右の中央に固定</string>
+    <string name="ui_page_type_center">中央にまとめる</string>
 </resources>

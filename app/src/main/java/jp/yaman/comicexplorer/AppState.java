@@ -486,14 +486,6 @@ public final class AppState {
         put(context, "resume_last_position", enabled);
     }
 
-    public static boolean startFullscreen(Context context) {
-        return enabled(context, "start_fullscreen", true);
-    }
-
-    public static void setStartFullscreen(Context context, boolean enabled) {
-        put(context, "start_fullscreen", enabled);
-    }
-
     public static boolean volumeNavigation(Context context) {
         return enabled(context, "volume_navigation", false);
     }

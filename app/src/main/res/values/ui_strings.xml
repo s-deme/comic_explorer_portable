@@ -83,7 +83,6 @@
     <string name="ui_delete_history_by_time_range" formatted="false">"Delete history by time range"</string>
     <string name="ui_try_a_different_name" formatted="false">"Try a different name."</string>
     <string name="ui_cannot_replace_the_existing_cover" formatted="false">"Cannot replace the existing cover."</string>
-    <string name="ui_hide_status_and_navigation_bars" formatted="false">"Hide status and navigation bars"</string>
     <string name="ui_reverse" formatted="false">"Reverse"</string>
     <string name="ui_reader_menu" formatted="false">"Reader menu "</string>
     <string name="ui_refresh" formatted="false">"Refresh"</string>
@@ -184,7 +183,6 @@
     <string name="ui_show_saved_directories" formatted="false">"Show saved directories"</string>
     <string name="ui_ascending_2" formatted="false">"Ascending"</string>
     <string name="ui_network_connections" formatted="false">"Network connections"</string>
-    <string name="ui_exit_fullscreen" formatted="false">"Exit fullscreen"</string>
     <string name="ui_chapters" formatted="false">"Chapters"</string>
     <string name="ui_enter_a_valid_name" formatted="false">"Enter a valid name"</string>
     <string name="ui_name_2" formatted="false">"Name"</string>
@@ -263,7 +261,6 @@
     <string name="ui_crop_page_margins" formatted="false">"Crop page margins"</string>
     <string name="ui_cannot_open_ftp_file" formatted="false">"Cannot open FTP file"</string>
     <string name="ui_show_a_dividing_line_between_scroll_pages" formatted="false">"Show a dividing line between scroll pages"</string>
-    <string name="ui_enter_fullscreen" formatted="false">"Enter fullscreen"</string>
     <string name="ui_google_authorization_did_not_complete" formatted="false">"Google authorization did not complete"</string>
     <string name="ui_removed_from_favorites" formatted="false">"Removed from favorites"</string>
     <string name="ui_long_press_a_folder_to_save_it" formatted="false">"Long press a folder to save it."</string>
@@ -297,7 +294,6 @@
     <string name="ui_keep_screen_on" formatted="false">"Keep screen on"</string>
     <string name="ui_change_sort_order" formatted="false">"Change sort order"</string>
     <string name="ui_question_mark" formatted="false">"?"</string>
-    <string name="ui_full_screen" formatted="false">"Full screen"</string>
     <string name="ui_cannot_create_cover_directory" formatted="false">"Cannot create cover directory."</string>
     <string name="ui_tap_or_swipe_to_turn_pages_tap_the_center_for" formatted="false">Tap the page for menus. Swipe or use the page buttons to turn pages.</string>
     <string name="ui_no_results" formatted="false">"No results"</string>
@@ -373,7 +369,6 @@
     <string name="ui_reload_file" formatted="false">"Reload file"</string>
     <string name="ui_close" formatted="false">"Close"</string>
     <string name="ui_last_page" formatted="false">"Last page"</string>
-    <string name="ui_fullscreen" formatted="false">"Fullscreen"</string>
     <string name="ui_cannot_start_google_authorization" formatted="false">"Cannot start Google authorization"</string>
     <string name="ui_save_screen_as_image" formatted="false">"Save screen as image"</string>
     <string name="ui_retry" formatted="false">"Retry"</string>
@@ -389,14 +384,8 @@
     <string name="ui_reading_position" formatted="false">"Reading position: "</string>
     <string name="ui_bookmarked_books" formatted="false">"Bookmarked books"</string>
     <string name="ui_find_page">Find a page</string>
-    <string name="ui_display_reading">Display and reading</string>
     <string name="ui_book_actions">Book actions</string>
-    <string name="ui_control_settings">Controls</string>
-    <string name="ui_page_list_style">Page list display</string>
-    <string name="ui_reading_mode">Reading mode</string>
     <string name="ui_scroll_mode">Scrolling mode</string>
-    <string name="ui_crop_settings">Margins and cropping</string>
-    <string name="ui_crop_all_books">Trim margins by percentage (all books)</string>
     <string name="ui_crop_this_book">Select crop area (this book)</string>
     <string name="ui_reset_position_confirm">Return to the first page and reset the saved reading position? Bookmarks will be kept.</string>
     <string name="ui_bookmark_actions">Bookmarks</string>
@@ -408,4 +397,9 @@
     <string name="ui_theme_orange">Orange</string>
     <string name="ui_theme_gray">Gray</string>
     <string name="ui_theme_system">Follow system</string>
+    <string name="ui_page_button_preview">Screen preview</string>
+    <string name="ui_page_type_corners">At both ends of the chosen edge</string>
+    <string name="ui_page_type_split">Split the chosen edge in half</string>
+    <string name="ui_page_type_sides">Middle of left and right edges (fixed)</string>
+    <string name="ui_page_type_center">Together at the center of the chosen edge</string>
 </resources>

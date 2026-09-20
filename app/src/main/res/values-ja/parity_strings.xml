@@ -30,7 +30,6 @@
     <string name="ui_album_delete_notice">アルバムを削除しますか？元画像は残ります。</string>
     <string name="ui_album_empty">ギャラリーやファイル選択から画像を追加できます。</string>
     <string name="ui_add_images">画像を追加</string>
-    <string name="ui_page_strip">ページサムネイル帯</string>
     <string name="ui_reference_import">ComicScreenから読み込み</string>
     <string name="ui_reference_import_detail">DB_DATA.db または basedata.xml のコピーを選択。原本・アカウントは変更しません。</string>
     <string name="ui_reference_import_summary">設定 %1$d件／履歴 %2$d件／しおり・お気に入り %3$d件／対象外 %4$d件。\n対応する設定は上書きします。既存の読書情報は維持し、履歴は新しい100件を表示します。作品へのアクセス許可が再度必要な場合があります。アルバム・アカウントは取り込みません。</string>
