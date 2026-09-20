@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.apache.commons.compress.archivers.zip.ZipMethod;
 
 /** Owns file handles and raw decoding. Open, decode and close on the reader's single worker. */
 final class PageSource implements AutoCloseable {
@@ -61,7 +62,7 @@ final class PageSource implements AutoCloseable {
                     try {
                         archive=ZipFile.builder().setFile(cached).setCharset(charset).get();
                         java.util.Enumeration<ZipArchiveEntry> entries=archive.getEntries();
-                        while(entries.hasMoreElements())if(entries.nextElement().getGeneralPurposeBit().usesEncryption()) {archive.close();archive=null;break;}
+                        while(entries.hasMoreElements())if(requiresSevenZip(entries.nextElement())) {archive.close();archive=null;break;}
                     }catch(IOException unsupported){if(archive!=null)archive.close();archive=null;}
                 }
                 java.util.Map<String,java.io.File> available=new java.util.HashMap<>(volumes);
@@ -81,6 +82,13 @@ final class PageSource implements AutoCloseable {
         }
     }
     int pageCount() { return count; }
+    static boolean requiresSevenZip(ZipArchiveEntry entry) {
+        int method=entry.getMethod();
+        return entry.getGeneralPurposeBit().usesEncryption() || !(method==ZipMethod.STORED.getCode() || method==ZipMethod.UNSHRINKING.getCode()
+                || method==ZipMethod.IMPLODING.getCode() || method==ZipMethod.DEFLATED.getCode() || method==ZipMethod.ENHANCED_DEFLATED.getCode()
+                || method==ZipMethod.BZIP2.getCode() || method==ZipMethod.ZSTD_DEPRECATED.getCode() || method==ZipMethod.ZSTD.getCode()
+                || method==ZipMethod.XZ.getCode());
+    }
     boolean isLandscape(int index) throws IOException {
         if (closed) throw new IOException("Page source is closed");
         if (pdf != null) {

@@ -681,6 +681,10 @@ public final class ParityInstrumentation extends Instrumentation {
         } finally {android.provider.DocumentsContract.deleteDocument(context.getContentResolver(),run); getUiAutomation().dropShellPermissionIdentity();}
     }
     private void checkAdvancedFormats(Context context,File fixtures) throws Exception {
+        org.apache.commons.compress.archivers.zip.ZipArchiveEntry deflated=new org.apache.commons.compress.archivers.zip.ZipArchiveEntry("page.png");deflated.setMethod(8);
+        org.apache.commons.compress.archivers.zip.ZipArchiveEntry ppmd=new org.apache.commons.compress.archivers.zip.ZipArchiveEntry("page.png");ppmd.setMethod(98);
+        org.apache.commons.compress.archivers.zip.ZipArchiveEntry lzma=new org.apache.commons.compress.archivers.zip.ZipArchiveEntry("page.png");lzma.setMethod(14);
+        check(!PageSource.requiresSevenZip(deflated) && PageSource.requiresSevenZip(ppmd) && PageSource.requiresSevenZip(lzma),"ZIP methods use the compatible reader");
         for(String name:new String[]{"stored-rar5.rar","encrypted.7z","split.7z.001","split.7z.002","split.part1.rar","split.part2.rar","animated.gif"}) {
             try(java.io.InputStream input=getContext().getAssets().open(name);FileOutputStream output=new FileOutputStream(new File(fixtures,name))){DocumentTransfer.copyAndHash(input,output,null);}
         }
