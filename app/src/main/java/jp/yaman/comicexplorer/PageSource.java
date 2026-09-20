@@ -81,6 +81,27 @@ final class PageSource implements AutoCloseable {
         }
     }
     int pageCount() { return count; }
+    boolean isLandscape(int index) throws IOException {
+        if (closed) throw new IOException("Page source is closed");
+        if (pdf != null) {
+            try (PdfRenderer.Page page = pdf.openPage(index)) { return page.getWidth() > page.getHeight(); }
+        }
+        java.io.File temporary = null;
+        try {
+            Uri uri = images.isEmpty() ? null : images.get(index);
+            if (extraArchive != null) {
+                temporary = java.io.File.createTempFile("page-bounds-", ".image", context.getCacheDir());
+                extraArchive.extract(archiveEntries.get(index), temporary);
+                uri = Uri.fromFile(temporary);
+            }
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            try (InputStream input = openImage(uri, uri == null ? archiveEntries.get(index) : null)) {
+                BitmapFactory.decodeStream(input, null, bounds);
+            }
+            return bounds.outWidth > bounds.outHeight && bounds.outHeight > 0;
+        } finally { if (temporary != null) temporary.delete(); }
+    }
     private java.io.File readPdf(java.io.File file,String password) throws IOException {
         com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context);
         try(com.tom_roush.pdfbox.pdmodel.PDDocument document=com.tom_roush.pdfbox.pdmodel.PDDocument.load(file,password==null ? "" : password,com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly().setTempDir(context.getCacheDir()))) {

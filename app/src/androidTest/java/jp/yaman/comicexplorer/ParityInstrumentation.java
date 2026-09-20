@@ -195,9 +195,9 @@ public final class ParityInstrumentation extends Instrumentation {
                 AppState.put(context,"page_both_next",true);
                 AppState.put(context,"page_reverse",true);
                 invoke(viewer,"updatePageButtons");
-                check(((android.view.View)field(viewer,"leftPageButton")).getContentDescription().equals(I18n.t(R.string.ui_previous_page))
-                        && ((android.view.View)field(viewer,"rightPageButton")).getContentDescription().equals(I18n.t(R.string.ui_previous_page)),
-                        "Page arrow descriptions follow both-next and reverse overrides");
+                check(((android.view.View)field(viewer,"leftPageButton")).getContentDescription().equals(I18n.t(R.string.ui_next_page))
+                        && ((android.view.View)field(viewer,"rightPageButton")).getContentDescription().equals(I18n.t(R.string.ui_next_page)),
+                        "Both-next takes precedence over reverse like the reference");
                 AppState.put(context,"page_both_next",false);
                 AppState.put(context,"page_reverse",false);
                 invoke(viewer,"updatePageButtons");
@@ -205,25 +205,48 @@ public final class ParityInstrumentation extends Instrumentation {
             awaitReady(() -> (Boolean)field(viewer,"initialized"),"ZIP reader initialized");
             awaitReady(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"ZIP first page decoded");
             runOnMainSync(() -> ReaderOptions.pageButtons(viewer,() -> invoke(viewer,"updatePageButtons")));
-            capture("buttons-corners");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_page_type_split)),"Select page button layout by descriptive label");
-            check(AppState.number(context,"page_type",0)==1 && ((android.view.View)field(viewer,"leftPageButton")).getLayoutParams().width==viewer.getResources().getDisplayMetrics().widthPixels/2,"Split layout applies to reader immediately");
-            capture("buttons-split");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_page_type_sides)),"Select fixed side buttons");
-            check(((android.widget.FrameLayout.LayoutParams)((android.view.View)field(viewer,"leftPageButton")).getLayoutParams()).gravity==(android.view.Gravity.LEFT|android.view.Gravity.CENTER_VERTICAL),"Side layout stays centered on left and right edges");
-            capture("buttons-sides");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_page_type_center)),"Select centered pair");
-            check(AppState.number(context,"page_type",0)==3,"Centered pair selection is saved");
-            capture("buttons-center");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_page_type_corners)),"Restore corner layout");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_close)),"Close page button samples");
+            capture("buttons-type0");
+            awaitReady(() -> clickText("Type1"),"Select reference Type1");
+            check(AppState.number(context,"page_type",0)==0,"Draft type does not save before OK");
+            awaitReady(() -> clickText("Right"),"Type1 exposes Left/Right");
+            capture("buttons-type1");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_cancel)),"Cancel page button draft");
+            waitForIdleSync();
+            check(AppState.number(context,"page_type",0)==0,"Cancel preserves saved type");
+            runOnMainSync(() -> ReaderOptions.pageButtons(viewer,() -> invoke(viewer,"updatePageButtons")));
+            awaitReady(() -> clickText("Type2"),"Select reference Type2");
+            capture("buttons-type2");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_ok)),"Save reference Type2");
+            awaitReady(() -> AppState.number(context,"page_type",0)==2,"Wait for committed Type2");
+            waitForIdleSync();
+            check(AppState.number(context,"page_type",0)==2
+                    && ((android.view.View)field(viewer,"leftPageButton")).getLayoutParams().height==((android.view.View)field(viewer,"pageCanvas")).getHeight(),"Type2 spans both side edges");
+            runOnMainSync(() -> ReaderOptions.pageButtons(viewer,() -> invoke(viewer,"updatePageButtons")));
+            awaitReady(() -> clickText("Type3"),"Select reference Type3");
+            capture("buttons-type3");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_default)),"Restore reference defaults in draft");
+            check(AppState.number(context,"page_type",0)==2,"Default does not persist until OK");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_ok)),"Save reference defaults");
+            awaitReady(() -> AppState.number(context,"page_type",-1)==0,"Wait for committed defaults");
+            waitForIdleSync();
+            check(AppState.number(context,"page_type",-1)==0 && PageButtonDialog.sizePercent(context)==10
+                    && AppState.pageButtonOpacity(context)==100 && !AppState.enabled(context,"page_fixed",true)
+                    && !AppState.enabled(context,"scroll_smooth",true),"Reference defaults persist together");
+            android.widget.FrameLayout.LayoutParams[] buttonBounds=PageButtonDialog.layouts(1,false,false,10,1000,2000);
+            check(buttonBounds[0].width==100 && buttonBounds[0].height==1000
+                    && buttonBounds[0].gravity==(android.view.Gravity.RIGHT|android.view.Gravity.TOP),"Type1 splits the selected vertical edge");
+            buttonBounds=PageButtonDialog.layouts(3,true,true,10,1000,2000);
+            check(buttonBounds[0].width==1000 && buttonBounds[0].height==100,"Type3 splits size across top and bottom edges");
+            check(PageButtonDialog.forward(true,0,false,false,true,true)
+                    && !PageButtonDialog.forward(true,0,false,false,false,true)
+                    && PageButtonDialog.forward(true,1,false,false,false,true),"Fixed ignores reading direction only for horizontal button types");
             runOnMainSync(() -> {
                 invoke(viewer,"toggleChrome");
                 android.widget.LinearLayout toolbar=(android.widget.LinearLayout)field(viewer,"readerMenuRow");
-                int[] labels={R.string.ui_page_thumbnails,R.string.ui_reading_direction,R.string.ui_page_layout,R.string.ui_image_filters,R.string.ui_crop_page_margins};
+                int[] labels={R.string.ui_page_thumbnails,R.string.ui_reading_direction,R.string.ui_page_layout,R.string.ui_image_filters};
                 boolean primary=toolbar.getChildCount()==labels.length;
                 for(int i=0;primary && i<labels.length;i++)primary=I18n.t(labels[i]).contentEquals(toolbar.getChildAt(i).getContentDescription());
-                check(primary,"Reader toolbar exposes only page list, direction, layout, filters and margin crop");
+                check(primary,"Reader toolbar exposes only page list, direction, layout and filters");
                 AppState.put(context,"key."+android.view.KeyEvent.KEYCODE_F1,5);
                 check(ReaderOptions.keyAction(viewer,android.view.KeyEvent.KEYCODE_F1)==0,"Legacy fullscreen key assignment becomes disabled");
                 AppState.prefs(context).edit().remove("setting.key."+android.view.KeyEvent.KEYCODE_F1).apply();
@@ -242,16 +265,16 @@ public final class ParityInstrumentation extends Instrumentation {
             await(() -> (Boolean)field(closingAdapter,"closed"),"Closing page list cancels thumbnail work");
             runOnMainSync(() -> invoke(viewer,"showReaderMenu"));
             capture("dark-menu");
+            android.view.accessibility.AccessibilityNodeInfo readerMenu=getUiAutomation().getRootInActiveWindow();
+            for(int removed:new int[]{R.string.ui_brightness,R.string.ui_double_tap_zoom,R.string.ui_crop_this_book,R.string.ui_book_actions,R.string.ui_settings}) {
+                check(readerMenu.findAccessibilityNodeInfosByText(I18n.t(removed)).isEmpty(),"Reader menu omits "+I18n.t(removed));
+            }
             awaitReady(() -> clickText(I18n.t(R.string.ui_auto_page_turn)),"Automatic paging is reachable from reader menu");
             awaitReady(() -> clickText(I18n.t(R.string.ui_every_15_seconds)),"Start automatic paging");
             check((Integer)field(viewer,"autoDelayMs")==15000,"Reader menu starts automatic paging");
             runOnMainSync(() -> invoke(viewer,"showReaderMenu"));
             awaitReady(() -> clickText(I18n.t(R.string.ui_stop_auto_page_turn)),"Stop automatic paging from reader menu");
             check((Integer)field(viewer,"autoDelayMs")==0,"Reader menu stops automatic paging");
-            runOnMainSync(() -> invoke(viewer,"showReaderMenu"));
-            awaitReady(() -> clickText(I18n.t(R.string.ui_brightness)),"Brightness is directly reachable from reader menu");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_system_settings)),"Reset brightness through relocated control");
-            check(AppState.brightness(context)==-1,"Relocated brightness control restores system setting");
             runOnMainSync(() -> invoke(viewer,"showReaderMenu"));
             awaitReady(() -> clickText(I18n.t(R.string.ui_bookmark_actions)),"Bookmarks are reachable from reader menu");
             awaitReady(() -> clickText(I18n.t(R.string.ui_bookmark_this_page)),"Add bookmark through relocated control");
@@ -316,23 +339,13 @@ public final class ParityInstrumentation extends Instrumentation {
             runOnMainSync(() -> ((ContinuousReader)field(viewer,"continuous")).setSelection(3));
             await(() -> (Integer)field(viewer,"page")==3,"Continuous scrolling updates position");
 
-            runOnMainSync(() -> invoke(viewer,"showReaderMenu"));
-            awaitReady(() -> clickText("この本の操作"), "Open book actions");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_reset_reading_position)), "Open reset confirmation");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_cancel)), "Cancel reading position reset");
-            check((Integer)field(viewer,"page")==3 && AppState.getPosition(context,Uri.fromFile(zip))==3,
-                    "Cancelling position reset preserves current and saved page");
-            java.nio.file.Files.deleteIfExists(AppState.coverFile(context,Uri.fromFile(zip)).toPath());
-            runOnMainSync(() -> invoke(viewer,"saveCurrentPageCover"));
-            await(() -> AppState.coverFile(context,Uri.fromFile(zip)).isFile(),"Continuous page can be saved as cover");
-            runOnMainSync(() -> ((android.widget.LinearLayout)field(viewer,"readerMenuRow")).getChildAt(4).performClick());
-            awaitReady(() -> clickText("5%"),"Select margin crop through the actual dialog");
+            runOnMainSync(() -> {AppState.setCropPercent(context,5);invoke(viewer,"refreshReader");});
             await(() -> {
                 ContinuousReader list=(ContinuousReader)field(viewer,"continuous");
                 if(list.getChildCount()==0)return false;
                 android.graphics.drawable.Drawable drawable=((ZoomImageView)list.getChildAt(0)).getDrawable();
                 return drawable instanceof android.graphics.drawable.BitmapDrawable && ((android.graphics.drawable.BitmapDrawable)drawable).getBitmap().getWidth()==540;
-            },"Visible continuous page reflects cropped pixels");
+            },"Existing saved crop still renders after removing its reader controls");
             runOnMainSync(() -> { AppState.put(context,"filter_contrast",true);AppState.put(context,"filter_gray",true);invoke(viewer,"refreshReader"); });
             await(() -> {
                 ContinuousReader list=(ContinuousReader)field(viewer,"continuous");
@@ -366,21 +379,6 @@ public final class ParityInstrumentation extends Instrumentation {
             runOnMainSync(() -> ((android.app.AlertDialog)field(pdfViewer,"pageListDialog")).dismiss());
 
 
-            ActivityMonitor cropMonitor=addMonitor(CropActivity.class.getName(),null,false);
-            runOnMainSync(() -> invoke(pdfViewer,"showCropEditor"));
-            CropActivity cropActivity=(CropActivity)waitForMonitorWithTimeout(cropMonitor,10000);
-            if (cropActivity==null) throw new AssertionError("Dedicated crop activity opens");
-            awaitReady(() -> {android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();return root!=null && !root.findAccessibilityNodeInfosByText("画像トリミング").isEmpty();},"Crop dialog visible");
-            check(cropActivity.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE,"Crop inherits the reader orientation");
-            android.graphics.RectF selection=new android.graphics.RectF(.1f,.2f,.8f,.9f);
-            waitForIdleSync();removeMonitor(cropMonitor);cropMonitor=addMonitor(CropActivity.class.getName(),null,false);
-            runOnMainSync(() -> {((CropView)field(cropActivity,"crop")).setSelection(selection);cropActivity.recreate();});
-            CropActivity recreatedCrop=(CropActivity)waitForMonitorWithTimeout(cropMonitor,10000);
-            waitForIdleSync();
-            check(recreatedCrop!=null && recreatedCrop!=cropActivity && ((CropView)field(recreatedCrop,"crop")).selection().equals(selection),"Crop selection survives activity recreation: "+(recreatedCrop==null ? "no recreated activity" : ((CropView)field(recreatedCrop,"crop")).selection()));
-            removeMonitor(cropMonitor);
-            awaitReady(() -> clickText("切り抜き"),"Apply crop through the actual screen");
-            await(() -> selection.equals(AppState.crop(context,Uri.fromFile(pdf))),"Crop result persists on the original book");
             runOnMainSync(() -> pdfViewer.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));
             awaitReady(() -> pdfViewer.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT,"Restore portrait");
             runOnMainSync(pdfViewer::finish);
@@ -404,6 +402,10 @@ public final class ParityInstrumentation extends Instrumentation {
             checkLibraryThumbnails(lightLibrary,Uri.fromFile(zip));
             LibraryEntry actionItem=new LibraryEntry(Uri.fromFile(zip),"sample.cbz",null,"CBZ",false,0,0);
             AppState.setBookmark(context,actionItem.uri,1,true,actionItem.name,actionItem.kind);
+            File coverFixture=AppState.coverFile(context,actionItem.uri);coverFixture.getParentFile().mkdirs();
+            Bitmap coverFixtureBitmap=Bitmap.createBitmap(2,2,Bitmap.Config.ARGB_8888);
+            try(FileOutputStream output=new FileOutputStream(coverFixture)){coverFixtureBitmap.compress(Bitmap.CompressFormat.PNG,100,output);}
+            coverFixtureBitmap.recycle();
             runOnMainSync(() -> {
                 try { java.lang.reflect.Method method=MainActivity.class.getDeclaredMethod("showActions",LibraryEntry.class);method.setAccessible(true);method.invoke(lightLibrary,actionItem); }
                 catch(Exception error) { throw new RuntimeException(error); }
@@ -417,7 +419,65 @@ public final class ParityInstrumentation extends Instrumentation {
                 capture("missing-book");runOnMainSync(unavailable::finish);
             }
 
+            checkForcedSinglePage(context,fixtures);
     }
+    private void checkForcedSinglePage(Context context,File fixtures) throws Exception {
+        AppState.prefs(context).edit().clear().commit(); AppState.put(context,"language","ja"); AppState.put(context,"theme",2);
+        AppState.markReaderHintSeen(context);
+        File book=new File(fixtures,"split.cbz");
+        try(ZipOutputStream output=new ZipOutputStream(new FileOutputStream(book))) {
+            int[][] sizes={{300,500},{601,400},{300,300}};
+            for(int i=0;i<sizes.length;i++) {
+                Bitmap bitmap=Bitmap.createBitmap(sizes[i][0],sizes[i][1],Bitmap.Config.ARGB_8888);
+                Canvas canvas=new Canvas(bitmap);canvas.drawColor(android.graphics.Color.RED);
+                if(i==1){Paint paint=new Paint();paint.setColor(android.graphics.Color.BLUE);canvas.drawRect(300,0,601,400,paint);}
+                output.putNextEntry(new ZipEntry(i+".png"));bitmap.compress(Bitmap.CompressFormat.PNG,100,output);output.closeEntry();bitmap.recycle();
+            }
+        }
+        byte[] original=java.nio.file.Files.readAllBytes(book.toPath());
+        Uri uri=Uri.fromFile(book);
+        try(PageSource source=new PageSource(context,uri,"split.cbz",null,java.nio.charset.StandardCharsets.UTF_8,2_000_000)) {
+            PageSequence sequence=new PageSequence(source,true);
+            check(sequence.count()==4 && sequence.original(2)==1 && sequence.display(2,0)==3,"Only landscape images create two display pages; square and portrait stay whole");
+            Bitmap right=sequence.decode(source,1,1080,-1,true),left=sequence.decode(source,2,1080,-1,true);
+            check(right.getWidth()==301 && left.getWidth()==300 && right.getPixel(0,0)==android.graphics.Color.BLUE && left.getPixel(0,0)==android.graphics.Color.RED,"RTL split keeps every column of odd-width images in right-left order");right.recycle();left.recycle();
+            left=sequence.decode(source,1,1080,-1,false);check(left.getPixel(0,0)==android.graphics.Color.RED,"LTR split starts with the left half");left.recycle();
+        }
+        ViewerActivity viewer=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(uri).putExtra(ViewerActivity.EXTRA_TITLE,"split.cbz").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        awaitReady(() -> (Boolean)field(viewer,"initialized"),"Mixed book opened");
+        runOnMainSync(() -> invoke(viewer,"showPageLayoutDialog"));
+        capture("force-single-choice");
+        awaitReady(() -> clickText(I18n.t(R.string.ui_force_single_page)),"Select force single page");
+        awaitReady(() -> (Boolean)field(viewer,"initialized") && (Integer)field(viewer,"totalPages")==4,"Force single builds display sequence");
+        runOnMainSync(() -> invoke(viewer,"forward"));
+        awaitReady(() -> AppState.getPosition(context,uri)==1 && ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"First half loaded");
+        capture("force-single-right");
+        runOnMainSync(() -> invoke(viewer,"forward"));
+        awaitReady(() -> AppState.prefs(context).getString("position_half."+AppState.key(uri),"").equals("1:1"),"Second half persisted");
+        check((Integer)field(viewer,"page")==2 && AppState.totalPages(context,uri)==3,"Display pages retain original book progress coordinates");
+        capture("force-single-left");
+        runOnMainSync(() -> {invoke(viewer,"toggleBookmark");viewer.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);});
+        awaitReady(() -> viewer.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE,"Rotate force single");
+        check(!ViewerActivity.usesDualPageLayout(AppState.PAGE_FORCE_SINGLE,android.content.res.Configuration.ORIENTATION_LANDSCAPE)
+                && AppState.hasBookmark(context,uri,1),"Force single remains split in landscape and bookmarks the original page");
+        capture("force-single-landscape");
+        runOnMainSync(() -> {viewer.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);});
+        awaitReady(() -> viewer.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT,"Restore split portrait");
+        runOnMainSync(viewer::finish);waitForIdleSync();
+        ViewerActivity resumed=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(uri).putExtra(ViewerActivity.EXTRA_TITLE,"split.cbz").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        awaitReady(() -> (Boolean)field(resumed,"initialized") && (Integer)field(resumed,"page")==2,"Resume the second half");
+        runOnMainSync(() -> {AppState.setPageLayout(context,AppState.PAGE_SINGLE);invoke(resumed,"refreshReader");});
+        awaitReady(() -> (Boolean)field(resumed,"initialized") && (Integer)field(resumed,"totalPages")==3,"Return to normal single page");
+        check((Integer)field(resumed,"page")==1,"Leaving split mode preserves the original image");
+        runOnMainSync(() -> {AppState.setPageLayout(context,AppState.PAGE_FORCE_SINGLE);AppState.setReadingFlow(context,AppState.FLOW_VERTICAL);invoke(resumed,"refreshReader");});
+        awaitReady(() -> (Boolean)field(resumed,"initialized") && ((ContinuousReader)field(resumed,"continuous")).getCount()==4,"Continuous scrolling uses split display pages");
+        capture("force-single-vertical");
+        runOnMainSync(resumed::finish);waitForIdleSync();
+        check(java.util.Arrays.equals(original,java.nio.file.Files.readAllBytes(book.toPath())),"Force single never changes archive bytes");
+        AppState.clearPosition(context,uri);
+        check(!AppState.prefs(context).contains("position_half."+AppState.key(uri)),"Reading position reset clears the saved half");
+    }
+
     private void checkLibraryThumbnails(Activity activity,Uri uri) throws Exception {
         LibraryThumbnails loader=new LibraryThumbnails(activity);
         android.widget.ImageView view=new android.widget.ImageView(activity);

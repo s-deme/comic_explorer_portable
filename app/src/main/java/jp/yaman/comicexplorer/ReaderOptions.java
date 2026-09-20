@@ -3,8 +3,6 @@ package jp.yaman.comicexplorer;
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.view.WindowManager;
-import android.view.Gravity;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.SeekBar;
@@ -84,7 +82,7 @@ public final class ReaderOptions {
 
     public static void pageLayout(Activity activity, Runnable changed) {
         Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_page_layout))
-                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_single_page), I18n.t(R.string.ui_two_pages), I18n.t(R.string.ui_auto_two_pages_in_landscape)}, AppState.pageLayout(activity), (dialog, selected) -> {
+                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_single_page), I18n.t(R.string.ui_two_pages), I18n.t(R.string.ui_auto_two_pages_in_landscape), I18n.t(R.string.ui_force_single_page)}, AppState.pageLayout(activity), (dialog, selected) -> {
                     AppState.setPageLayout(activity, selected);
                     dialog.dismiss();
                     changed.run();
@@ -133,79 +131,8 @@ public final class ReaderOptions {
             AppState.put(activity, key, android.graphics.Color.parseColor(input.getText().toString())); changed.run(); dialog.dismiss();
         });
     }
-    static FrameLayout.LayoutParams[] pageButtonLayouts(int type, int position, int size, int screenWidth, int screenHeight, int thickness) {
-        boolean horizontal = position < 2;
-        int edge = position == 0 ? Gravity.BOTTOM : position == 1 ? Gravity.TOP : position == 2 ? Gravity.LEFT : Gravity.RIGHT;
-        int first = edge | (horizontal ? Gravity.LEFT : Gravity.TOP);
-        int second = edge | (horizontal ? Gravity.RIGHT : Gravity.BOTTOM);
-        int width = horizontal ? (type == 1 ? screenWidth / 2 : size) : thickness;
-        int height = horizontal ? thickness : (type == 1 ? Math.max(size, screenHeight/2) : size);
-        if (type == 2) { first = Gravity.LEFT | Gravity.CENTER_VERTICAL; second = Gravity.RIGHT | Gravity.CENTER_VERTICAL; width = thickness; height = size; }
-        if (type == 3) { first = edge | Gravity.CENTER; second = edge | Gravity.CENTER; }
-        FrameLayout.LayoutParams left = new FrameLayout.LayoutParams(width, height, first);
-        FrameLayout.LayoutParams right = new FrameLayout.LayoutParams(width, height, second);
-        if (type == 3) { if (horizontal) { left.rightMargin = size; right.leftMargin = size; } else { left.bottomMargin = size; right.topMargin = size; } }
-        return new FrameLayout.LayoutParams[]{left, right};
-    }
-
     public static void pageButtons(Activity activity, Runnable changed) {
-        PreferenceRows rows = new PreferenceRows(activity);
-        String[] types = {I18n.t(R.string.ui_page_type_corners), I18n.t(R.string.ui_page_type_split),
-                I18n.t(R.string.ui_page_type_sides), I18n.t(R.string.ui_page_type_center)};
-        rows.section(I18n.t(R.string.ui_page_button_preview));
-        android.view.View preview = new android.view.View(activity) {
-            final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-            final android.graphics.Rect screen = new android.graphics.Rect(), bounds = new android.graphics.Rect();
-            final android.graphics.Path arrow = new android.graphics.Path();
-            @Override protected void onMeasure(int widthSpec, int heightSpec) {
-                int height = activity.getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE ? 64 : 180;
-                setMeasuredDimension(MeasureSpec.getSize(widthSpec), resolveSize(Ui.dp(activity,height),heightSpec));
-            }
-            @Override protected void onDraw(android.graphics.Canvas canvas) {
-                super.onDraw(canvas);
-                int width = activity.getResources().getDisplayMetrics().widthPixels;
-                int height = activity.getResources().getDisplayMetrics().heightPixels;
-                float scale = Math.min((getWidth()-Ui.dp(activity,16))/(float)width, (getHeight()-Ui.dp(activity,16))/(float)height);
-                canvas.save();
-                canvas.translate((getWidth()-width*scale)/2, (getHeight()-height*scale)/2); canvas.scale(scale,scale);
-                paint.setColor(Ui.SURFACE_RAISED); canvas.drawRect(0,0,width,height,paint);
-                paint.setColor(Ui.OUTLINE); paint.setStyle(android.graphics.Paint.Style.STROKE); paint.setStrokeWidth(Ui.dp(activity,2));
-                canvas.drawRect(0,0,width,height,paint); paint.setStyle(android.graphics.Paint.Style.FILL);
-                if(AppState.pageButtons(activity)) {
-                    FrameLayout.LayoutParams[] layouts = pageButtonLayouts(AppState.number(activity,"page_type",0),
-                            AppState.number(activity,"page_position",0), Ui.dp(activity,AppState.number(activity,"page_button_height",96)), width,height,Ui.dp(activity,48));
-                    screen.set(0,0,width,height);
-                    for(int i=0;i<layouts.length;i++) {
-                        FrameLayout.LayoutParams layout=layouts[i];
-                        Gravity.apply(layout.gravity,layout.width,layout.height,screen,bounds);
-                        bounds.offset(layout.leftMargin-layout.rightMargin,layout.topMargin-layout.bottomMargin);
-                        paint.setColor(Ui.BRAND); paint.setAlpha(Math.round(AppState.pageButtonOpacity(activity)*2.55f));
-                        canvas.drawRect(bounds,paint);
-                        paint.setColor(Ui.TEXT_PRIMARY); paint.setAlpha(Math.round(AppState.pageButtonOpacity(activity)*2.55f)); paint.setStyle(android.graphics.Paint.Style.STROKE); paint.setStrokeWidth(Ui.dp(activity,3));
-                        float x=bounds.exactCenterX(), y=bounds.exactCenterY(), d=Ui.dp(activity,8), sign=i==0 ? -1 : 1;
-                        arrow.reset();
-                        arrow.moveTo(x-sign*d/2,y-d); arrow.lineTo(x+sign*d/2,y); arrow.lineTo(x-sign*d/2,y+d);
-                        canvas.drawPath(arrow,paint); paint.setStyle(android.graphics.Paint.Style.FILL);
-                    }
-                }
-                canvas.restore();
-            }
-        };
-        preview.setImportantForAccessibility(android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        rows.content.addView(preview,new LinearLayout.LayoutParams(-1,-2));
-        Runnable update=() -> {preview.invalidate();changed.run();};
-        rows.section(I18n.t(R.string.ui_type));
-        rows.radio(types,new int[]{0,1,2,3},"page_type",0,false,update);
-        rows.choice(I18n.t(R.string.ui_position), new String[]{I18n.t(R.string.ui_bottom), I18n.t(R.string.ui_top), I18n.t(R.string.ui_left), I18n.t(R.string.ui_right)}, "page_position", 0, update);
-        rows.check(I18n.t(R.string.ui_enable), null, "page_buttons", true, update);
-        rows.check("+,+", I18n.t(R.string.ui_both_buttons_move_forward), "page_both_next", false, changed);
-        rows.check(I18n.t(R.string.ui_reverse), null, "page_reverse", false, changed);
-        rows.check(I18n.t(R.string.ui_fixed), I18n.t(R.string.ui_keep_buttons_visible_with_menus), "page_fixed", true, changed);
-        rows.slider(I18n.t(R.string.ui_opacity), "page_button_opacity", 70, 0, 100, "%", update);
-        rows.slider(I18n.t(R.string.ui_size), "page_button_height", 96, 48, 160, " dp", update);
-        rows.check(I18n.t(R.string.ui_scroll_animation), null, "scroll_smooth", true, changed);
-        rows.slider(I18n.t(R.string.ui_scroll_overlap), "scroll_overlap", 23, 0, 100, " sp", changed);
-        rows.show(I18n.t(R.string.ui_page_button_area));
+        new PageButtonDialog(activity, changed).show();
     }
     public static void zoom(Activity activity, Runnable changed) {
         PreferenceRows rows = new PreferenceRows(activity);

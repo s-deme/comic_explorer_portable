@@ -397,9 +397,5 @@
     <string name="ui_theme_orange">주황</string>
     <string name="ui_theme_gray">회색</string>
     <string name="ui_theme_system">시스템 설정 따르기</string>
-    <string name="ui_page_button_preview">화면 미리보기</string>
-    <string name="ui_page_type_corners">선택한 가장자리의 양 끝</string>
-    <string name="ui_page_type_split">선택한 가장자리를 절반씩</string>
-    <string name="ui_page_type_sides">왼쪽과 오른쪽 중앙 (위치 고정)</string>
-    <string name="ui_page_type_center">선택한 가장자리의 중앙에 나란히</string>
+    <string name="ui_force_single_page">한 페이지 강제 표시</string>
 </resources>

@@ -397,9 +397,5 @@
     <string name="ui_theme_orange">オレンジ</string>
     <string name="ui_theme_gray">グレー</string>
     <string name="ui_theme_system">システムに合わせる</string>
-    <string name="ui_page_button_preview">画面サンプル</string>
-    <string name="ui_page_type_corners">両端に配置</string>
-    <string name="ui_page_type_split">端いっぱいに広げる</string>
-    <string name="ui_page_type_sides">左右の中央に固定</string>
-    <string name="ui_page_type_center">中央にまとめる</string>
+    <string name="ui_force_single_page">強制単ページ</string>
 </resources>

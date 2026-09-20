@@ -36,5 +36,5 @@
     <string name="ui_reference_import_failed">未対応・破損したファイル、または上限を超えるデータです。取り込みは行っていません。</string>
     <string name="ui_book_password">作品のパスワード</string>
     <string name="ui_archive_volumes">分割アーカイブのファイルを選択</string>
-    <string name="ui_scroll_overlap">スクロール時に残す範囲</string>
+    <string name="ui_scroll_overlap">スクロールの長さ(下へ)</string>
 </resources>

@@ -31,6 +31,7 @@ public final class AppState {
     public static final int PAGE_SINGLE = 0;
     public static final int PAGE_DUAL = 1;
     public static final int PAGE_AUTO = 2;
+    public static final int PAGE_FORCE_SINGLE = 3;
     public static final int FILTER_NONE = 0;
     public static final int FILTER_GRAYSCALE = 1;
     public static final int FILTER_CONTRAST = 2;
@@ -76,7 +77,7 @@ public final class AppState {
     }
     public static void resetSettings(Context context) { clearPrefixes(context, "setting."); }
     public static void clearPositions(Context context) {
-        clearPrefixes(context, "position.", "total.");
+        clearPrefixes(context, "position.", "position_half.", "total.");
         for (SavedItem item : recents(context)) updateReadingProgress(context, item.uri, 0, 0);
     }
     public static void clearAllBookmarks(Context context) {
@@ -328,6 +329,7 @@ public final class AppState {
     }
 
     public static void clearPosition(Context context, Uri uri) {
+        prefs(context).edit().remove("position_half." + key(uri)).apply();
         updateReadingProgress(context, uri, 0, totalPages(context, uri));
     }
 
@@ -338,7 +340,7 @@ public final class AppState {
         String oldId = key(oldUri), newId = key(newUri);
         SharedPreferences.Editor editor = pref.edit();
         if (!oldUri.equals(newUri)) {
-            String[] prefixes = {"position.", "total.", "bookmark.", "bookmark_meta.", "bookmark_memo.", "favorite.", "directory.", "sync.id.", "crop."};
+            String[] prefixes = {"position.", "position_half.", "total.", "bookmark.", "bookmark_meta.", "bookmark_memo.", "favorite.", "directory.", "sync.id.", "crop."};
             for (java.util.Map.Entry<String, ?> entry : pref.getAll().entrySet()) for (String prefix : prefixes) {
                 String name = entry.getKey();
                 if (!name.equals(prefix + oldId) && !name.startsWith(prefix + oldId + ".")) continue;
@@ -506,14 +508,14 @@ public final class AppState {
     public static void setLeftLibraryScrollbar(Context context, boolean enabled) { put(context, "left_library_scrollbar", enabled); }
     public static boolean pageButtons(Context context) { return enabled(context, "page_buttons", true); }
     public static void setPageButtons(Context context, boolean enabled) { put(context, "page_buttons", enabled); }
-    public static int pageButtonOpacity(Context context) { return Math.max(0, Math.min(100, number(context, "page_button_opacity", 70))); }
+    public static int pageButtonOpacity(Context context) { return Math.max(0, Math.min(100, number(context, "page_button_opacity", 100))); }
     public static void setPageButtonOpacity(Context context, int opacity) { put(context, "page_button_opacity", Math.max(0, Math.min(100, opacity))); }
     public static int pageButtonHeight(Context context) { return Math.max(64, Math.min(160, number(context, "page_button_height", 96))); }
     public static void setPageButtonHeight(Context context, int height) { put(context, "page_button_height", Math.max(64, Math.min(160, height))); }
     public static int readingFlow(Context context) { return number(context, "reading_flow", FLOW_HORIZONTAL); }
     public static void setReadingFlow(Context context, int mode) { put(context, "reading_flow", mode); }
-    public static int pageLayout(Context context) { return Math.max(PAGE_SINGLE, Math.min(PAGE_AUTO, number(context, "page_layout", PAGE_SINGLE))); }
-    public static void setPageLayout(Context context, int mode) { put(context, "page_layout", Math.max(PAGE_SINGLE, Math.min(PAGE_AUTO, mode))); }
+    public static int pageLayout(Context context) { return Math.max(PAGE_SINGLE, Math.min(PAGE_FORCE_SINGLE, number(context, "page_layout", PAGE_SINGLE))); }
+    public static void setPageLayout(Context context, int mode) { put(context, "page_layout", Math.max(PAGE_SINGLE, Math.min(PAGE_FORCE_SINGLE, mode))); }
     public static boolean dualPageDivider(Context context) { return enabled(context, "dual_page_divider", true); }
     public static void setDualPageDivider(Context context, boolean enabled) { put(context, "dual_page_divider", enabled); }
     public static int doubleTapScale(Context context) { return Math.max(100, Math.min(600, number(context, "double_tap_scale", 180))); }
@@ -567,7 +569,7 @@ public final class AppState {
             SharedPreferences pref = prefs(context);
             SharedPreferences.Editor editor = pref.edit();
             for (String name : pref.getAll().keySet()) {
-                if (name.startsWith("position.") || name.startsWith("total.") || name.startsWith("bookmark.")
+                if (name.startsWith("position.") || name.startsWith("position_half.") || name.startsWith("total.") || name.startsWith("bookmark.")
                         || name.startsWith("bookmark_meta.") || name.startsWith("bookmark_memo.") || name.startsWith("sync.") || name.startsWith("crop.")) editor.remove(name);
             }
             editor.remove(BOOKMARKED_ITEMS);

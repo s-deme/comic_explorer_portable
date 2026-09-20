@@ -49,7 +49,7 @@ public final class ContinuousReader extends ListView {
         int distance=length*(forward ? 1 : -1);
         int duration=Math.min(2000,(int)((length/(float)Math.max(1,getHeight())+1)*300));
         cancelScroll();
-        if (AppState.enabled(activity, "scroll_smooth", true)) {
+        if (AppState.enabled(activity, "scroll_smooth", false)) {
             scrollAnimation=android.animation.ValueAnimator.ofInt(0,distance);scrollAnimation.setDuration(duration);
             scrollAnimation.setInterpolator(value -> {float t=value-1;return t*t*t*t*t+1;});
             int[] previous={0};scrollAnimation.addUpdateListener(value -> {int next=(Integer)value.getAnimatedValue();scrollListBy(next-previous[0]);previous[0]=next;});scrollAnimation.start();

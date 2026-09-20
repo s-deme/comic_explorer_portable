@@ -397,9 +397,5 @@
     <string name="ui_theme_orange">Orange</string>
     <string name="ui_theme_gray">Gray</string>
     <string name="ui_theme_system">Follow system</string>
-    <string name="ui_page_button_preview">Screen preview</string>
-    <string name="ui_page_type_corners">At both ends of the chosen edge</string>
-    <string name="ui_page_type_split">Split the chosen edge in half</string>
-    <string name="ui_page_type_sides">Middle of left and right edges (fixed)</string>
-    <string name="ui_page_type_center">Together at the center of the chosen edge</string>
+    <string name="ui_force_single_page">Force single page</string>
 </resources>

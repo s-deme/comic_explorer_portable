@@ -397,9 +397,5 @@
     <string name="ui_theme_orange">Оранжевая</string>
     <string name="ui_theme_gray">Серая</string>
     <string name="ui_theme_system">Как в системе</string>
-    <string name="ui_page_button_preview">Предпросмотр экрана</string>
-    <string name="ui_page_type_corners">По концам выбранного края</string>
-    <string name="ui_page_type_split">Две половины выбранного края</string>
-    <string name="ui_page_type_sides">По центру слева и справа (фиксировано)</string>
-    <string name="ui_page_type_center">Рядом по центру выбранного края</string>
+    <string name="ui_force_single_page">Принудительно одна страница</string>
 </resources>
