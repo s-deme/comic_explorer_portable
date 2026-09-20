@@ -24,11 +24,13 @@ def releaseSigning = [
 def missingReleaseSigning = releaseSigning.findAll { entry ->
     entry.value == null || entry.value.trim().isEmpty()
 }.keySet()
+def validationApplicationIdSuffix = providers.gradleProperty('comicExplorerValidationSuffix').orElse('.validation')
 
 android {
     namespace 'jp.yaman.comicexplorer'
     compileSdk 35
     buildToolsVersion '36.0.0'
+    if (providers.gradleProperty('comicExplorerReleaseInstrumentation').orNull == 'true') testBuildType 'release'
 
     defaultConfig {
         applicationId 'jp.yaman.comicexplorer'
@@ -52,11 +54,22 @@ android {
 
     buildTypes {
         debug {
-            if (providers.gradleProperty('comicExplorerValidation').orNull == 'true') applicationIdSuffix '.validation'
+            if (providers.gradleProperty('comicExplorerValidation').orNull == 'true') applicationIdSuffix validationApplicationIdSuffix.get()
         }
         release {
             signingConfig signingConfigs.release
-            minifyEnabled false
+            if (providers.gradleProperty('comicExplorerValidation').orNull == 'true') applicationIdSuffix validationApplicationIdSuffix.get()
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
+            universalApk true // Keeps the existing single-APK Debug workflow; Release publishing omits it.
         }
     }
     bundle { language { enableSplit = false } }

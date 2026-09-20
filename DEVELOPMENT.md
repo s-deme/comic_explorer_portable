@@ -1,5 +1,20 @@
 # 開発・検証・リリース手順
 
+## 2026-09-20 ABI別Release APKと縮小
+
+ReleaseはR8によるコード縮小とリソース縮小を有効にし、`arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64`を個別APKとして出力する。通常の配布先は`arm64-v8a`。`build.ps1 -Configuration Release -OutputDirectory dist`は4 APKそれぞれの署名・権限・ABIとSHA-256を検証し、`.sha256`を作成する。Debugは従来どおりuniversal APKを`dist/comic-explorer.apk`へ出力する。
+
+実測はR8／resource shrink後の一時検証署名APK（配布・更新には使用不可）。基準のDebug universal APKは176,022,009 bytes。
+
+| ABI | bytes | Debug比削減率 |
+| --- | ---: | ---: |
+| arm64-v8a（通常配布） | 31,731,018 | 81.41% |
+| armeabi-v7a | 23,593,792 | 86.60% |
+| x86 | 50,911,228 | 71.08% |
+| x86_64 | 65,047,689 | 63.05% |
+
+縮小Releaseはx86_64／Android 35・16 KiBエミュレーターで起動を確認。既存Instrumentationは別APKから元のクラス名を直接参照するため、R8後の対象APKでは最初の`AppState`参照で解決できず実行不可だった。全クラス保持で回避しないため、OpenCV画像処理、書庫展開、PDF処理、実ネットワーク接続は縮小Releaseでは未検証。Release用テストAPKを既存Debugテストと並行インストールできるよう、テストProvider authorityは`${applicationId}`基準にした。
+
 ## 2026-09-20 画像ビューの不要な操作を削除
 
 読書メニューから明るさ、ダブルタップ動作、この本の切り抜き、この本の操作、アプリ設定を削除。上部の余白切り取りボタンも削除し、ページ一覧・送り方向・ページレイアウト・画像フィルターの4操作にした。入口を失った画像保存・表紙変更・切り抜き画面呼び出し等の専用処理をViewerActivityから除去。保存済みの表示設定、書庫側の設定入口、読書位置・しおり、強制単ページは維持する。
@@ -203,7 +218,15 @@ Android SDK（platforms/android-35 と build-tools/36.0.0）および JDK 21を�
 ./build.ps1 -Configuration Debug
 ```
 
-出力先は既定で `dist/comic-explorer.apk` です。`-OutputPath`で変更できます。Debugビルドでは、初回だけローカル署名用のデバッグキーストアをプロジェクト直下（Git管理外）に生成します。
+Debugの出力先は既定で `dist/comic-explorer.apk` です。`-OutputPath`で変更できます。Debugは全ABIを含むuniversal APKなので、従来の開発・テスト導線を維持します。初回だけローカル署名用のデバッグキーストアをプロジェクト直下（Git管理外）に生成します。
+
+Releaseは固定署名鍵を設定してから、次で作成します。
+
+```powershell
+./build.ps1 -Configuration Release -OutputDirectory dist
+```
+
+出力は`dist/comic-explorer-arm64-v8a.apk`（通常配布）、`dist/comic-explorer-armeabi-v7a.apk`、`dist/comic-explorer-x86.apk`、`dist/comic-explorer-x86_64.apk`と、それぞれの`.sha256`です。各APKについて署名、許可権限、ABI、SHA-256を検証します。Release用にuniversal APKは配布しません。
 
 Releaseビルドは固定された署名鍵を必要とし、次の環境変数が不足している場合はデバッグ鍵へフォールバックせず失敗します。
 
@@ -212,7 +235,7 @@ Releaseビルドは固定された署名鍵を必要とし、次の環境変数�
 - `ANDROID_KEY_ALIAS`
 - `ANDROID_KEY_PASSWORD`
 
-ビルド後はAPK署名と、不要なAndroid権限が含まれていないことを自動検証します。
+鍵がない場合、Releaseはデバッグ鍵へフォールバックせず失敗します。ビルド後は各配布APKの署名、不要なAndroid権限、ABI、SHA-256を自動検証します。
 
 ### 手動確認の最小項目
 
@@ -227,8 +250,8 @@ Releaseビルドは固定された署名鍵を必要とし、次の環境変数�
 
 GitHub Actionsは用途を分離しています。
 
-- `main`へのpushとPull Request: Debug APKをビルド・検証し、コミットSHAを含むWorkflow Artifactとして14日間保存します。正式Releaseは作成しません。
-- `v*`タグのpush: 固定鍵で署名したAPKをビルドし、APKとSHA-256ファイルを新しい正式Releaseへ添付します。
+- `main`へのpushとPull Request: Debug universal APKをビルド・検証し、コミットSHAを含むWorkflow Artifactとして14日間保存します。正式Releaseは作成しません。
+- `v*`タグのpush: 固定鍵で署名した4 ABI APKと各SHA-256ファイルを新しい正式Releaseへ添付します。`arm64-v8a`を通常配布として表示します。
 
 Release処理は、`gradle.properties` の `comicExplorerVersionName` とタグが一致しない場合、`comicExplorerVersionCode`が正の整数でない場合、同じタグのReleaseが存在する場合、または署名設定が不足している場合に失敗します。既存のReleaseやタグは上書きしません。
 

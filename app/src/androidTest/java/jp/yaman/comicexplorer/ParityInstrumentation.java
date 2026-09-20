@@ -643,7 +643,8 @@ public final class ParityInstrumentation extends Instrumentation {
         Albums.delete(context,album);check(AppState.crop(context,newBook).equals(crop),"Deleting album preserves source reading data");
         String unique="run-"+System.nanoTime();
         getUiAutomation().adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");
-        Uri tree=android.provider.DocumentsContract.buildTreeDocumentUri("jp.yaman.comicexplorer.parity.documents","root");
+        String providerAuthority=getContext().getPackageName()+".parity.documents";
+        Uri tree=android.provider.DocumentsContract.buildTreeDocumentUri(providerAuthority,"root");
         Uri root=android.provider.DocumentsContract.buildDocumentUriUsingTree(tree,"root");
         Uri run=android.provider.DocumentsContract.createDocument(context.getContentResolver(),root,android.provider.DocumentsContract.Document.MIME_TYPE_DIR,unique);
         try {
@@ -667,7 +668,7 @@ public final class ParityInstrumentation extends Instrumentation {
             LibraryEntry renamedDir=null;for(LibraryEntry child:LibraryDirectoryReader.read(context.getContentResolver(),target,target,false))if(child.name.equals("renamed"))renamedDir=child;
             LibraryEntry renamedPage=null;for(LibraryEntry child:LibraryDirectoryReader.read(context.getContentResolver(),renamedDir.uri,renamedDir.uri,false))if(child.name.equals("page.png"))renamedPage=child;
             check(renamedPage!=null && AppState.hasBookmark(context,renamedPage.uri,2),"Folder rename migrates descendant reading data");
-            Uri otherTree=android.provider.DocumentsContract.buildTreeDocumentUri("jp.yaman.comicexplorer.parity.documents2","root");
+            Uri otherTree=android.provider.DocumentsContract.buildTreeDocumentUri(providerAuthority+"2","root");
             Uri otherTarget=android.provider.DocumentsContract.buildDocumentUriUsingTree(otherTree,android.provider.DocumentsContract.getDocumentId(target));
             Uri cross=new DocumentTransfer(context).transfer(renamedPage,otherTarget,false,0);
             check(cross.getAuthority().equals(otherTarget.getAuthority()),"Cross-provider copy verified");

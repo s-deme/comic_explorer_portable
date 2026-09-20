@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   release:
-    name: Build and publish signed APK
+    name: Build and publish signed ABI APKs
     runs-on: windows-latest
     timeout-minutes: 25
     permissions:
@@ -86,18 +86,12 @@ jobs:
           [IO.File]::WriteAllBytes($keystorePath, $keystoreBytes)
           "ANDROID_KEYSTORE_PATH=$keystorePath" | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8
 
-      - name: Build and verify release APK
+      - name: Build and verify release ABI APKs
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./build.ps1 -Configuration Release -OutputPath 'dist/comic-explorer.apk'
-
-      - name: Generate SHA-256 checksum
-        run: |
-          $apk = Resolve-Path 'dist/comic-explorer.apk'
-          $hash = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  comic-explorer.apk" | Set-Content -LiteralPath 'dist/comic-explorer.apk.sha256' -Encoding ascii
+        run: ./build.ps1 -Configuration Release -OutputDirectory 'dist'
 
       - name: Publish GitHub Release
         env:
@@ -105,8 +99,14 @@ jobs:
           RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
         run: |
           gh release create $env:GITHUB_REF_NAME `
-            'dist/comic-explorer.apk#Comic Explorer APK' `
-            'dist/comic-explorer.apk.sha256#SHA-256 checksum' `
+            'dist/comic-explorer-arm64-v8a.apk#Comic Explorer APK (arm64-v8a, recommended)' `
+            'dist/comic-explorer-arm64-v8a.apk.sha256#SHA-256 checksum (arm64-v8a)' `
+            'dist/comic-explorer-armeabi-v7a.apk#Comic Explorer APK (armeabi-v7a)' `
+            'dist/comic-explorer-armeabi-v7a.apk.sha256#SHA-256 checksum (armeabi-v7a)' `
+            'dist/comic-explorer-x86.apk#Comic Explorer APK (x86)' `
+            'dist/comic-explorer-x86.apk.sha256#SHA-256 checksum (x86)' `
+            'dist/comic-explorer-x86_64.apk#Comic Explorer APK (x86_64)' `
+            'dist/comic-explorer-x86_64.apk.sha256#SHA-256 checksum (x86_64)' `
             --repo $env:GITHUB_REPOSITORY `
             --verify-tag `
             --generate-notes `
