@@ -33,6 +33,7 @@ public final class ContinuousReader extends ListView {
         });
     }
     public void reset(int pages, int page) { cancelScroll();generation++; count = pages; adapter.notifyDataSetChanged(); setSelection(page); }
+    public void setPageCount(int pages) { if(count!=pages){count=pages;adapter.notifyDataSetChanged();} }
     public void stop() {
         cancelScroll();stopped = true; generation++;
         for(int i=0;i<getChildCount();i++)if(getChildAt(i) instanceof android.widget.ImageView) {

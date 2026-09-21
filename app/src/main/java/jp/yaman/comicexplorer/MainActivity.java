@@ -74,11 +74,8 @@ public final class MainActivity extends BaseActivity {
     private ImageButton upButton;
     private ImageButton searchButton;
     private Button libraryDestination;
-    private Button directoriesDestination;
     private Button recentsDestination;
     private Button bookmarksDestination;
-    private Button sortButton;
-    private Button viewButton;
     private EditText search;
     private View searchPanel;
     private View emptyPanel;
@@ -114,6 +111,7 @@ public final class MainActivity extends BaseActivity {
                 for (Bundle item : savedItems) transferring.add(new LibraryEntry(item.getParcelable("uri"), item.getString("name"), item.getString("mime"), item.getString("kind"), item.getBoolean("directory"), item.getLong("size"), item.getLong("modified")));
             }
         }
+        if (mode == MODE_DIRECTORIES || mode == MODE_FAVORITES) mode = MODE_LIBRARY;
         gridMode = AppState.gridView(this);
         buildUi();
         Uri opened = getIntent().getData();
@@ -179,11 +177,9 @@ public final class MainActivity extends BaseActivity {
         tabs.setGravity(Gravity.CENTER_VERTICAL);
         tabs.setBackgroundColor(Ui.SURFACE);
         libraryDestination = tabButton(I18n.t(R.string.ui_storage), MODE_LIBRARY, I18n.t(R.string.ui_show_storage));
-        directoriesDestination = tabButton(I18n.t(R.string.ui_directory), MODE_DIRECTORIES, I18n.t(R.string.ui_show_saved_directories));
         recentsDestination = tabButton(I18n.t(R.string.ui_history), MODE_RECENTS, I18n.t(R.string.ui_show_reading_history));
         bookmarksDestination = tabButton(I18n.t(R.string.ui_add_bookmark), MODE_BOOKMARKS, I18n.t(R.string.ui_show_bookmarked_books));
         tabs.addView(libraryDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        tabs.addView(directoriesDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         tabs.addView(recentsDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         tabs.addView(bookmarksDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         root.addView(tabs, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
@@ -272,23 +268,6 @@ public final class MainActivity extends BaseActivity {
         emptyPanel = createEmptyPanel();
         content.addView(emptyPanel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
         root.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-
-        LinearLayout navigation = new LinearLayout(this);
-        navigation.setGravity(Gravity.CENTER_VERTICAL);
-        navigation.setBackgroundColor(Ui.SURFACE_RAISED);
-        Button actionsButton = navigationAction(I18n.t(R.string.ui_actions), I18n.t(R.string.ui_actions_for_this_list), R.drawable.ic_nav_folder);
-        actionsButton.setOnClickListener(view -> showListActions());
-        Button recentButton = navigationAction(I18n.t(R.string.ui_history), I18n.t(R.string.ui_show_reading_history), R.drawable.ic_nav_history);
-        recentButton.setOnClickListener(view -> selectMode(MODE_RECENTS));
-        viewButton = navigationAction(gridMode ? I18n.t(R.string.ui_list) : I18n.t(R.string.ui_grid), I18n.t(R.string.ui_change_list_type), R.drawable.ic_reader_pages);
-        viewButton.setOnClickListener(view -> toggleCollectionView());
-        sortButton = navigationAction(I18n.t(R.string.ui_sort), I18n.t(R.string.ui_change_sort_order), R.drawable.ic_nav_sort);
-        sortButton.setOnClickListener(view -> chooseSort());
-        navigation.addView(actionsButton, new LinearLayout.LayoutParams(0, dp(58), 1f));
-        navigation.addView(recentButton, new LinearLayout.LayoutParams(0, dp(58), 1f));
-        navigation.addView(viewButton, new LinearLayout.LayoutParams(0, dp(58), 1f));
-        navigation.addView(sortButton, new LinearLayout.LayoutParams(0, dp(58), 1f));
-        root.addView(navigation, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(58)));
         setContentView(root);
         Ui.applySystemBarInsets(this, root);
         updateCollectionView();
@@ -308,14 +287,6 @@ public final class MainActivity extends BaseActivity {
         button.setContentDescription(description);
         button.setOnClickListener(view -> selectMode(targetMode));
         Ui.styleTopTab(button, false);
-        return button;
-    }
-
-    private Button navigationAction(String label, String description, int icon) {
-        Button button = Ui.button(this, label, Ui.ButtonStyle.GHOST);
-        button.setContentDescription(description);
-        button.setCompoundDrawablesWithIntrinsicBounds(0, icon, 0, 0);
-        Ui.styleNavigationDestination(button, false);
         return button;
     }
 
@@ -443,7 +414,6 @@ public final class MainActivity extends BaseActivity {
 
     private void updateNavigation() {
         Ui.styleTopTab(libraryDestination, mode == MODE_LIBRARY);
-        Ui.styleTopTab(directoriesDestination, mode == MODE_DIRECTORIES);
         Ui.styleTopTab(recentsDestination, mode == MODE_RECENTS);
         Ui.styleTopTab(bookmarksDestination, mode == MODE_BOOKMARKS);
         if (screenTitle != null) screenTitle.setText(mode == MODE_DIRECTORIES ? I18n.t(R.string.ui_directory) : mode == MODE_FAVORITES ? I18n.t(R.string.ui_favorites) : mode == MODE_RECENTS ? I18n.t(R.string.ui_history) : mode == MODE_BOOKMARKS ? I18n.t(R.string.ui_add_bookmark) : "Comic Explorer");
@@ -472,56 +442,15 @@ public final class MainActivity extends BaseActivity {
                 ? View.SCROLLBAR_POSITION_LEFT : View.SCROLLBAR_POSITION_RIGHT;
         listView.setVerticalScrollbarPosition(scrollPosition);
         gridView.setVerticalScrollbarPosition(scrollPosition);
-        if (viewButton != null) {
-            viewButton.setText(I18n.t(R.string.ui_list_type));
-            viewButton.setContentDescription(I18n.t(R.string.ui_choose_icons_thumbnails_or_grid));
-        }
         adapter.notifyDataSetChanged();
-    }
-
-    private void showListActions() {
-        Ui.Actions menu = new Ui.Actions();
-        if (!visibleRows.isEmpty() && mode != MODE_ALBUMS) menu.add(I18n.t(R.string.ui_select_items), this::selectItems);
-        if (mode == MODE_ALBUMS) menu.add(I18n.t(R.string.ui_create_album), () -> editAlbum(null));
-        if (mode == MODE_ALBUM) menu.add(I18n.t(R.string.ui_add_images), this::addAlbumImages);
-        menu.add(I18n.t(R.string.ui_albums), () -> selectMode(MODE_ALBUMS));
-        menu.add(I18n.t(R.string.ui_open_file), this::chooseFile);
-        menu.add(I18n.t(R.string.ui_select_folder_again), this::chooseFolder);
-        menu.add(I18n.t(R.string.ui_network_connections), () -> NetworkStorage.show(this));
-        menu.add(I18n.t(R.string.ui_gallery), this::showGallery);
-        if (mode == MODE_LIBRARY && directoryUri != null) menu.add(I18n.t(R.string.ui_create_folder), () -> editFile(null, I18n.t(R.string.ui_create_folder)));
-        if (!allRows.isEmpty()) {
-            if (mode == MODE_RECENTS) menu.add(I18n.t(R.string.ui_delete_history_by_time_range), this::showHistoryCleanup);
-            if (mode == MODE_DIRECTORIES) menu.add(I18n.t(R.string.ui_remove_all_saved_directories), () -> confirmCollectionClear(R.string.ui_remove_all_saved_directories, () -> AppState.clearDirectories(this)));
-            if (mode == MODE_FAVORITES) menu.add(I18n.t(R.string.ui_remove_all_favorites), () -> confirmCollectionClear(R.string.ui_remove_all_favorites, () -> {
-                for (AppState.SavedItem item : AppState.favorites(this)) AppState.setFavorite(this, item.uri, item.title, item.kind, false);
-            }));
-            if (mode == MODE_BOOKMARKS) menu.add(I18n.t(R.string.ui_delete_all_bookmarks_2), () -> confirmCollectionClear(R.string.ui_delete_all_bookmarks_2, () -> AppState.clearAllBookmarks(this)));
-        }
-        menu.show(this, I18n.t(R.string.ui_actions));
-    }
-
-    private void confirmCollectionClear(int message, Runnable action) {
-        Ui.show(new AlertDialog.Builder(this).setMessage(I18n.t(message))
-                .setNegativeButton(I18n.t(R.string.ui_cancel), null)
-                .setPositiveButton(I18n.t(R.string.ui_apply), (dialog, which) -> { action.run(); loadSavedItems(); }));
-    }
-
-    private void showHistoryCleanup() {
-        String[] choices = {I18n.t(R.string.ui_past_hour), I18n.t(R.string.ui_past_day), I18n.t(R.string.ui_past_week), I18n.t(R.string.ui_all)};
-        long[] ages = {60L * 60 * 1000, 24L * 60 * 60 * 1000, 7L * 24 * 60 * 60 * 1000, Long.MAX_VALUE};
-        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_clear_history)).setItems(choices, (dialog, selected) -> {
-            if (selected == choices.length - 1) AppState.clearRecents(this);
-            else AppState.clearRecentsSince(this, System.currentTimeMillis() - ages[selected]);
-            loadSavedItems();
-        }));
     }
 
     private void showAppMenu() {
         Ui.Actions menu = new Ui.Actions();
         menu.add(I18n.t(R.string.ui_refresh), this::refresh);
         menu.add(I18n.t(R.string.ui_open_file), this::chooseFile);
-        menu.add(I18n.t(R.string.ui_favorites), () -> selectMode(MODE_FAVORITES));
+        menu.add(I18n.t(R.string.ui_list_type), this::toggleCollectionView);
+        menu.add(I18n.t(R.string.ui_sort), this::chooseSort);
         if (mode == MODE_LIBRARY) {
             menu.add(I18n.t(R.string.ui_select_folder_again), this::chooseFolder);
             if (treeUri != null && directoryUri != null && !directoryUri.equals(treeUri))
@@ -623,8 +552,6 @@ public final class MainActivity extends BaseActivity {
                 return descending ? -result : result;
             }
         });
-        sortButton.setText(I18n.t(R.string.ui_sort));
-        sortButton.setContentDescription((sortMode == SORT_MODIFIED ? I18n.t(R.string.ui_modified_date) : sortMode == SORT_SIZE ? I18n.t(R.string.ui_size) : I18n.t(R.string.ui_name_3)) + (descending ? I18n.t(R.string.ui_descending_2) : I18n.t(R.string.ui_ascending)) + I18n.t(R.string.ui_tap_to_change));
         if (!allRows.isEmpty() && visibleRows.isEmpty()) {
             stateText.setText(I18n.t(R.string.ui_0_items));
             showEmptyState(I18n.t(R.string.ui_no_results), I18n.t(R.string.ui_try_a_different_name), null, false);
@@ -781,9 +708,9 @@ public final class MainActivity extends BaseActivity {
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
         if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) { swipeX = event.getX(); swipeY = event.getY(); }
         if (event.getAction() == android.view.MotionEvent.ACTION_UP && Math.abs(event.getX()-swipeX) > dp(100) && Math.abs(event.getY()-swipeY) < dp(48)) {
-            int[] tabs = {MODE_LIBRARY, MODE_DIRECTORIES, MODE_RECENTS, MODE_BOOKMARKS}; int index = 0;
+            int[] tabs = {MODE_LIBRARY, MODE_RECENTS, MODE_BOOKMARKS}; int index = 0;
             for (int i=0; i<tabs.length; i++) if (tabs[i] == mode) index = i;
-            selectMode(tabs[(index + (event.getX()<swipeX ? 1 : 3)) % 4]);
+            selectMode(tabs[(index + (event.getX()<swipeX ? 1 : tabs.length - 1)) % tabs.length]);
             android.view.MotionEvent cancel = android.view.MotionEvent.obtain(event); cancel.setAction(android.view.MotionEvent.ACTION_CANCEL); super.dispatchTouchEvent(cancel); cancel.recycle(); return true;
         }
         return super.dispatchTouchEvent(event);

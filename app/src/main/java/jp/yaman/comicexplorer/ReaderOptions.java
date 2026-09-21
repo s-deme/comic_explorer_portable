@@ -16,10 +16,16 @@ public final class ReaderOptions {
     private ReaderOptions() { }
 
     public static void direction(Activity activity, Runnable changed) {
-        String[] choices = {I18n.t(R.string.ui_right), I18n.t(R.string.ui_left)};
+        int[] directions = {AppState.PAGE_SWIPE_RIGHT, AppState.PAGE_SWIPE_LEFT, AppState.PAGE_SWIPE_UP, AppState.PAGE_SWIPE_DOWN};
+        String[] choices = {I18n.t(R.string.ui_right), I18n.t(R.string.ui_left), I18n.t(R.string.ui_up), I18n.t(R.string.ui_down)};
+        int checked = 0;
+        for (int i = 0; i < directions.length; i++) if (directions[i] == AppState.pageSwipeDirection(activity)) checked = i;
         Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_reading_direction))
-                .setSingleChoiceItems(choices, AppState.direction(activity), (dialog, selected) -> {
-                    AppState.setDirection(activity, selected);
+                .setSingleChoiceItems(choices, checked, (dialog, selected) -> {
+                    int direction = directions[selected];
+                    AppState.setPageSwipeDirection(activity, direction);
+                    if (direction == AppState.PAGE_SWIPE_RIGHT) AppState.setDirection(activity, AppState.DIRECTION_RTL);
+                    if (direction == AppState.PAGE_SWIPE_LEFT) AppState.setDirection(activity, AppState.DIRECTION_LTR);
                     dialog.dismiss();
                     changed.run();
                 }));

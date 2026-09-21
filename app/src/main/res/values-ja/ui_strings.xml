@@ -44,6 +44,7 @@
     <string name="ui_sync_data_is_too_large" formatted="false">"同期データが大きすぎます"</string>
     <string name="ui_favorites" formatted="false">"お気に入り"</string>
     <string name="ui_left" formatted="false">"左へ"</string>
+    <string name="ui_up" formatted="false">"上へ"</string>
     <string name="ui_scroll_animation" formatted="false">"スクロールアニメーション"</string>
     <string name="ui_add_hardware_key" formatted="false">"ハードウェアキーを追加"</string>
     <string name="ui_delete_reading_data_and_library_registrations_book_files_will_be" formatted="false">"作品ファイルは残し、読書データとライブラリ登録を削除しますか？"</string>
@@ -77,6 +78,7 @@
     <string name="ui_continuous_vertical_scrolling" formatted="false">"連続縦スクロール"</string>
     <string name="ui_scroll_length_vertical" formatted="false">"スクロールの長さ(下へ)"</string>
     <string name="ui_right" formatted="false">"右へ"</string>
+    <string name="ui_down" formatted="false">"下へ"</string>
     <string name="ui_remove_all_saved_directories" formatted="false">"登録ディレクトリをすべて解除"</string>
     <string name="ui_default" formatted="false">"デフォルト"</string>
     <string name="ui_left_page_button" formatted="false">"左側のページ操作"</string>
@@ -105,6 +107,7 @@
     <string name="ui_disabled" formatted="false">"無効"</string>
     <string name="ui_open" formatted="false">"開く"</string>
     <string name="ui_unsupported_format_choose_pdf_cbz_zip_or_images" formatted="false">"この形式は表示できません。PDF、ZIP/CBZ、RAR/CBR、7z、画像に対応しています。"</string>
+    <string name="ui_zip_compression_method_not_supported" formatted="false">"このZIP圧縮方式には対応していません"</string>
     <string name="ui_show" formatted="false">"を表示"</string>
     <string name="ui_operation_failed" formatted="false">"操作できません: "</string>
     <string name="ui_close_settings" formatted="false">"設定を閉じる"</string>

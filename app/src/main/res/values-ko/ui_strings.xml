@@ -14,6 +14,7 @@
     <string name="ui_edit" formatted="false">"수정"</string>
     <string name="ui_favorites" formatted="false">"즐겨찾기"</string>
     <string name="ui_left" formatted="false">"좌측"</string>
+    <string name="ui_up" formatted="false">"위로"</string>
     <string name="ui_scroll_animation" formatted="false">"스크롤 애니메이션"</string>
     <string name="ui_open_the_last_compressed_file" formatted="false">"가장 최근에 본 압축 파일을 바로 열음"</string>
     <string name="ui_background_color" formatted="false">"배경색 설정"</string>
@@ -25,6 +26,7 @@
     <string name="ui_delete_item" formatted="false">"항목삭제"</string>
     <string name="ui_scroll_length_vertical" formatted="false">"스크롤 길이(수직)"</string>
     <string name="ui_right" formatted="false">"우측"</string>
+    <string name="ui_down" formatted="false">"아래로"</string>
     <string name="ui_default" formatted="false">"기본값"</string>
     <string name="ui_reverse" formatted="false">"반전"</string>
     <string name="ui_refresh" formatted="false">"업데이트"</string>
@@ -176,6 +178,7 @@
     <string name="ui_screen_rotation" formatted="false">"화면 회전"</string>
     <string name="ui_disabled" formatted="false">"사용 안 함"</string>
     <string name="ui_unsupported_format_choose_pdf_cbz_zip_or_images" formatted="false">"지원하지 않는 형식입니다. PDF, ZIP/CBZ, RAR/CBR, 7z 또는 이미지를 선택하세요."</string>
+    <string name="ui_zip_compression_method_not_supported" formatted="false">"이 ZIP 압축 방식은 지원하지 않습니다"</string>
     <string name="ui_show" formatted="false">"표시"</string>
     <string name="ui_operation_failed" formatted="false">"작업 실패: "</string>
     <string name="ui_close_settings" formatted="false">"설정 닫기"</string>

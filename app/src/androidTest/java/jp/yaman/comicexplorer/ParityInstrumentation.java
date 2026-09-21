@@ -204,6 +204,20 @@ public final class ParityInstrumentation extends Instrumentation {
             });
             awaitReady(() -> (Boolean)field(viewer,"initialized"),"ZIP reader initialized");
             awaitReady(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"ZIP first page decoded");
+            runOnMainSync(() -> ReaderOptions.direction(viewer,() -> invoke(viewer,"refreshReader")));
+            awaitReady(() -> {
+                android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
+                return root!=null && !root.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_up)).isEmpty()
+                        && !root.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_down)).isEmpty();
+            },"Page swipe direction offers vertical choices");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_up)),"Set upward page swipe");
+            awaitReady(() -> AppState.pageSwipeDirection(context)==AppState.PAGE_SWIPE_UP
+                    && (Boolean)field(field(viewer,"imageView"),"verticalPaging"),"Upward page swipe updates the reader gesture");
+            runOnMainSync(() -> viewer.onSwipe(AppState.PAGE_SWIPE_UP));
+            awaitReady(() -> (Integer)field(viewer,"page")==1,"Upward page swipe advances the page");
+            runOnMainSync(() -> viewer.onSwipe(AppState.PAGE_SWIPE_DOWN));
+            awaitReady(() -> (Integer)field(viewer,"page")==0,"Opposite vertical swipe returns to the previous page");
+            runOnMainSync(() -> { AppState.setPageSwipeDirection(context,AppState.PAGE_SWIPE_RIGHT); invoke(viewer,"refreshReader"); });
             runOnMainSync(() -> ReaderOptions.pageButtons(viewer,() -> invoke(viewer,"updatePageButtons")));
             capture("buttons-type0");
             awaitReady(() -> clickText("Type1"),"Select reference Type1");
@@ -327,13 +341,20 @@ public final class ParityInstrumentation extends Instrumentation {
             await(() -> field(viewer,"pageListDialog")==null && !viewer.isFinishing(),"Back closes page list without closing reader");
             runOnMainSync(() -> { AppState.setReadingFlow(context,1); invoke(viewer,"refreshReader"); });
             awaitReady(() -> ((ContinuousReader)field(viewer,"continuous")).getChildCount()>0,"Continuous pages rendered");
+            runOnMainSync(() -> { AppState.setReadingFlow(context,AppState.FLOW_HORIZONTAL); invoke(viewer,"refreshReader"); });
+            awaitReady(() -> !((Boolean)field(field(viewer,"imageView"),"verticalPaging"))
+                    && ((android.view.View)field(viewer,"imageView")).getVisibility()==android.view.View.VISIBLE
+                    && ((android.view.View)field(viewer,"continuous")).getVisibility()==android.view.View.GONE,
+                    "Returning to horizontal swipe updates the visible reader and gesture direction");
+            runOnMainSync(() -> { AppState.setReadingFlow(context,AppState.FLOW_VERTICAL); invoke(viewer,"refreshReader"); });
+            awaitReady(() -> ((ContinuousReader)field(viewer,"continuous")).getChildCount()>0,"Continuous pages return after horizontal swipe check");
             runOnMainSync(() -> {
                 AppState.setDirection(context,AppState.DIRECTION_LTR);
                 ((android.widget.LinearLayout)field(viewer,"readerMenuRow")).getChildAt(1).performClick();
             });
             awaitReady(() -> clickText(I18n.t(R.string.ui_left)), "Change direction through the toolbar");
-            check(AppState.readingFlow(context)==AppState.FLOW_VERTICAL && AppState.direction(context)==1,
-                    "Direction changes preserve vertical scrolling");
+            check(AppState.readingFlow(context)==AppState.FLOW_VERTICAL && AppState.pageSwipeDirection(context)==AppState.PAGE_SWIPE_LEFT,
+                    "Page swipe direction changes preserve vertical scrolling");
             awaitReady(() -> ((android.view.View)field(viewer,"loading")).getVisibility()==android.view.View.GONE, "Direction change finished rendering");
             waitForIdleSync();
             runOnMainSync(() -> ((ContinuousReader)field(viewer,"continuous")).setSelection(3));
@@ -388,6 +409,16 @@ public final class ParityInstrumentation extends Instrumentation {
             MainActivity lightLibrary=(MainActivity)startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             runOnMainSync(() -> {try{java.lang.reflect.Method mode=MainActivity.class.getDeclaredMethod("selectMode",int.class);mode.setAccessible(true);mode.invoke(lightLibrary,2);}catch(Exception e){throw new RuntimeException(e);}});
             awaitReady(() -> ((android.widget.GridView)field(lightLibrary,"gridView")).getChildCount()>0,"Light-theme grid has visible books");
+            runOnMainSync(() -> invoke(lightLibrary,"showAppMenu"));
+            awaitReady(() -> {
+                android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
+                return root!=null && !root.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_list_type)).isEmpty();
+            },"Library menu shows list type");
+            android.view.accessibility.AccessibilityNodeInfo libraryMenu=getUiAutomation().getRootInActiveWindow();
+            check(!libraryMenu.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_sort)).isEmpty()
+                    && libraryMenu.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_favorites)).isEmpty(),
+                    "Library menu moves view and sort controls without favorites");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); waitForIdleSync();
             android.view.View firstCell=((android.widget.GridView)field(lightLibrary,"gridView")).getChildAt(0);
             int labelColor=((android.widget.TextView)field(firstCell.getTag(),"name")).getCurrentTextColor();
             check(androidx.core.graphics.ColorUtils.calculateContrast(labelColor,AppState.number(context,"grid_color",Ui.BACKGROUND))>=4.5,"Grid filename contrast follows selected background");
@@ -438,6 +469,8 @@ public final class ParityInstrumentation extends Instrumentation {
         Uri uri=Uri.fromFile(book);
         try(PageSource source=new PageSource(context,uri,"split.cbz",null,java.nio.charset.StandardCharsets.UTF_8,2_000_000)) {
             PageSequence sequence=new PageSequence(source,true);
+            check(!sequence.complete() && sequence.display(source,0,0)==0 && sequence.count()==3,"Force single opens after only the starting page is checked");
+            sequence.scanAll(source);
             check(sequence.count()==4 && sequence.original(2)==1 && sequence.display(2,0)==3,"Only landscape images create two display pages; square and portrait stay whole");
             Bitmap right=sequence.decode(source,1,1080,-1,true),left=sequence.decode(source,2,1080,-1,true);
             check(right.getWidth()==301 && left.getWidth()==300 && right.getPixel(0,0)==android.graphics.Color.BLUE && left.getPixel(0,0)==android.graphics.Color.RED,"RTL split keeps every column of odd-width images in right-left order");right.recycle();left.recycle();
@@ -476,6 +509,9 @@ public final class ParityInstrumentation extends Instrumentation {
         check(java.util.Arrays.equals(original,java.nio.file.Files.readAllBytes(book.toPath())),"Force single never changes archive bytes");
         AppState.clearPosition(context,uri);
         check(!AppState.prefs(context).contains("position_half."+AppState.key(uri)),"Reading position reset clears the saved half");
+        AppState.setPageLayout(context,AppState.PAGE_SINGLE);
+        AppState.setReadingFlow(context,AppState.FLOW_HORIZONTAL);
+        AppState.prefs(context).edit().remove("page_swipe_direction").apply();
     }
 
     private void checkLibraryThumbnails(Activity activity,Uri uri) throws Exception {
@@ -684,7 +720,12 @@ public final class ParityInstrumentation extends Instrumentation {
         org.apache.commons.compress.archivers.zip.ZipArchiveEntry deflated=new org.apache.commons.compress.archivers.zip.ZipArchiveEntry("page.png");deflated.setMethod(8);
         org.apache.commons.compress.archivers.zip.ZipArchiveEntry ppmd=new org.apache.commons.compress.archivers.zip.ZipArchiveEntry("page.png");ppmd.setMethod(98);
         org.apache.commons.compress.archivers.zip.ZipArchiveEntry lzma=new org.apache.commons.compress.archivers.zip.ZipArchiveEntry("page.png");lzma.setMethod(14);
-        check(!PageSource.requiresSevenZip(deflated) && PageSource.requiresSevenZip(ppmd) && PageSource.requiresSevenZip(lzma),"ZIP methods use the compatible reader");
+        org.apache.commons.compress.archivers.zip.ZipArchiveEntry reducing=new org.apache.commons.compress.archivers.zip.ZipArchiveEntry("page.png");reducing.setMethod(2);
+        check(!PageSource.requiresSevenZip(deflated) && PageSource.requiresSevenZip(ppmd) && PageSource.requiresSevenZip(lzma)
+                && PageSource.supportsSevenZipZipMethod(14) && !PageSource.supportsSevenZipZipMethod(reducing.getMethod()),"ZIP methods use the compatible reader");
+        check(new PageSource.UnsupportedZipMethod(96).getMessage().endsWith("(96)"),"Unsupported ZIP method identifies its number");
+        check(java.util.Arrays.equals(ViewerActivity.prefetchTargets(3,true,8,1),new int[]{4,5})
+                && java.util.Arrays.equals(ViewerActivity.prefetchTargets(4,false,8,2),new int[]{2,0}),"Reader prefetches two pages in the reading direction");
         for(String name:new String[]{"stored-rar5.rar","encrypted.7z","split.7z.001","split.7z.002","split.part1.rar","split.part2.rar","animated.gif"}) {
             try(java.io.InputStream input=getContext().getAssets().open(name);FileOutputStream output=new FileOutputStream(new File(fixtures,name))){DocumentTransfer.copyAndHash(input,output,null);}
         }

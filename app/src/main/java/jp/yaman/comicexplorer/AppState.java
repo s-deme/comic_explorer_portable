@@ -22,6 +22,10 @@ public final class AppState {
 
     public static final int DIRECTION_LTR = 0;
     public static final int DIRECTION_RTL = 1;
+    public static final int PAGE_SWIPE_LEFT = -1;
+    public static final int PAGE_SWIPE_RIGHT = 1;
+    public static final int PAGE_SWIPE_UP = -2;
+    public static final int PAGE_SWIPE_DOWN = 2;
     public static final int FIT_SCREEN = 0;
     public static final int FIT_WIDTH = 1;
     public static final int FIT_HEIGHT = 2;
@@ -463,6 +467,18 @@ public final class AppState {
     public static void setDirection(Context context, int direction) {
         put(context, "direction", direction);
     }
+
+    public static int pageSwipeDirection(Context context) {
+        int stored = number(context, "page_swipe_direction", 0);
+        if (stored == PAGE_SWIPE_LEFT || stored == PAGE_SWIPE_RIGHT || stored == PAGE_SWIPE_UP || stored == PAGE_SWIPE_DOWN) return stored;
+        return direction(context) == DIRECTION_RTL ? PAGE_SWIPE_RIGHT : PAGE_SWIPE_LEFT;
+    }
+
+    public static void setPageSwipeDirection(Context context, int direction) {
+        if (direction == PAGE_SWIPE_LEFT || direction == PAGE_SWIPE_RIGHT || direction == PAGE_SWIPE_UP || direction == PAGE_SWIPE_DOWN) put(context, "page_swipe_direction", direction);
+    }
+
+    public static boolean verticalPageSwipe(Context context) { return Math.abs(pageSwipeDirection(context)) == 2; }
 
     public static int fitMode(Context context) {
         return number(context, "fit", FIT_SCREEN);

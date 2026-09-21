@@ -254,21 +254,6 @@ public final class Ui {
         if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? I18n.t(R.string.ui_selected) : I18n.t(R.string.ui_not_selected));
     }
 
-    /** Bottom navigation keeps the library's stable destinations reachable without a top tab row. */
-    public static void styleNavigationDestination(Button view, boolean selected) {
-        styleButton(view, ButtonStyle.SURFACE_GHOST);
-        view.setTextSize(11);
-        view.setPadding(dp(view.getContext(), 4), 0, dp(view.getContext(), 4), 0);
-        view.setCompoundDrawablePadding(dp(view.getContext(), 1));
-        view.setTextColor(selected ? BRAND : TEXT_PRIMARY);
-        view.setCompoundDrawableTintList(ColorStateList.valueOf(selected ? BRAND : TEXT_SECONDARY));
-        view.setBackground(controlBackground(selected ? SURFACE : SURFACE_RAISED,
-                selected ? SURFACE : SURFACE_RAISED, SURFACE, SURFACE, 0, BRAND));
-        view.setSelected(selected);
-        view.setContentDescription(view.getText() + (selected ? I18n.t(R.string.ui_selected_2) : I18n.t(R.string.ui_show)));
-        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? I18n.t(R.string.ui_selected) : I18n.t(R.string.ui_not_selected));
-    }
-
     public static void styleTopTab(Button view, boolean selected) {
         view.setAllCaps(false);
         view.setTextSize(12);

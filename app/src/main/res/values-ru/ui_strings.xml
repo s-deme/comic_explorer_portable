@@ -14,6 +14,7 @@
     <string name="ui_edit" formatted="false">"Править"</string>
     <string name="ui_favorites" formatted="false">"Избранное"</string>
     <string name="ui_left" formatted="false">"Справа налево"</string>
+    <string name="ui_up" formatted="false">"Вверх"</string>
     <string name="ui_scroll_animation" formatted="false">"анимация прокрутки"</string>
     <string name="ui_open_the_last_compressed_file" formatted="false">"Открыть последний архив"</string>
     <string name="ui_background_color" formatted="false">"Цвет фона"</string>
@@ -25,6 +26,7 @@
     <string name="ui_delete_item" formatted="false">"Удаление"</string>
     <string name="ui_scroll_length_vertical" formatted="false">"длина прокрутки(Вниз.)"</string>
     <string name="ui_right" formatted="false">"Слева направо"</string>
+    <string name="ui_down" formatted="false">"Вниз"</string>
     <string name="ui_default" formatted="false">"По умолчанию"</string>
     <string name="ui_reverse" formatted="false">"Поменять\n      местами"</string>
     <string name="ui_refresh" formatted="false">"Обновить"</string>
@@ -176,6 +178,7 @@
     <string name="ui_screen_rotation" formatted="false">"Поворот экрана"</string>
     <string name="ui_disabled" formatted="false">"Отключено"</string>
     <string name="ui_unsupported_format_choose_pdf_cbz_zip_or_images" formatted="false">"Формат не поддерживается. Выберите PDF, ZIP/CBZ, RAR/CBR, 7z или изображения."</string>
+    <string name="ui_zip_compression_method_not_supported" formatted="false">"Этот метод сжатия ZIP не поддерживается"</string>
     <string name="ui_show" formatted="false">"Показать"</string>
     <string name="ui_operation_failed" formatted="false">"Ошибка операции: "</string>
     <string name="ui_close_settings" formatted="false">"Закрыть настройки"</string>
