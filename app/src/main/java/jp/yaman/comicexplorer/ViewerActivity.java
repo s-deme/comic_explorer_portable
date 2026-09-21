@@ -175,7 +175,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         continuous = new ContinuousReader(this, worker, index -> readerDrawable(index,decodeLayout(index)), index -> {
             if (!initialized || !vertical() || page == index) return;
             page = index; updateControls(); saveReadingPosition(page);
-        }, this);
+        }, forward -> { if (forward) forward(); else back(); }, this);
         continuous.setVisibility(View.GONE);
         canvas.addView(continuous, new FrameLayout.LayoutParams(-1, -1));
         leftPageButton = PageButtonDialog.button(this);
@@ -591,8 +591,8 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         return next >= 0 && next < totalPages ? next : -1;
     }
 
-    private void forward() { prefetchForward=true;if (vertical() && continuous.canScrollVertically(1)) { continuous.move(true); return; } int next = nextIndex(page, true); if (next >= 0) goToPage(next); else if(pageCountReady())nextBook(true); }
-    private void back() { prefetchForward=false;if (vertical() && continuous.canScrollVertically(-1)) { continuous.move(false); return; } int previous = nextIndex(page, false); if (previous >= 0) goToPage(previous); else nextBook(false); }
+    private void forward() { prefetchForward=true;if (vertical()) { if (continuous.canScrollVertically(1)) { continuous.move(true); return; } if(pageCountReady()){nextBook(true);return;} } int next = nextIndex(page, true); if (next >= 0) goToPage(next); else if(pageCountReady())nextBook(true); }
+    private void back() { prefetchForward=false;if (vertical()) { if (continuous.canScrollVertically(-1)) { continuous.move(false); return; } if(pageCountReady()){nextBook(false);return;} } int previous = nextIndex(page, false); if (previous >= 0) goToPage(previous); else nextBook(false); }
 
     private void updateControls() {
         boolean dualPage = usesDualPageLayout();

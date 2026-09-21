@@ -8,6 +8,7 @@ import android.widget.AbsListView;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 /** Recycles only visible page views, so large books do not allocate one bitmap per page. */
@@ -17,12 +18,16 @@ public final class ContinuousReader extends ListView {
     private final ExecutorService worker;
     private final Decoder decoder;
     private final IntConsumer position;
+    private final Consumer<Boolean> edgeNavigation;
     private final ZoomImageView.InteractionListener interaction;
+    private final int edgeSlop;
     private int count, generation;
-    private boolean stopped;
+    private boolean stopped, edgeAtStart, edgeAtEnd, edgeMultiTouch;
+    private float edgeDownY;
     private android.animation.ValueAnimator scrollAnimation;
-    public ContinuousReader(Activity activity, ExecutorService worker, Decoder decoder, IntConsumer position, ZoomImageView.InteractionListener interaction) {
-        super(activity); this.activity = activity; this.worker = worker; this.decoder = decoder; this.position = position; this.interaction = interaction;
+    public ContinuousReader(Activity activity, ExecutorService worker, Decoder decoder, IntConsumer position, Consumer<Boolean> edgeNavigation, ZoomImageView.InteractionListener interaction) {
+        super(activity); this.activity = activity; this.worker = worker; this.decoder = decoder; this.position = position; this.edgeNavigation = edgeNavigation; this.interaction = interaction;
+        edgeSlop=android.view.ViewConfiguration.get(activity).getScaledTouchSlop()*4;
         setBackgroundColor(0xff101114);
         setDivider(new android.graphics.drawable.ColorDrawable(0xff555555));
         setDividerHeight(Ui.dp(activity, AppState.number(activity, "page_gap", 0)) + (AppState.enabled(activity, "scroll_divider", false) ? 1 : 0));
@@ -42,7 +47,20 @@ public final class ContinuousReader extends ListView {
         }
     }
     private void cancelScroll(){if(scrollAnimation!=null){scrollAnimation.cancel();scrollAnimation=null;}}
-    @Override public boolean onTouchEvent(android.view.MotionEvent event){if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN)cancelScroll();return super.onTouchEvent(event);}
+    static int edgeDirection(boolean atStart, boolean atEnd, float distance, int slop) {
+        if (Math.abs(distance) <= slop) return 0;
+        return distance < 0 && atEnd ? 1 : distance > 0 && atStart ? -1 : 0;
+    }
+    @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        int action=event.getActionMasked();
+        if(action==android.view.MotionEvent.ACTION_DOWN) {
+            cancelScroll(); edgeAtStart=!canScrollVertically(-1); edgeAtEnd=!canScrollVertically(1); edgeDownY=event.getY(); edgeMultiTouch=false;
+        } else if(action==android.view.MotionEvent.ACTION_POINTER_DOWN) edgeMultiTouch=true;
+        int direction=action==android.view.MotionEvent.ACTION_UP && !edgeMultiTouch ? edgeDirection(edgeAtStart,edgeAtEnd,event.getY()-edgeDownY,edgeSlop) : 0;
+        boolean handled=super.dispatchTouchEvent(event);
+        if(direction!=0)edgeNavigation.accept(direction>0);
+        return handled;
+    }
     public void move(boolean forward) {
         int overlap=Math.round(AppState.number(activity,"scroll_overlap",23)*getResources().getDisplayMetrics().scaledDensity);
         int length=Math.max(1,getHeight()-overlap);

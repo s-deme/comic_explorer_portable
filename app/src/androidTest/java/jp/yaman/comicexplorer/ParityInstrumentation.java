@@ -359,6 +359,11 @@ public final class ParityInstrumentation extends Instrumentation {
             waitForIdleSync();
             runOnMainSync(() -> ((ContinuousReader)field(viewer,"continuous")).setSelection(3));
             await(() -> (Integer)field(viewer,"page")==3,"Continuous scrolling updates position");
+            check(ContinuousReader.edgeDirection(false,true,-100,20)==1
+                    && ContinuousReader.edgeDirection(true,false,100,20)==-1
+                    && ContinuousReader.edgeDirection(false,true,100,20)==0
+                    && ContinuousReader.edgeDirection(false,true,-20,20)==0,
+                    "Continuous reader only exits a book on an outward edge swipe");
 
             runOnMainSync(() -> {AppState.setCropPercent(context,5);invoke(viewer,"refreshReader");});
             await(() -> {
