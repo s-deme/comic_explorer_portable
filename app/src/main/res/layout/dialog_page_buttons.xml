@@ -1,42 +1,42 @@
-<?xml version='1.0' encoding='utf-8'?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
-    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="3dp" android:layout_marginRight="3dp" android:weightSum="3">
-        <CheckBox android:id="@+id/pop_pagebtn_use_chk" android:padding="0dp" android:layout_width="match_parent" android:layout_height="match_parent" android:text="@string/ui_enable" android:layout_weight="1" />
-        <CheckBox android:id="@+id/pop_pagebtn_plpl_chk" android:padding="0dp" android:layout_width="wrap_content" android:layout_height="match_parent" android:text="+,+" android:layout_weight="0.0" />
-        <CheckBox android:id="@+id/pop_pagebtn_reverse_chk" android:padding="0dp" android:layout_width="match_parent" android:layout_height="match_parent" android:text="@string/ui_reverse" android:layout_weight="1" />
-        <CheckBox android:id="@+id/pop_pagebtn_fix_chk" android:padding="0dp" android:layout_width="match_parent" android:layout_height="match_parent" android:text="@string/ui_fixed" android:layout_weight="1" />
-    </LinearLayout>
-    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="5dp" android:layout_marginRight="5dp" android:weightSum="3">
-        <RadioGroup android:gravity="center" android:orientation="vertical" android:id="@+id/pop_pagebtn_rdgp_type" android:background="@drawable/page_button_box" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginRight="5dp" android:weightSum="4" android:layout_weight="2">
-            <RadioButton android:id="@+id/pop_pagebtn_rdo_type0" android:padding="0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Type0" android:layout_weight="1" />
-            <RadioButton android:id="@+id/pop_pagebtn_rdo_type1" android:padding="0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Type1" android:layout_weight="1" />
-            <RadioButton android:id="@+id/pop_pagebtn_rdo_type2" android:padding="0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Type2" android:layout_weight="1" />
-            <RadioButton android:id="@+id/pop_pagebtn_rdo_type3" android:padding="0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Type3" android:layout_weight="1" />
-        </RadioGroup>
-        <FrameLayout android:orientation="vertical" android:id="@+id/pop_pagebtn_layout_btn" android:background="@drawable/page_button_box" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginLeft="5dp" android:layout_weight="1" />
-    </LinearLayout>
-    <RadioGroup android:orientation="horizontal" android:id="@+id/pop_pagebtn_rdgp_position1" android:background="@drawable/page_button_box" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="5dp" android:layout_marginTop="5dp" android:layout_marginRight="5dp" android:weightSum="2">
-        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_bottom" android:padding="0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Bottom" android:layout_weight="1" />
-        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_top" android:padding="0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Top" android:layout_weight="1" />
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="20dp" android:paddingEnd="20dp" android:paddingBottom="8dp">
+    <CheckBox android:id="@+id/pop_pagebtn_use_chk" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_enable" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_layout" android:textSize="16sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp" android:accessibilityHeading="true" />
+    <RadioGroup android:id="@+id/pop_pagebtn_rdgp_type" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_type0" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="56dp" android:drawablePadding="12dp" android:paddingEnd="8dp" android:text="@string/pb_type0" />
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_type1" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="56dp" android:drawablePadding="12dp" android:paddingEnd="8dp" android:text="@string/pb_type1" />
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_type2" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="56dp" android:drawablePadding="12dp" android:paddingEnd="8dp" android:text="@string/pb_type2" />
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_type3" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="56dp" android:drawablePadding="12dp" android:paddingEnd="8dp" android:text="@string/pb_type3" />
     </RadioGroup>
-    <RadioGroup android:orientation="horizontal" android:id="@+id/pop_pagebtn_rdgp_position2" android:background="@drawable/page_button_box" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="5dp" android:layout_marginTop="5dp" android:layout_marginRight="5dp" android:weightSum="2">
-        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_left" android:padding="0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Left" android:layout_weight="1" />
-        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_right" android:padding="0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Right" android:layout_weight="1" />
+    <RadioGroup android:id="@+id/pop_pagebtn_rdgp_position1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_bottom" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_bottom" />
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_top" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_top" />
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_horizontal_both" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_both_edges" />
     </RadioGroup>
-    <LinearLayout android:paddingBottom="5dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="5dp" android:layout_marginTop="5dp" android:layout_marginRight="5dp" android:weightSum="20">
-        <TextView android:gravity="center_vertical" android:id="@+id/pop_pagebtn_alpha_txt" android:layout_width="match_parent" android:layout_height="match_parent" android:text="@string/ui_opacity" android:layout_weight="8" />
-        <SeekBar android:id="@+id/pop_pagebtn_alpha_seek" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_weight="3" />
-        <TextView android:textSize="11sp" android:gravity="center" android:id="@+id/pop_pagebtn_alpha_value" android:layout_width="match_parent" android:layout_height="match_parent" android:text="0" android:layout_weight="9" />
-    </LinearLayout>
-    <LinearLayout android:paddingBottom="5dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="5dp" android:layout_marginTop="5dp" android:layout_marginRight="5dp" android:weightSum="20">
-        <TextView android:gravity="center_vertical" android:id="@+id/pop_pagebtn_thick_txt" android:layout_width="match_parent" android:layout_height="match_parent" android:text="@string/ui_size" android:layout_weight="8" />
-        <SeekBar android:id="@+id/pop_pagebtn_thick_seek" android:layout_width="match_parent" android:layout_height="match_parent" android:max="65" android:layout_weight="3" />
-        <TextView android:textSize="11sp" android:gravity="center" android:id="@+id/pop_pagebtn_thick_value" android:layout_width="match_parent" android:layout_height="match_parent" android:text="0" android:layout_weight="9" />
-    </LinearLayout>
-    <CheckBox android:id="@+id/pop_pagebtn_smooth" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="5dp" android:text="@string/ui_scroll_animation" />
-    <TextView android:gravity="center_vertical" android:id="@+id/pop_pagebtn_offset_txt" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="5dp" android:layout_marginTop="5dp" android:text="@string/ui_scroll_overlap" />
-    <LinearLayout android:paddingBottom="5dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="5dp" android:layout_marginRight="5dp">
-        <SeekBar android:id="@+id/pop_pagebtn_offset_seek" android:layout_width="match_parent" android:layout_height="match_parent" android:max="50" android:layout_weight="1" />
-        <TextView android:textSize="11sp" android:gravity="center_vertical" android:id="@+id/pop_pagebtn_offset_value" android:layout_width="wrap_content" android:layout_height="match_parent" android:text="0" android:minEms="6" android:layout_weight="0.0" />
-    </LinearLayout>
+    <RadioGroup android:id="@+id/pop_pagebtn_rdgp_position2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_left" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_left" />
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_right" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_right" />
+        <RadioButton android:id="@+id/pop_pagebtn_rdo_position_vertical_both" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_both_edges" />
+    </RadioGroup>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_preview" android:textSize="16sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp" android:accessibilityHeading="true" />
+    <FrameLayout android:id="@+id/pop_pagebtn_layout_btn" android:layout_width="match_parent" android:layout_height="160dp" android:background="@drawable/page_button_box" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_preview" android:textSize="14sp" android:id="@+id/page_button_summary" android:layout_marginTop="4dp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_direction_rtl" android:textSize="14sp" android:id="@+id/page_button_direction" android:layout_marginTop="4dp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_preview_hint" android:textSize="14sp" android:id="@+id/page_button_hint" android:layout_marginTop="4dp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_height" android:textSize="16sp" android:id="@+id/pop_pagebtn_thick_txt" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp" android:accessibilityHeading="true" />
+    <TextView android:id="@+id/pop_pagebtn_thick_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="14sp" />
+    <SeekBar android:id="@+id/pop_pagebtn_thick_seek" android:layout_width="match_parent" android:layout_height="48dp" android:max="65" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_opacity" android:textSize="16sp" android:id="@+id/pop_pagebtn_alpha_txt" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp" android:accessibilityHeading="true" />
+    <TextView android:id="@+id/pop_pagebtn_alpha_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="14sp" />
+    <SeekBar android:id="@+id/pop_pagebtn_alpha_seek" android:layout_width="match_parent" android:layout_height="48dp" android:max="100" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_actions" android:textSize="16sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp" android:accessibilityHeading="true" />
+    <CheckBox android:id="@+id/pop_pagebtn_plpl_chk" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_both_next" />
+    <CheckBox android:id="@+id/pop_pagebtn_reverse_chk" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_reverse" />
+    <CheckBox android:id="@+id/pop_pagebtn_fix_chk" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_fixed" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_scroll" android:textSize="16sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp" android:accessibilityHeading="true" />
+    <CheckBox android:id="@+id/pop_pagebtn_smooth" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/ui_scroll_animation" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_overlap" android:textSize="14sp" android:id="@+id/pop_pagebtn_offset_txt" android:layout_marginTop="4dp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_overlap_hint" android:textSize="14sp" android:layout_marginTop="4dp" />
+    <TextView android:id="@+id/pop_pagebtn_offset_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="14sp" />
+    <SeekBar android:id="@+id/pop_pagebtn_offset_seek" android:layout_width="match_parent" android:layout_height="48dp" android:max="50" />
 </LinearLayout>

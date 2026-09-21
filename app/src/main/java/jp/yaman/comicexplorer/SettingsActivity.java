@@ -13,22 +13,7 @@ public final class SettingsActivity extends BaseActivity {
     @Override public void onCreate(Bundle state) { super.onCreate(state); buildUi(); }
     @Override protected void onActivityResult(int request, int result, android.content.Intent data) {
         super.onActivityResult(request, result, data);
-        if(request==84 && result==RESULT_OK && data!=null && data.getData()!=null) {
-            android.net.Uri source=data.getData();
-            new Thread(() -> {
-                try {
-                    ReferenceImport plan=ReferenceImport.read(this,source);
-                    runOnUiThread(() -> {
-                        if(isFinishing() || isDestroyed())return;
-                        String summary=String.format(java.util.Locale.getDefault(),I18n.t(R.string.ui_reference_import_summary),plan.settings.size(),plan.history.size(),plan.entries.size(),plan.skipped);
-                        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_reference_import)).setMessage(summary)
-                            .setNegativeButton(I18n.t(R.string.ui_cancel),null).setPositiveButton(I18n.t(R.string.ui_apply),(dialog,which) -> {
-                                new Thread(() -> {plan.apply(this);runOnUiThread(() -> {if(!isFinishing() && !isDestroyed())recreate();});},"reference-import").start();
-                            }));
-                    });
-                } catch(Exception error) {runOnUiThread(() -> {if(!isFinishing())Toast.makeText(this,I18n.t(R.string.ui_reference_import_failed),Toast.LENGTH_LONG).show();});}
-            },"reference-inspect").start();
-        } else ReadingSync.result(this, request, result, data);
+        ReadingSync.result(this, request, result, data);
     }
     private void buildUi() {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
@@ -82,8 +67,6 @@ public final class SettingsActivity extends BaseActivity {
             AppState.clearLibrary(this); AppState.clearReadingData(this); runOnUiThread(this::finish);
         }, "clear-cache").start()));
         rows.section("INFORMATION");
-        rows.action(I18n.t(R.string.ui_reference_import),I18n.t(R.string.ui_reference_import_detail),() -> startActivityForResult(
-                new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).addCategory(android.content.Intent.CATEGORY_OPENABLE).setType("*/*"),84));
         rows.action("About", I18n.t(R.string.ui_about), () -> Ui.show(new AlertDialog.Builder(this).setTitle("Comic Explorer")
                 .setMessage(I18n.t(R.string.ui_comic_explorer_1_1_2_read_comics_and_pdfs_from))
                 .setPositiveButton(I18n.t(R.string.ui_close), null)));
@@ -112,21 +95,13 @@ public final class SettingsActivity extends BaseActivity {
             String name = I18n.t(Ui.THEMES[index].name);
             android.widget.Button option = Ui.button(this, name + (index == selected ? " ✓" : ""),
                     index == selected ? Ui.ButtonStyle.TONAL : Ui.ButtonStyle.SECONDARY);
-            option.setMinHeight(Ui.dp(this, 80));
+            option.setMinHeight(Ui.dp(this, 112));
             option.setPadding(Ui.dp(this, 4), Ui.dp(this, 8), Ui.dp(this, 4), Ui.dp(this, 8));
             option.setSelected(index == selected);
             option.setContentDescription(name + (index == selected ? I18n.t(R.string.ui_selected_2) : ""));
             if (android.os.Build.VERSION.SDK_INT >= 30)
                 option.setStateDescription(I18n.t(index == selected ? R.string.ui_selected : R.string.ui_not_selected));
-            android.graphics.drawable.GradientDrawable swatch = new android.graphics.drawable.GradientDrawable();
-            if (index == 0) {
-                swatch.setOrientation(android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT);
-                swatch.setColors(new int[]{0xFFFAFAFA, 0xFF18181B});
-            } else swatch.setColor(index == 1 ? 0xFFFAFAFA : index == 2 ? 0xFF18181B : Ui.themeAccent(this, index));
-            swatch.setCornerRadius(Ui.dp(this, 6));
-            swatch.setStroke(Ui.dp(this, 1), Ui.OUTLINE);
-            swatch.setBounds(0, 0, Ui.dp(this, 40), Ui.dp(this, 20));
-            option.setCompoundDrawables(null, swatch, null, null);
+            option.setCompoundDrawablesWithIntrinsicBounds(null, Ui.themePreview(this,index), null, null);
             option.setCompoundDrawablePadding(Ui.dp(this, 8));
             option.setOnClickListener(view -> {
                 dialog.dismiss();

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pb_enable">페이지 버튼 사용</string>
+    <string name="pb_layout">버튼 배치</string>
+    <string name="pb_type0">위쪽 또는 아래쪽에 가로 배치</string>
+    <string name="pb_type1">왼쪽 또는 오른쪽에 세로 배치</string>
+    <string name="pb_type2">좌우 양쪽 가장자리</string>
+    <string name="pb_type3">위아래 가장자리</string>
+    <string name="pb_bottom">아래쪽</string>
+    <string name="pb_top">위쪽</string>
+    <string name="pb_left">왼쪽</string>
+    <string name="pb_right">오른쪽</string>
+    <string name="pb_preview">미리보기</string>
+    <string name="pb_preview_hint">테두리는 탭 영역입니다. 투명해도 확인용 아이콘은 표시됩니다.</string>
+    <string name="pb_disabled">페이지 버튼이 꺼져 있습니다</string>
+    <string name="pb_zero_size">크기가 0%이면 탭 영역이 없습니다.</string>
+    <string name="pb_direction_rtl">읽기 방향: 오른쪽에서 왼쪽</string>
+    <string name="pb_direction_ltr">읽기 방향: 왼쪽에서 오른쪽</string>
+    <string name="pb_width">영역 너비</string>
+    <string name="pb_height">영역 높이</string>
+    <string name="pb_each_edge">전체 %1$s%% (한쪽당 %2$s%%)</string>
+    <string name="pb_actions">버튼 동작</string>
+    <string name="pb_both_next">모든 버튼을 다음으로</string>
+    <string name="pb_reverse">이전과 다음 바꾸기</string>
+    <string name="pb_fixed">읽기 방향에 따라 버튼 순서를 바꾸지 않음</string>
+    <string name="pb_scroll">세로 스크롤 동작</string>
+    <string name="pb_overlap">스크롤 후 겹치는 부분</string>
+    <string name="pb_overlap_hint">단위는 글자 크기 기준(sp)입니다. 겹치는 부분이 클수록 이동 거리가 짧아집니다.</string>
+    <string name="pb_reset">초기값</string>
+    <string name="pb_previous">− 이전</string>
+    <string name="pb_next">+ 다음</string>
+    <string name="pb_horizontal_summary">왼쪽: %1$s / 오른쪽: %2$s</string>
+    <string name="pb_vertical_summary">위: %1$s / 아래: %2$s</string>
+    <string name="pb_both_edges">양쪽</string>
+</resources>

@@ -45,7 +45,7 @@ foreach ($tool in @($apksigner, $aapt2)) {
     }
 }
 
-$allowedPermissions = @('android.permission.INTERNET', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.READ_MEDIA_IMAGES',
+$allowedPermissions = @('android.permission.INTERNET',
     'jp.yaman.comicexplorer.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION') # AndroidX private receivers; signature-protected.
 
 function Copy-AndVerifyApk {

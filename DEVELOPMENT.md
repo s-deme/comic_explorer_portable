@@ -1,5 +1,51 @@
 # 開発・検証・リリース手順
 
+## 2026-09-22 廃止処理と未使用リソースの追加整理
+
+テストからしか使われない旧設定setterと旧ページ送りヘルパーの計8メソッド、参照のないアイコン7個、4言語の未使用文言64種類を削除。旧切り抜き設定の読み出し・入力検証は維持し、テストは保存済みデータの読み出しと実際のページ送り処理を検証する。
+
+検証: クリーンビルド成功。読書96・データ34・テーマ33、計163項目成功。Lintは0 errors / 35 warnings、UnusedResourcesは0件。記録: `build/remaining-dead-code-{build,reader,data,themes}.txt`。
+
+## 2026-09-22 廃止機能の残存コードを削除
+
+ギャラリー・アルバム・手動切り抜き画面と、到達できない明るさ／ダブルタップ設定ダイアログを削除。お気に入り・フォルダー保存も廃止し、フォルダーの長押しはファイル操作を直接表示する。画像ライブラリの読み取り権限を削除し、SAFと外部ファイル受け取りを維持する。保存済みの表示設定・切り抜きと、旧お気に入りにしか登録されていないしおりの読み出し・名前変更後の表示を保持する。
+
+検証: クリーンビルド成功。読書96・データ32・テーマ33・ネットワーク5、計166項目成功。Lintは0 errors / 106 warnings。リソース削除後はアプリとテストAPKを同時生成・再インストールする（片方だけ更新するとIDが食い違う）。全件テストは既存のZIP方式14の期待値と`supportsSevenZipZipMethod`の不一致で失敗し、今回は変更しない。記録: `build/retired-features-clean-build.txt`、`build/retired-features-{reader,data,themes,network,tests}.txt`。
+
+## 2026-09-22 テーマの全面配色と画面見本
+
+保存IDを維持し、ペーパー・チャコール・ワイン・ミッドナイト・フォレスト・バイオレット・ローズ・セピア・スレートへ更新。色付きテーマは背景・パネル・操作面・本文・補助文字・枠線まで専用配色にし、ローズとセピアは明色とした。明暗判定とアクセント上の文字色を実際の配色から決める。選択画面は実際のテーマ属性で描く小さな画面見本を表示する。
+
+本棚の個別背景色は保持し、色選択ダイアログの「テーマに合わせる」で解除できる。未指定時は本棚の本文・補助文字もテーマの色に揃える。漫画画像の画素やページ操作の意味色は変更しない。
+
+検証: 全9テーマの54組のコントラスト検査成功。テーマ33項目が通常文字・文字150%とも成功。Lintは0 errors / 107 warnings。テーマ選択とペーパー・セピア・チャコール・ミッドナイトの設定画面を撮影して目視確認。実機での全テーマ・TalkBack操作は未検証。記録: `build/theme-palettes-{build,tests,large,contrast,delivery}.txt`、`build/theme-palettes-screens/`。
+
+
+## 2026-09-22 ComicScreenからの読み込みを削除
+
+設定画面の取り込み入口、XML／DB専用のReferenceImport、専用の履歴マージ、4言語の案内文と取り込み専用テストを削除。取り込み済みの設定・履歴・しおりには変更を加えない。設定画面の外部アクティビティ結果は既存の読書情報同期へ渡す。
+
+検証: データ34項目、設定テーマ14項目成功。Lintは0 errors / 107 warnings。専用クラス・文言・リクエストへの残存参照がないことを確認。記録: `build/remove-reference-import-{build,data,themes,delivery}.txt`。
+
+
+## 2026-09-22 ページボタンの操作アイコン・色分け・両端配置
+
+プレビューに青い＋（次へ）とオレンジの−（前へ）を追加。反転・読書方向・すべて次へにアイコンと領域色が連動する。小さい領域や透明度0%でも確認用アイコンを読み取れる大きさで残し、サイズ0%と無効時には隠す。明暗の8組のコントラスト検査を通過した。
+
+横並びの上下位置、縦並びの左右位置に「両端」を追加。既存の配置IDを保持し、`page_horizontal_both` / `page_vertical_both`を別途保存する。合計サイズを両側へ半分ずつ配分して4領域を配置し、重なりを防ぐ。読書画面の追加2領域も同じ配置計算・操作・表示条件を使う。保存、再表示、ページ送り、通常配置への切り替え、初期値への復元を検証した。
+
+検証: 通常文字・文字150%とも読書94項目成功。Lintは0 errors / 107 warnings。ダーク縦画面・ライト横画面の前後アイコン、上下・左右の両端配置、透明表示を撮影確認。通常版APKを更新し、署名・権限チェック成功。実端末・TalkBackは未検証。記録: `build/page-buttons-edges-{build,reader,large,delivery}.txt`、`build/page-buttons-edges-screens/`。
+
+
+## 2026-09-22 ページボタン領域の設定UI
+
+Type0〜3を配置図付きの名称へ変更し、有効化・配置・プレビュー・サイズ／不透明度・ボタン動作・縦スクロールの順に整理した。配置図とプレビューは読書画面と同じ配置計算を使う。前後の割り当てと読書方向を文字で示し、透明度0%でも編集用の枠を残す。サイズ0%には説明を表示し、両端配置は合計と片側の割合を併記する。横画面はプレビューを縮める。
+
+「両方とも次へ」では反転・固定の操作を無効化するが、保存済みの値は保持する。設定キーと配置ID、保存まで下書きを維持する動きは変更しない。スクロールの重なりは保存値を直接表示し、増やすほど重なりが大きくなるスライダーへ変更。既定値23 spと実際の移動量は維持する。4言語の文言を追加し、この画面のラベルをアプリの選択言語に合わせた。
+
+検証: 読書80項目成功、最終版も文字150%で80項目成功。Lintは0 errors / 100 warnings。仮想端末のダーク縦画面・ライト横画面、透明表示、拡大文字、下部設定へのスクロールを撮影して目視確認。実端末とTalkBackによる操作は未検証。記録: `build/page-buttons-ui-{build,reader,large,delivery}.txt`、`build/page-buttons-ui-screens/`。
+
+
 ## 2026-09-20 ABI別Release APKと縮小
 
 ReleaseはR8によるコード縮小とリソース縮小を有効にし、`arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64`を個別APKとして出力する。通常の配布先は`arm64-v8a`。`build.ps1 -Configuration Release -OutputDirectory dist`は4 APKそれぞれの署名・権限・ABIとSHA-256を検証し、`.sha256`を作成する。Debugは従来どおりuniversal APKを`dist/comic-explorer.apk`へ出力する。
@@ -83,7 +129,7 @@ adb shell am instrument -w -e suite all jp.yaman.comicexplorer.validation.test/j
 |---|---|
 | `themes` | 旧ライト／ダークID、9テーマの配色、不明ID、選択・保存・再生成・キャンセル |
 | `reader` | 画像補正、ページ境界、ZIP／PDF、ジェスチャー、閲覧設定、切り抜き、関連する表示不具合 |
-| `data` | 読書情報、同期競合、設定インポート、キャッシュ、アルバム、転送と失敗時の原本保持 |
+| `data` | 読書情報、同期競合、設定インポート、キャッシュ、転送と失敗時の原本保持 |
 | `network` | パス境界、ローカルの模擬FTPサーバーとの通信 |
 | `formats` | RAR・7z・分割／暗号化アーカイブ・アニメーション等の追加形式 |
 
@@ -184,7 +230,7 @@ adb shell am instrument -w jp.yaman.comicexplorer.validation.test/jp.yaman.comic
 
 Instrumentationは対象IDが`.validation`で終わることを確認してから、その検証アプリの設定を初期化します。通常APKを作る際は`comicExplorerValidation`を指定しません。
 
-ネットワーク依存はSMBJ、Apache Commons Net、Google Play services authです。依存ライブラリ同梱のLICENSE／NOTICEはAPKへマージします。追加権限はINTERNETとギャラリー用画像読み取りで、`build.ps1`の許可リストで確認します。
+ネットワーク依存はSMBJ、Apache Commons Net、Google Play services authです。依存ライブラリ同梱のLICENSE／NOTICEはAPKへマージします。追加権限はINTERNETで、`build.ps1`の許可リストで確認します。
 
 FTPSでは端末標準の証明書検証とホスト名確認を有効にしています。[FTPSClientの仕様](https://commons.apache.org/proper/commons-net/apidocs/org/apache/commons/net/ftp/FTPSClient.html#setTrustManager(javax.net.ssl.TrustManager))に従い、`setTrustManager(null)`で標準TrustManagerを使います。自己署名証明書を無条件に許可する設定はありません。
 

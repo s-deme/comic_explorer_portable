@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pb_enable">Использовать кнопки страниц</string>
+    <string name="pb_layout">Расположение кнопок</string>
+    <string name="pb_type0">Рядом у верхнего или нижнего края</string>
+    <string name="pb_type1">Друг над другом у бокового края</string>
+    <string name="pb_type2">По левому и правому краям</string>
+    <string name="pb_type3">По верхнему и нижнему краям</string>
+    <string name="pb_bottom">Снизу</string>
+    <string name="pb_top">Сверху</string>
+    <string name="pb_left">Слева</string>
+    <string name="pb_right">Справа</string>
+    <string name="pb_preview">Предпросмотр</string>
+    <string name="pb_preview_hint">Рамки обозначают области нажатия. Значки для проверки видны и при полной прозрачности.</string>
+    <string name="pb_disabled">Кнопки страниц отключены</string>
+    <string name="pb_zero_size">При размере 0% области нажатия нет.</string>
+    <string name="pb_direction_rtl">Направление чтения: справа налево</string>
+    <string name="pb_direction_ltr">Направление чтения: слева направо</string>
+    <string name="pb_width">Ширина области</string>
+    <string name="pb_height">Высота области</string>
+    <string name="pb_each_edge">Всего %1$s%% (по %2$s%% с каждой стороны)</string>
+    <string name="pb_actions">Действия кнопок</string>
+    <string name="pb_both_next">Все кнопки листают вперёд</string>
+    <string name="pb_reverse">Поменять местами назад и вперёд</string>
+    <string name="pb_fixed">Не менять порядок кнопок при смене направления чтения</string>
+    <string name="pb_scroll">Вертикальная прокрутка</string>
+    <string name="pb_overlap">Перекрытие после прокрутки</string>
+    <string name="pb_overlap_hint">В единицах размера текста (sp). Чем больше перекрытие, тем короче прокрутка.</string>
+    <string name="pb_reset">Сброс</string>
+    <string name="pb_previous">− Назад</string>
+    <string name="pb_next">+ Вперёд</string>
+    <string name="pb_horizontal_summary">Слева: %1$s / Справа: %2$s</string>
+    <string name="pb_vertical_summary">Сверху: %1$s / Снизу: %2$s</string>
+    <string name="pb_both_edges">Оба края</string>
+</resources>

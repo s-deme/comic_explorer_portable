@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ui_blue_light">ブルーライト軽減</string>
-    <string name="ui_light_theme">ライト</string>
-    <string name="ui_dark_theme">ダーク</string>
+    <string name="ui_light_theme">ペーパー</string>
+    <string name="ui_dark_theme">チャコール</string>
     <string name="ui_archive_error">圧縮ファイルを読めません（RAR5・暗号化・分割形式は非対応の場合があります）。</string>
-    <string name="ui_top">上</string>
-    <string name="ui_bottom">下</string>
     <string name="ui_grayscale">グレースケール</string>
     <string name="ui_auto_contrast">自動コントラスト</string>
     <string name="ui_same_destination">移動元と移動先が同じです。</string>
@@ -14,27 +12,11 @@
     <string name="ui_verification_failed">コピーの検証に失敗しました。元ファイルは残しています。</string>
     <string name="ui_cannot_verify_destination">移動先フォルダの位置を確認できません。</string>
     <string name="ui_copy">コピー</string>
-    <string name="ui_select_items">複数選択</string>
-    <string name="ui_select_all">すべて選択</string>
     <string name="ui_conflict">同名ファイルがある場合</string>
     <string name="ui_keep_both">両方残す</string>
     <string name="ui_replace">検証して置き換える</string>
     <string name="ui_skip">スキップ</string>
     <string name="ui_transfer_running">転送しています…</string>
-    <string name="ui_bulk_rename">選択項目の名前変更</string>
-    <string name="ui_name_prefix">名前の先頭（連番を自動付与）</string>
-    <string name="ui_albums">アルバム</string>
-    <string name="ui_create_album">アルバムを作成</string>
-    <string name="ui_add_to_album">アルバムへ追加</string>
-    <string name="ui_remove_from_album">アルバムから外す</string>
-    <string name="ui_album_delete_notice">アルバムを削除しますか？元画像は残ります。</string>
-    <string name="ui_album_empty">ギャラリーやファイル選択から画像を追加できます。</string>
-    <string name="ui_add_images">画像を追加</string>
-    <string name="ui_reference_import">ComicScreenから読み込み</string>
-    <string name="ui_reference_import_detail">DB_DATA.db または basedata.xml のコピーを選択。原本・アカウントは変更しません。</string>
-    <string name="ui_reference_import_summary">設定 %1$d件／履歴 %2$d件／しおり・お気に入り %3$d件／対象外 %4$d件。\n対応する設定は上書きします。既存の読書情報は維持し、履歴は新しい100件を表示します。作品へのアクセス許可が再度必要な場合があります。アルバム・アカウントは取り込みません。</string>
-    <string name="ui_reference_import_failed">未対応・破損したファイル、または上限を超えるデータです。取り込みは行っていません。</string>
     <string name="ui_book_password">作品のパスワード</string>
     <string name="ui_archive_volumes">分割アーカイブのファイルを選択</string>
-    <string name="ui_scroll_overlap">スクロールの長さ(下へ)</string>
 </resources>

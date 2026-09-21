@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pb_enable">ページボタンを使う</string>
+    <string name="pb_layout">ボタンの配置</string>
+    <string name="pb_type0">上下端に横並び</string>
+    <string name="pb_type1">左右端に縦並び</string>
+    <string name="pb_type2">左右両端</string>
+    <string name="pb_type3">上下両端</string>
+    <string name="pb_bottom">下端</string>
+    <string name="pb_top">上端</string>
+    <string name="pb_left">左端</string>
+    <string name="pb_right">右端</string>
+    <string name="pb_preview">プレビュー</string>
+    <string name="pb_preview_hint">枠線はタップ領域です。確認用アイコンは透明にしても表示します。</string>
+    <string name="pb_disabled">ページボタンは無効です</string>
+    <string name="pb_zero_size">大きさが0%のため、タップ領域はありません。</string>
+    <string name="pb_direction_rtl">読書方向：右から左</string>
+    <string name="pb_direction_ltr">読書方向：左から右</string>
+    <string name="pb_width">領域の幅</string>
+    <string name="pb_height">領域の高さ</string>
+    <string name="pb_each_edge">合計 %1$s%%（片側 %2$s%%）</string>
+    <string name="pb_actions">ボタンの動作</string>
+    <string name="pb_both_next">すべて次へ</string>
+    <string name="pb_reverse">前へ／次へを入れ替える</string>
+    <string name="pb_fixed">読書方向による自動入れ替えをしない</string>
+    <string name="pb_scroll">縦スクロール時の動作</string>
+    <string name="pb_overlap">スクロール後に残す重なり</string>
+    <string name="pb_overlap_hint">単位は文字サイズ基準（sp）。大きいほど1回の移動が短くなります。</string>
+    <string name="pb_reset">初期値</string>
+    <string name="pb_previous">− 前へ</string>
+    <string name="pb_next">＋ 次へ</string>
+    <string name="pb_horizontal_summary">左：%1$s ／ 右：%2$s</string>
+    <string name="pb_vertical_summary">上：%1$s ／ 下：%2$s</string>
+    <string name="pb_both_edges">両端</string>
+</resources>

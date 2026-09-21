@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pb_enable">Use page buttons</string>
+    <string name="pb_layout">Button layout</string>
+    <string name="pb_type0">Side by side at top or bottom</string>
+    <string name="pb_type1">Stacked at left or right</string>
+    <string name="pb_type2">Both side edges</string>
+    <string name="pb_type3">Top and bottom edges</string>
+    <string name="pb_bottom">Bottom</string>
+    <string name="pb_top">Top</string>
+    <string name="pb_left">Left</string>
+    <string name="pb_right">Right</string>
+    <string name="pb_preview">Preview</string>
+    <string name="pb_preview_hint">Outlines mark tap areas. Icons stay visible here, even when transparent.</string>
+    <string name="pb_disabled">Page buttons are off</string>
+    <string name="pb_zero_size">At 0%, there is no tap area.</string>
+    <string name="pb_direction_rtl">Reading direction: right to left</string>
+    <string name="pb_direction_ltr">Reading direction: left to right</string>
+    <string name="pb_width">Area width</string>
+    <string name="pb_height">Area height</string>
+    <string name="pb_each_edge">%1$s%% total (%2$s%% per edge)</string>
+    <string name="pb_actions">Button actions</string>
+    <string name="pb_both_next">All buttons go forward</string>
+    <string name="pb_reverse">Swap previous and next</string>
+    <string name="pb_fixed">Keep button order regardless of reading direction</string>
+    <string name="pb_scroll">Vertical scrolling</string>
+    <string name="pb_overlap">Overlap after each scroll</string>
+    <string name="pb_overlap_hint">In text-size units (sp). More overlap means a shorter scroll.</string>
+    <string name="pb_reset">Reset</string>
+    <string name="pb_previous">− Previous</string>
+    <string name="pb_next">+ Next</string>
+    <string name="pb_horizontal_summary">Left: %1$s / Right: %2$s</string>
+    <string name="pb_vertical_summary">Top: %1$s / Bottom: %2$s</string>
+    <string name="pb_both_edges">Both edges</string>
+</resources>

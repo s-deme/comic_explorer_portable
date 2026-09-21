@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ui_blue_light">Blue light reduction</string>
-    <string name="ui_light_theme">Light</string>
-    <string name="ui_dark_theme">Dark</string>
+    <string name="ui_light_theme">Paper</string>
+    <string name="ui_dark_theme">Charcoal</string>
     <string name="ui_archive_error">Cannot read archive (RAR5, encrypted or split archives may be unsupported).</string>
-    <string name="ui_top">Top</string>
-    <string name="ui_bottom">Bottom</string>
     <string name="ui_grayscale">Grayscale</string>
     <string name="ui_auto_contrast">Auto contrast</string>
     <string name="ui_same_destination">Source and destination are the same.</string>
@@ -14,27 +12,11 @@
     <string name="ui_verification_failed">Copy verification failed. The source was retained.</string>
     <string name="ui_cannot_verify_destination">Cannot verify the destination folder.</string>
     <string name="ui_copy">Copy</string>
-    <string name="ui_select_items">Select items</string>
-    <string name="ui_select_all">Select all</string>
     <string name="ui_conflict">If the same name exists</string>
     <string name="ui_keep_both">Keep both</string>
     <string name="ui_replace">Replace after verification</string>
     <string name="ui_skip">Skip</string>
     <string name="ui_transfer_running">Transferring…</string>
-    <string name="ui_bulk_rename">Rename selected items</string>
-    <string name="ui_name_prefix">Name prefix (numbered automatically)</string>
-    <string name="ui_albums">Albums</string>
-    <string name="ui_create_album">Create album</string>
-    <string name="ui_add_to_album">Add to album</string>
-    <string name="ui_remove_from_album">Remove from album</string>
-    <string name="ui_album_delete_notice">Delete this album? Original images will remain.</string>
-    <string name="ui_album_empty">Add images from the gallery or file picker.</string>
-    <string name="ui_add_images">Add images</string>
-    <string name="ui_reference_import">Import from ComicScreen</string>
-    <string name="ui_reference_import_detail">Choose a copy of DB_DATA.db or basedata.xml. Original files and accounts are not changed.</string>
-    <string name="ui_reference_import_summary">Settings: %1$d; history: %2$d; bookmarks/favorites: %3$d; skipped: %4$d.\nSupported settings will replace current values. Existing reading data is kept. History displays the newest 100 entries. Book access permission may need to be granted again. Albums and accounts are not imported.</string>
-    <string name="ui_reference_import_failed">This file is unsupported, damaged, or exceeds the import limit. No data was imported.</string>
     <string name="ui_book_password">Book password</string>
     <string name="ui_archive_volumes">Select archive volumes</string>
-    <string name="ui_scroll_overlap">Scroll overlap</string>
 </resources>

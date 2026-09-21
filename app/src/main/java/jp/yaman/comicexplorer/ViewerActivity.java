@@ -105,6 +105,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private SeekBar pageSlider;
     private TextView leftPageButton;
     private TextView rightPageButton;
+    private final TextView[] extraPageButtons = new TextView[2];
     private FrameLayout pageCanvas;
     private ContinuousReader continuous;
     private String bookPassword;
@@ -186,6 +187,13 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         FrameLayout.LayoutParams rightPageParams = new FrameLayout.LayoutParams(dp(48), dp(96), Gravity.END | Gravity.CENTER_VERTICAL);
         canvas.addView(leftPageButton, leftPageParams);
         canvas.addView(rightPageButton, rightPageParams);
+        for (int i=0;i<extraPageButtons.length;i++) {
+            boolean second=i==1;
+            extraPageButtons[i]=PageButtonDialog.button(this);
+            extraPageButtons[i].setOnClickListener(view -> pageButton(second));
+            extraPageButtons[i].setVisibility(View.GONE);
+            canvas.addView(extraPageButtons[i]);
+        }
         canvas.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
             if(r-l!=or-ol || b-t!=ob-ot) updatePageButtons();
         });
@@ -293,25 +301,25 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private void updatePageButtons() {
         if (leftPageButton == null) return;
         boolean visible = AppState.pageButtons(this) && !chromeVisible;
-        leftPageButton.setVisibility(visible ? View.VISIBLE : View.GONE);
-        rightPageButton.setVisibility(visible ? View.VISIBLE : View.GONE);
         float alpha = AppState.pageButtonOpacity(this) / 100f;
-        leftPageButton.setAlpha(alpha);
-        rightPageButton.setAlpha(alpha);
         int type = AppState.number(this, "page_type", 0);
         FrameLayout.LayoutParams[] layout = PageButtonDialog.layouts(type,
                 AppState.enabled(this,"page_bottom",AppState.number(this,"page_position",0)!=1),
                 AppState.enabled(this,"page_left",AppState.number(this,"page_position",0)!=3),
+                type<2 && AppState.enabled(this,type==0 ? "page_horizontal_both" : "page_vertical_both",false),
                 PageButtonDialog.sizePercent(this), pageCanvas.getWidth(), pageCanvas.getHeight());
-        leftPageButton.setText(pageButtonForward(false) ? "+" : "-");
-        rightPageButton.setText(pageButtonForward(true) ? "+" : "-");
-        leftPageButton.setLayoutParams(layout[0]); rightPageButton.setLayoutParams(layout[1]);
-        leftPageButton.requestLayout();
-        rightPageButton.requestLayout();
-        leftPageButton.setContentDescription(pageButtonForward(false) ? I18n.t(R.string.ui_next_page) : I18n.t(R.string.ui_previous_page));
-        rightPageButton.setContentDescription(pageButtonForward(true) ? I18n.t(R.string.ui_next_page) : I18n.t(R.string.ui_previous_page));
-        leftPageButton.setTooltipText(leftPageButton.getContentDescription());
-        rightPageButton.setTooltipText(rightPageButton.getContentDescription());
+        TextView[] buttons={leftPageButton,rightPageButton,extraPageButtons[0],extraPageButtons[1]};
+        for (int i=0;i<buttons.length;i++) {
+            TextView button=buttons[i];
+            button.setVisibility(visible && i<layout.length ? View.VISIBLE : View.GONE);
+            if (i>=layout.length) continue;
+            boolean next=pageButtonForward(i%2==1);
+            button.setAlpha(alpha);
+            button.setText(next ? "+" : "-");
+            button.setLayoutParams(layout[i]);
+            button.setContentDescription(I18n.t(next ? R.string.ui_next_page : R.string.ui_previous_page));
+            button.setTooltipText(button.getContentDescription());
+        }
     }
 
     private void initializeSource() {
@@ -598,7 +606,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         boolean dualPage = usesDualPageLayout();
         int shownEnd = dualPage ? Math.min(totalPages, page + 2) : page + 1;
         pageText.setText(totalPages > 0 ? (dualPage ? (page + 1) + "-" + shownEnd : String.valueOf(page + 1))
-                + " / " + (pageCountReady() ? totalPages : "…") + (pageCountReady() ? "  " + Math.round(shownEnd * 100f / totalPages) + "%" : "") : I18n.t(R.string.ui_loading));
+                + " / " + (pageCountReady() ? totalPages : "…") : I18n.t(R.string.ui_loading));
         pageSlider.setProgress(page);
     }
 
@@ -919,11 +927,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         worker.execute(() -> { if (pageSource != null) try { pageSource.close(); } catch (IOException ignored) { } });
         worker.shutdown();
         super.onDestroy();
-    }
-
-    static int adjacentPage(int index, boolean forward, int count) {
-        int next = index + (forward ? 1 : -1);
-        return next >= 0 && next < count ? next : -1;
     }
 
     static boolean usesDualPageLayout(int layout, int orientation) {

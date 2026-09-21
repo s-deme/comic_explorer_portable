@@ -88,9 +88,29 @@ public final class Ui {
         return accent;
     }
 
+    static Drawable themePreview(Context context, int theme) {
+        android.content.res.TypedArray colors = new android.view.ContextThemeWrapper(context,themeStyle(context,theme))
+                .obtainStyledAttributes(new int[]{android.R.attr.colorBackground,android.R.attr.colorPrimary,
+                        android.R.attr.colorBackgroundFloating,android.R.attr.colorAccent,android.R.attr.colorForeground});
+        android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(dp(context,76),dp(context,52),android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas=new android.graphics.Canvas(bitmap);
+        canvas.scale(bitmap.getWidth()/76f,bitmap.getHeight()/52f);
+        android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        canvas.drawColor(colors.getColor(0,Color.BLACK));
+        paint.setColor(colors.getColor(1,Color.DKGRAY)); canvas.drawRect(0,0,76,11,paint);
+        paint.setColor(colors.getColor(4,Color.WHITE)); canvas.drawRect(5,4,28,6,paint);
+        paint.setColor(colors.getColor(2,Color.DKGRAY)); canvas.drawRect(4,15,72,23,paint);
+        for(int i=0;i<3;i++) {
+            paint.setColor(colors.getColor(i==0 ? 3 : 2,Color.GRAY));
+            canvas.drawRect(4+i*24,27,24+i*24,44,paint);
+            paint.setColor(colors.getColor(4,Color.WHITE)); canvas.drawRect(4+i*24,47,20+i*24,48,paint);
+        }
+        colors.recycle();
+        return new android.graphics.drawable.BitmapDrawable(context.getResources(),bitmap);
+    }
+
     public static void configure(Context context) {
         themeStyle = themeStyle(context, themeIndex(context));
-        light = themeStyle == R.style.AppThemeLight;
         android.content.res.TypedArray colors = new android.view.ContextThemeWrapper(context, themeStyle)
                 .obtainStyledAttributes(new int[]{android.R.attr.colorAccent, android.R.attr.colorPrimary,
                         android.R.attr.colorBackground, android.R.attr.colorBackgroundFloating,
@@ -105,7 +125,8 @@ public final class Ui {
         TEXT_SECONDARY = colors.getColor(6, Color.LTGRAY);
         OUTLINE = colors.getColor(7, Color.GRAY);
         colors.recycle();
-        ON_BRAND = light ? Color.WHITE : 0xFF161616;
+        light = androidx.core.graphics.ColorUtils.calculateLuminance(BACKGROUND) > .5;
+        ON_BRAND = androidx.core.graphics.ColorUtils.calculateContrast(Color.WHITE,BRAND) >= 4.5 ? Color.WHITE : 0xFF161616;
         BRAND_CONTAINER = androidx.core.graphics.ColorUtils.blendARGB(SURFACE, BRAND, .16f);
         ON_BRAND_CONTAINER = BRAND;
     }
@@ -240,20 +261,6 @@ public final class Ui {
         view.setElevation(0);
     }
 
-    public static void styleSegment(Button view, boolean selected) {
-        styleButton(view, selected ? ButtonStyle.PRIMARY : ButtonStyle.GHOST);
-        view.setAutoSizeTextTypeUniformWithConfiguration(13, 14, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
-        view.setPadding(dp(view.getContext(), 4), 0, dp(view.getContext(), 4), 0);
-        int background = selected ? BRAND : BACKGROUND;
-        int foreground = selected ? ON_BRAND : TEXT_SECONDARY;
-        view.setTextColor(colors(foreground, TEXT_SECONDARY));
-        view.setBackground(controlBackground(background, background, SURFACE_RAISED, OUTLINE, 18, BRAND));
-        view.setMinHeight(dp(view.getContext(), 48));
-        view.setSelected(selected);
-        view.setContentDescription(view.getText() + (selected ? I18n.t(R.string.ui_selected_2) : I18n.t(R.string.ui_show)));
-        if (Build.VERSION.SDK_INT >= 30) view.setStateDescription(selected ? I18n.t(R.string.ui_selected) : I18n.t(R.string.ui_not_selected));
-    }
-
     public static void styleTopTab(Button view, boolean selected) {
         view.setAllCaps(false);
         view.setTextSize(12);
@@ -288,14 +295,6 @@ public final class Ui {
         input.setBackground(darkInputBackground());
         input.setPadding(dp(input.getContext(), 14), 0, dp(input.getContext(), 14), 0);
         input.setMinHeight(dp(input.getContext(), 44));
-    }
-
-    public static void styleCheckable(CompoundButton control) {
-        control.setTextColor(TEXT_PRIMARY);
-        control.setTextSize(16);
-        control.setMinHeight(dp(control.getContext(), 52));
-        control.setButtonTintList(checkableColors());
-        control.setPadding(dp(control.getContext(), 8), 0, dp(control.getContext(), 8), 0);
     }
 
     public static void stylePaddedCheckable(CompoundButton control) {
@@ -333,29 +332,6 @@ public final class Ui {
         dialog.setOnShowListener(ignored -> styleDialog(dialog));
         dialog.show();
         return dialog;
-    }
-
-    public static void setVisibleAsDisabled(View view, boolean enabled) {
-        view.setEnabled(enabled);
-        view.setAlpha(1f);
-    }
-
-    public static void styleCard(View view, boolean interactive) {
-        Drawable content;
-        if (interactive) {
-            StateListDrawable states = new StateListDrawable();
-            states.addState(new int[]{android.R.attr.state_focused}, shape(SURFACE, BRAND, 2, 0));
-            states.addState(new int[]{}, shape(SURFACE, OUTLINE, 1, 0));
-            content = new RippleDrawable(ColorStateList.valueOf(androidx.core.graphics.ColorUtils.setAlphaComponent(BRAND, 46)), states, null);
-        } else {
-            content = shape(SURFACE, OUTLINE, 1, 0);
-        }
-        view.setBackground(content);
-        view.setElevation(dp(view.getContext(), 1));
-    }
-
-    public static void styleInsetPanel(View view) {
-        view.setBackground(shape(SURFACE_RAISED, OUTLINE, 1, 16));
     }
 
     public static void styleDarkPanel(View view) {
@@ -410,15 +386,6 @@ public final class Ui {
         view.setElevation(0);
     }
 
-    public static void styleReaderPageButton(ImageButton view) {
-        view.setImageTintList(ColorStateList.valueOf(TEXT_PRIMARY));
-        view.setAlpha(.72f);
-        view.setBackground(controlBackground(SURFACE, OUTLINE,
-                SURFACE_RAISED, OUTLINE, 2, BRAND));
-        view.setMinimumWidth(dp(view.getContext(), 48));
-        view.setMinimumHeight(dp(view.getContext(), 48));
-    }
-
     public static void styleListRow(View view) {
         StateListDrawable states = new StateListDrawable();
         states.addState(new int[]{android.R.attr.state_focused}, shape(SURFACE_RAISED, BRAND, 1, 0));
@@ -438,16 +405,6 @@ public final class Ui {
 
     private static ColorStateList colors(int enabled, int disabled) {
         return new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}}, new int[]{disabled, enabled});
-    }
-
-    private static ColorStateList checkableColors() {
-        return new ColorStateList(
-                new int[][]{
-                        new int[]{-android.R.attr.state_enabled},
-                        new int[]{android.R.attr.state_checked},
-                        new int[]{}
-                },
-                new int[]{0xFFA19AA4, BRAND, OUTLINE});
     }
 
     private static Drawable inputBackground() {

@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
-import android.widget.TextView;
-import android.widget.SeekBar;
 import android.app.AlertDialog;
 import android.view.KeyEvent;
 import android.widget.EditText;
@@ -36,36 +34,6 @@ public final class ReaderOptions {
         Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_screen_rotation)).setItems(choices, (dialog, selected) -> {
             activity.setRequestedOrientation(selected == 1 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : selected == 2 ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         }));
-    }
-
-    public static void brightness(Activity activity, java.util.function.IntConsumer preview) {
-        LinearLayout content = new LinearLayout(activity);
-        content.setPadding(Ui.dp(activity, 24), Ui.dp(activity, 6), Ui.dp(activity, 24), Ui.dp(activity, 4));
-        content.setOrientation(LinearLayout.VERTICAL);
-        TextView value = Ui.text(activity, "", 16, Ui.TEXT_PRIMARY);
-        int current = AppState.brightness(activity);
-        value.setText(current < 0 ? I18n.t(R.string.ui_system_brightness) : current + "%");
-        content.addView(value);
-        SeekBar slider = new SeekBar(activity);
-        slider.setMax(100);
-        slider.setProgress(current < 0 ? 50 : current);
-        Ui.styleSeekBar(slider);
-        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) { value.setText(progress + "%"); preview.accept(progress); }
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
-            @Override public void onStopTrackingTouch(SeekBar seekBar) { }
-        });
-        content.addView(slider);
-        android.widget.CheckBox keep = new android.widget.CheckBox(activity);
-        keep.setText(I18n.t(R.string.ui_keep_screen_on)); Ui.stylePaddedCheckable(keep); keep.setChecked(AppState.keepScreenOn(activity));
-        keep.setOnCheckedChangeListener((button, checked) -> { AppState.setKeepScreenOn(activity, checked); if (checked) activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); else activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); });
-        content.addView(keep);
-        Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_brightness)).setView(content).setNegativeButton(I18n.t(R.string.ui_system_settings), (dialog, which) -> {
-            AppState.setBrightness(activity, -1);
-            preview.accept(-1);
-        }).setPositiveButton(I18n.t(R.string.ui_save), (dialog, which) -> AppState.setBrightness(activity, slider.getProgress())));
     }
 
     public static void fit(Activity activity, Runnable changed) {
@@ -110,7 +78,8 @@ public final class ReaderOptions {
         rows.check(I18n.t(R.string.ui_show_filename), null, "grid_name", true, changed);
         rows.check(I18n.t(R.string.ui_square), null, "grid_square", false, changed);
         rows.slider(I18n.t(R.string.ui_columns), "grid_columns", 4, 1, 10, "", changed);
-        rows.action(I18n.t(R.string.ui_background), String.format("#%06X", AppState.number(activity, "grid_color", Ui.BACKGROUND) & 0xFFFFFF), () -> color(activity, "grid_color", changed));
+        rows.action(I18n.t(R.string.ui_background), AppState.prefs(activity).contains("setting.grid_color")
+                ? String.format("#%06X", AppState.number(activity, "grid_color", Ui.BACKGROUND) & 0xFFFFFF) : I18n.t(R.string.ui_match_theme), () -> color(activity, "grid_color", changed));
         rows.show(I18n.t(R.string.ui_list_type));
     }
     public static void color(Activity activity, String key, Runnable changed) {
@@ -131,7 +100,9 @@ public final class ReaderOptions {
             layout.addView(palette);
         }
         layout.addView(input);
-        AlertDialog dialog = Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_background_color)).setView(layout).setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_ok), null));
+        AlertDialog dialog = Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_background_color)).setView(layout)
+                .setNeutralButton(I18n.t(R.string.ui_match_theme), (d,which) -> { AppState.prefs(activity).edit().remove("setting."+key).apply(); changed.run(); })
+                .setNegativeButton(I18n.t(R.string.ui_cancel), null).setPositiveButton(I18n.t(R.string.ui_ok), null));
         dialog.getButton(-1).setOnClickListener(v -> {
             if (!input.getText().toString().matches("#[0-9a-fA-F]{6}")) { input.setError(I18n.t(R.string.ui_enter_a_color_as_rrggbb)); return; }
             AppState.put(activity, key, android.graphics.Color.parseColor(input.getText().toString())); changed.run(); dialog.dismiss();
@@ -139,12 +110,6 @@ public final class ReaderOptions {
     }
     public static void pageButtons(Activity activity, Runnable changed) {
         new PageButtonDialog(activity, changed).show();
-    }
-    public static void zoom(Activity activity, Runnable changed) {
-        PreferenceRows rows = new PreferenceRows(activity);
-        rows.radio(new String[]{I18n.t(R.string.ui_disabled), I18n.t(R.string.ui_fit_screen_2), I18n.t(R.string.ui_zoom), I18n.t(R.string.ui_zoom_inside_fit_screen_outside)}, new int[]{0, 2, 1, 3}, "double_tap_mode", 0, false, changed);
-        rows.slider(I18n.t(R.string.ui_scale), "double_tap_scale", 180, 100, 600, "%", changed);
-        rows.show(I18n.t(R.string.ui_double_tap_zoom));
     }
     public static void filters(Activity activity, Runnable changed) {
         PreferenceRows rows = new PreferenceRows(activity);

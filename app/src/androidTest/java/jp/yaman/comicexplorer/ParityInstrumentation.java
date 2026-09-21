@@ -43,7 +43,7 @@ public final class ParityInstrumentation extends Instrumentation {
                 AppState.put(context,"theme",2); Ui.configure(context);
                 int before=checks;
                 switch(group) {
-                    case "data": checkData(context); checkReferenceImport(context,fixtures); checkTransfers(context); break;
+                    case "data": checkData(context); checkTransfers(context); break;
                     case "network": checkNetwork(); checkFtp(fixtures); break;
                     case "formats": checkFormats(context,fixtures); break;
                     case "reader": checkReader(context,fixtures); break;
@@ -84,12 +84,19 @@ public final class ParityInstrumentation extends Instrumentation {
             AppState.updateReadingProgress(context,book,2,10); AppState.clearAllBookmarks(context);
             check(AppState.getPosition(context,book)==2 && AppState.bookmarks(context,book).isEmpty(),"Bookmark deletion preserves positions");
             AppState.setBookmark(context,book,2,true,"book.cbz","CBZ"); AppState.setBookmarkMemo(context,book,2,"preserved");
-            AppState.setFavorite(context,book,"book.cbz","CBZ",true);
             Uri renamed=Uri.parse("content://test/renamed"); AppState.relocate(context,book,renamed,"renamed.cbz");
             check(AppState.getPosition(context,renamed)==2 && AppState.hasBookmark(context,renamed,2),"Rename preserves reading position and bookmarks");
-            check(AppState.bookmarkMemo(context,renamed,2).equals("preserved") && AppState.isFavorite(context,renamed),"Rename preserves notes and favorites");
+            check(AppState.bookmarkMemo(context,renamed,2).equals("preserved"),"Rename preserves bookmark notes");
             check(AppState.recents(context).get(0).uri.equals(renamed),"Rename updates history URI");
             AppState.relocate(context,renamed,book,"book.cbz");
+            Uri legacy=Uri.parse("content://test/legacy-bookmark");
+            AppState.prefs(context).edit().putStringSet("library.favorites",java.util.Collections.singleton(legacy.toString()))
+                    .putStringSet("bookmark."+AppState.key(legacy),java.util.Collections.singleton("1"))
+                    .putString("favorite."+AppState.key(legacy)+".title","legacy.cbz").apply();
+            check(AppState.bookmarkedItems(context).stream().anyMatch(item -> item.uri.equals(legacy) && item.title.equals("legacy.cbz")),"Retiring favorites preserves legacy bookmark discovery");
+            Uri legacyMoved=Uri.parse("content://test/legacy-moved"); AppState.relocate(context,legacy,legacyMoved,"moved.cbz");
+            check(AppState.bookmarkedItems(context).stream().anyMatch(item -> item.uri.equals(legacyMoved) && item.title.equals("moved.cbz")),"Legacy bookmarks remain discoverable after rename");
+            AppState.clearBookmarks(context,legacyMoved);
             AppState.put(context,"theme",2); AppState.resetSettings(context);
             check(AppState.number(context,"theme",0)==0 && AppState.getPosition(context,book)==2,"Settings reset preserves reading data");
             String hash=String.join("",java.util.Collections.nCopies(64,"a"));
@@ -145,7 +152,6 @@ public final class ParityInstrumentation extends Instrumentation {
             adjusted=ImageProcessing.apply(context,tonal,6,100);
             check(adjusted.getWidth()==6 && adjusted.getPixel(3,1)==0xff555555,"Lanczos4 preserves constant colors");adjusted.recycle();tonal.recycle();
             AppState.put(context,"filter_upscale",false);
-            check(ViewerActivity.adjacentPage(0,true,3)==1 && ViewerActivity.adjacentPage(0,false,3)==-1,"Page navigation respects the first-page boundary");
             check(!ViewerActivity.usesDualPageLayout(AppState.PAGE_AUTO,android.content.res.Configuration.ORIENTATION_PORTRAIT)
                     && ViewerActivity.usesDualPageLayout(AppState.PAGE_AUTO,android.content.res.Configuration.ORIENTATION_LANDSCAPE),"Automatic spread follows orientation");
             int[] cover=ViewerActivity.coverSize(2000,1000);
@@ -154,11 +160,6 @@ public final class ParityInstrumentation extends Instrumentation {
             int[] tallPdf=PageSource.pdfBitmapSize(1,100_000,1080,2_000_000);
             check(tallPdf[0]<=8192 && tallPdf[1]<=8192 && (long)tallPdf[0]*tallPdf[1]<=2_000_000,"Extreme PDF dimensions stay within texture and pixel limits");
             checkReaderGestures(context);
-            Bitmap cropBitmap=Bitmap.createBitmap(20,20,Bitmap.Config.ARGB_8888);
-            runOnMainSync(() -> {
-                CropView crop=new CropView(context,cropBitmap); crop.setEdge(0,.25f);crop.setEdge(2,.1f);
-                check(crop.selection().left==.25f && crop.selection().width()>=.009f,"Accessible crop keeps a nonempty rectangle");
-            }); cropBitmap.recycle();
             File zip=new File(fixtures,"sample.cbz");
             try(ZipOutputStream output=new ZipOutputStream(new FileOutputStream(zip))){
                 for(int i=0;i<6;i++) {
@@ -204,6 +205,25 @@ public final class ParityInstrumentation extends Instrumentation {
             });
             awaitReady(() -> (Boolean)field(viewer,"initialized"),"ZIP reader initialized");
             awaitReady(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"ZIP first page decoded");
+            runOnMainSync(() -> {
+                try {
+                    java.lang.reflect.Method next=ViewerActivity.class.getDeclaredMethod("nextIndex",int.class,boolean.class);next.setAccessible(true);
+                    check((Integer)next.invoke(viewer,0,true)==1 && (Integer)next.invoke(viewer,0,false)==-1 && (Integer)next.invoke(viewer,5,true)==-1,"Reader navigation respects both page boundaries");
+                } catch(Exception error) { throw new RuntimeException(error); }
+            });
+            runOnMainSync(() -> { invoke(viewer,"forward"); invoke(viewer,"forward"); });
+            awaitReady(() -> (Integer)field(viewer,"page")==2,"Reader moved before launcher re-entry");
+            ActivityMonitor launcherMonitor=addMonitor(MainActivity.class.getName(),null,false);
+            try {
+                runOnMainSync(() -> viewer.startActivity(new Intent(context,MainActivity.class)
+                        .setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)));
+                awaitReady(() -> launcherMonitor.getLastActivity()!=null,"Duplicate launcher activity created");
+                await(() -> launcherMonitor.getLastActivity().isDestroyed() && viewer.hasWindowFocus(),
+                        "Launcher re-entry reveals the existing reader");
+                check(!viewer.isFinishing() && (Integer)field(viewer,"page")==2,
+                        "Launcher re-entry preserves the open page");
+            } finally { removeMonitor(launcherMonitor); }
+            runOnMainSync(() -> { invoke(viewer,"back"); invoke(viewer,"back"); });
             runOnMainSync(() -> ReaderOptions.direction(viewer,() -> invoke(viewer,"refreshReader")));
             awaitReady(() -> {
                 android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
@@ -218,42 +238,133 @@ public final class ParityInstrumentation extends Instrumentation {
             runOnMainSync(() -> viewer.onSwipe(AppState.PAGE_SWIPE_DOWN));
             awaitReady(() -> (Integer)field(viewer,"page")==0,"Opposite vertical swipe returns to the previous page");
             runOnMainSync(() -> { AppState.setPageSwipeDirection(context,AppState.PAGE_SWIPE_RIGHT); invoke(viewer,"refreshReader"); });
+            runOnMainSync(() -> {
+                PageButtonDialog draft=new PageButtonDialog(viewer,() -> {});
+                android.view.View content=(android.view.View)field(draft,"content");
+                android.widget.CheckBox both=content.findViewById(R.id.pop_pagebtn_plpl_chk);
+                android.widget.CheckBox reverse=content.findViewById(R.id.pop_pagebtn_reverse_chk);
+                android.widget.CheckBox fixed=content.findViewById(R.id.pop_pagebtn_fix_chk);
+                reverse.setChecked(true); both.setChecked(true);
+                check(!reverse.isEnabled() && !fixed.isEnabled() && reverse.isChecked(),"Both-next disables irrelevant controls without discarding values");
+                both.setChecked(false);
+                check(reverse.isEnabled() && fixed.isEnabled(),"Direction controls become available again");
+                ((android.widget.SeekBar)content.findViewById(R.id.pop_pagebtn_alpha_seek)).setProgress(0);
+                android.view.View area=(android.view.View)field(draft,"minus");
+                check(area.getVisibility()==android.view.View.VISIBLE && area.getAlpha()==1f && area.getBackground()!=null,
+                        "Transparent preview retains editing outline");
+                android.widget.TextView[] icons=(android.widget.TextView[])field(draft,"previewIcons");
+                check(icons[0].getVisibility()==android.view.View.VISIBLE && icons[1].getVisibility()==android.view.View.VISIBLE
+                        && !icons[0].getText().toString().equals(icons[1].getText().toString()),"Preview keeps distinct action icons at zero opacity");
+                int firstColor=((android.graphics.drawable.GradientDrawable)icons[0].getBackground()).getColor().getDefaultColor();
+                int secondColor=((android.graphics.drawable.GradientDrawable)icons[1].getBackground()).getColor().getDefaultColor();
+                String firstIcon=icons[0].getText().toString();
+                reverse.setChecked(!reverse.isChecked());
+                check(firstColor!=secondColor && !firstIcon.equals(icons[0].getText().toString())
+                        && ((android.graphics.drawable.GradientDrawable)icons[0].getBackground()).getColor().getDefaultColor()==secondColor,
+                        "Reversing buttons swaps their preview symbols and colors");
+                ((android.widget.RadioGroup)content.findViewById(R.id.pop_pagebtn_rdgp_position1)).check(R.id.pop_pagebtn_rdo_position_horizontal_both);
+                both.setChecked(true);
+                boolean allNext=true;
+                for(android.widget.TextView icon:icons)allNext &= icon.getVisibility()==android.view.View.VISIBLE && "+".contentEquals(icon.getText());
+                check(allNext,"Both edges preview four forward icons when all-next is enabled");
+                both.setChecked(false);
+
+                ((android.widget.RadioGroup)content.findViewById(R.id.pop_pagebtn_rdgp_type)).check(R.id.pop_pagebtn_rdo_type2);
+                check(((android.widget.TextView)content.findViewById(R.id.pop_pagebtn_thick_value)).getText().toString().contains("5%"),
+                        "Split-edge size shows each edge share");
+                ((android.widget.RadioGroup)content.findViewById(R.id.pop_pagebtn_rdgp_type)).check(R.id.pop_pagebtn_rdo_type1);
+                check(fixed.getVisibility()==android.view.View.GONE && content.findViewById(R.id.pop_pagebtn_rdgp_position2).getVisibility()==android.view.View.VISIBLE,
+                        "Vertical layout exposes only relevant controls");
+                ((android.widget.SeekBar)content.findViewById(R.id.pop_pagebtn_thick_seek)).setProgress(0);
+                check(((android.widget.TextView)content.findViewById(R.id.page_button_hint)).getText().toString().equals(I18n.t(R.string.pb_zero_size)),
+                        "Zero size explains missing tap area");
+                ((android.widget.CheckBox)content.findViewById(R.id.pop_pagebtn_use_chk)).setChecked(false);
+                check(!both.isEnabled() && !content.findViewById(R.id.pop_pagebtn_thick_seek).isEnabled()
+                        && ((android.widget.TextView)content.findViewById(R.id.page_button_summary)).getText().toString().equals(I18n.t(R.string.pb_disabled)),
+                        "Disabled page buttons have explicit preview state");
+                check(AppState.pageButtonOpacity(context)==100 && PageButtonDialog.sizePercent(context)==10,
+                        "Preview-only edits do not leak into saved settings");
+            });
+            capturePageButtons(viewer,"dark-buttons");
             runOnMainSync(() -> ReaderOptions.pageButtons(viewer,() -> invoke(viewer,"updatePageButtons")));
             capture("buttons-type0");
-            awaitReady(() -> clickText("Type1"),"Select reference Type1");
+            awaitReady(() -> clickText(I18n.t(R.string.pb_type1)),"Select reference Type1");
             check(AppState.number(context,"page_type",0)==0,"Draft type does not save before OK");
-            awaitReady(() -> clickText("Right"),"Type1 exposes Left/Right");
+            awaitReady(() -> clickText(I18n.t(R.string.pb_right)),"Type1 exposes Left/Right");
             capture("buttons-type1");
             awaitReady(() -> clickText(I18n.t(R.string.ui_cancel)),"Cancel page button draft");
             waitForIdleSync();
             check(AppState.number(context,"page_type",0)==0,"Cancel preserves saved type");
             runOnMainSync(() -> ReaderOptions.pageButtons(viewer,() -> invoke(viewer,"updatePageButtons")));
-            awaitReady(() -> clickText("Type2"),"Select reference Type2");
+            awaitReady(() -> clickText(I18n.t(R.string.pb_type2)),"Select reference Type2");
             capture("buttons-type2");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_ok)),"Save reference Type2");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_save)),"Save reference Type2");
             awaitReady(() -> AppState.number(context,"page_type",0)==2,"Wait for committed Type2");
             waitForIdleSync();
             check(AppState.number(context,"page_type",0)==2
                     && ((android.view.View)field(viewer,"leftPageButton")).getLayoutParams().height==((android.view.View)field(viewer,"pageCanvas")).getHeight(),"Type2 spans both side edges");
             runOnMainSync(() -> ReaderOptions.pageButtons(viewer,() -> invoke(viewer,"updatePageButtons")));
-            awaitReady(() -> clickText("Type3"),"Select reference Type3");
+            awaitReady(() -> clickText(I18n.t(R.string.pb_type3)),"Select reference Type3");
             capture("buttons-type3");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_default)),"Restore reference defaults in draft");
+            awaitReady(() -> clickText(I18n.t(R.string.pb_reset)),"Restore reference defaults in draft");
             check(AppState.number(context,"page_type",0)==2,"Default does not persist until OK");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_ok)),"Save reference defaults");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_save)),"Save reference defaults");
             awaitReady(() -> AppState.number(context,"page_type",-1)==0,"Wait for committed defaults");
             waitForIdleSync();
             check(AppState.number(context,"page_type",-1)==0 && PageButtonDialog.sizePercent(context)==10
                     && AppState.pageButtonOpacity(context)==100 && !AppState.enabled(context,"page_fixed",true)
-                    && !AppState.enabled(context,"scroll_smooth",true),"Reference defaults persist together");
-            android.widget.FrameLayout.LayoutParams[] buttonBounds=PageButtonDialog.layouts(1,false,false,10,1000,2000);
+                    && !AppState.enabled(context,"scroll_smooth",true) && AppState.number(context,"scroll_overlap",-1)==23,"Reference defaults persist together");
+            android.widget.FrameLayout.LayoutParams[] buttonBounds=PageButtonDialog.layouts(1,false,false,false,10,1000,2000);
             check(buttonBounds[0].width==100 && buttonBounds[0].height==1000
                     && buttonBounds[0].gravity==(android.view.Gravity.RIGHT|android.view.Gravity.TOP),"Type1 splits the selected vertical edge");
-            buttonBounds=PageButtonDialog.layouts(3,true,true,10,1000,2000);
+            buttonBounds=PageButtonDialog.layouts(3,true,true,false,10,1000,2000);
             check(buttonBounds[0].width==1000 && buttonBounds[0].height==100,"Type3 splits size across top and bottom edges");
             check(PageButtonDialog.forward(true,0,false,false,true,true)
                     && !PageButtonDialog.forward(true,0,false,false,false,true)
                     && PageButtonDialog.forward(true,1,false,false,false,true),"Fixed ignores reading direction only for horizontal button types");
+            buttonBounds=PageButtonDialog.layouts(0,true,true,true,10,1000,2000);
+            check(buttonBounds.length==4 && buttonBounds[0].height==100 && buttonBounds[2].height==100
+                    && buttonBounds[0].gravity==(android.view.Gravity.BOTTOM|android.view.Gravity.LEFT)
+                    && buttonBounds[2].gravity==(android.view.Gravity.TOP|android.view.Gravity.LEFT),"Both horizontal edges split the total size across four regions");
+            buttonBounds=PageButtonDialog.layouts(1,true,true,true,65,1000,2000);
+            check(buttonBounds.length==4 && buttonBounds[0].width==325 && buttonBounds[2].width==325
+                    && buttonBounds[2].gravity==(android.view.Gravity.RIGHT|android.view.Gravity.TOP),"Both vertical edges cannot overlap at maximum size");
+            runOnMainSync(() -> {
+                PageButtonDialog draft=new PageButtonDialog(viewer,() -> invoke(viewer,"updatePageButtons"));
+                ((android.widget.RadioGroup)field(draft,"horizontal")).check(R.id.pop_pagebtn_rdo_position_horizontal_both);
+                invoke(draft,"save");
+                android.widget.TextView[] extra=(android.widget.TextView[])field(viewer,"extraPageButtons");
+                check(AppState.enabled(context,"page_horizontal_both",false) && extra[0].getVisibility()==android.view.View.VISIBLE
+                        && extra[1].getVisibility()==android.view.View.VISIBLE,"Saving both edges creates additional reader buttons");
+                PageButtonDialog reopened=new PageButtonDialog(viewer,() -> {});
+                check(((android.widget.RadioGroup)field(reopened,"horizontal")).getCheckedRadioButtonId()==R.id.pop_pagebtn_rdo_position_horizontal_both,
+                        "Both-edge selection survives reopening settings");
+                for(android.widget.TextView button:extra)if(I18n.t(R.string.ui_next_page).contentEquals(button.getContentDescription()))button.performClick();
+            });
+            await(() -> (Integer)field(viewer,"page")==1,"Extra forward button advances a page");
+            runOnMainSync(() -> {
+                for(android.widget.TextView button:(android.widget.TextView[])field(viewer,"extraPageButtons"))
+                    if(I18n.t(R.string.ui_previous_page).contentEquals(button.getContentDescription()))button.performClick();
+            });
+            await(() -> (Integer)field(viewer,"page")==0,"Extra previous button returns a page");
+            runOnMainSync(() -> {
+                PageButtonDialog draft=new PageButtonDialog(viewer,() -> invoke(viewer,"updatePageButtons"));
+                ((android.widget.RadioGroup)field(draft,"types")).check(R.id.pop_pagebtn_rdo_type1);
+                ((android.widget.RadioGroup)field(draft,"vertical")).check(R.id.pop_pagebtn_rdo_position_vertical_both);
+                invoke(draft,"save");
+                android.widget.TextView[] extra=(android.widget.TextView[])field(viewer,"extraPageButtons");
+                check(AppState.enabled(context,"page_vertical_both",false) && extra[0].getVisibility()==android.view.View.VISIBLE,
+                        "Vertical both-edge layout reaches the reader");
+                AppState.put(context,"page_type",2); invoke(viewer,"updatePageButtons");
+                check(extra[0].getVisibility()==android.view.View.GONE && extra[1].getVisibility()==android.view.View.GONE,
+                        "Switching to a two-region layout removes extra tap targets");
+                ReaderOptions.pageButtons(viewer,() -> invoke(viewer,"updatePageButtons"));
+            });
+            awaitReady(() -> clickText(I18n.t(R.string.pb_reset)),"Reset both-edge draft");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_save)),"Save reset both-edge settings");
+            waitForIdleSync();
+            check(!AppState.enabled(context,"page_horizontal_both",true) && !AppState.enabled(context,"page_vertical_both",true),
+                    "Reset clears both-edge settings on both axes");
             runOnMainSync(() -> {
                 invoke(viewer,"toggleChrome");
                 android.widget.LinearLayout toolbar=(android.widget.LinearLayout)field(viewer,"readerMenuRow");
@@ -302,9 +413,9 @@ public final class ParityInstrumentation extends Instrumentation {
             SettingsActivity readerSettings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             runOnMainSync(() -> {
                 AppState.setFitMode(context,AppState.FIT_WIDTH);
-                AppState.setDoubleTapScale(context,250);
-                AppState.setKeepScreenOn(context,false);
-                AppState.setBrightness(context,42);
+                AppState.put(context,"double_tap_scale",250);
+                AppState.put(context,"keep_screen_on",false);
+                AppState.put(context,"brightness",42);
                 readerSettings.finish();
             });
             await(() -> (Integer)field(field(viewer,"imageView"),"fitMode")==AppState.FIT_WIDTH
@@ -315,9 +426,9 @@ public final class ParityInstrumentation extends Instrumentation {
             if(android.os.Build.VERSION.SDK_INT>=30) check(viewer.getWindow().getDecorView().getRootWindowInsets().isVisible(android.view.WindowInsets.Type.statusBars() | android.view.WindowInsets.Type.navigationBars()),"System bars remain visible despite legacy fullscreen preference");
             runOnMainSync(() -> {
                 AppState.setFitMode(context,AppState.FIT_SCREEN);
-                AppState.setDoubleTapScale(context,180);
-                AppState.setKeepScreenOn(context,true);
-                AppState.setBrightness(context,-1);
+                AppState.put(context,"double_tap_scale",180);
+                AppState.put(context,"keep_screen_on",true);
+                AppState.put(context,"brightness",-1);
                 invoke(viewer,"applyReaderPreferences");
             });
             runOnMainSync(() -> { AppState.setPageLayout(context,AppState.PAGE_DUAL); AppState.put(context,"filter_contrast",true); invoke(viewer,"refreshReader"); });
@@ -365,7 +476,7 @@ public final class ParityInstrumentation extends Instrumentation {
                     && ContinuousReader.edgeDirection(false,true,-20,20)==0,
                     "Continuous reader only exits a book on an outward edge swipe");
 
-            runOnMainSync(() -> {AppState.setCropPercent(context,5);invoke(viewer,"refreshReader");});
+            runOnMainSync(() -> {AppState.put(context,"crop_percent",5);invoke(viewer,"refreshReader");});
             await(() -> {
                 ContinuousReader list=(ContinuousReader)field(viewer,"continuous");
                 if(list.getChildCount()==0)return false;
@@ -394,6 +505,7 @@ public final class ParityInstrumentation extends Instrumentation {
             awaitReady(() -> ((android.view.View)field(pdfViewer,"loading")).getVisibility()==android.view.View.GONE,"Landscape rendering complete");
             runOnMainSync(() -> invoke(pdfViewer,"toggleChrome"));
             capture("light-landscape-reader");
+            capturePageButtons(pdfViewer,"light-landscape-buttons");
             if(screenshots!=null) {
                 runOnMainSync(() -> invoke(pdfViewer,"showReaderMenu"));
                 capture("light-landscape-menu");
@@ -409,7 +521,7 @@ public final class ParityInstrumentation extends Instrumentation {
             awaitReady(() -> pdfViewer.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT,"Restore portrait");
             runOnMainSync(pdfViewer::finish);
             AppState.addRecent(context,Uri.fromFile(zip),"sample.cbz","CBZ");AppState.addRecent(context,Uri.fromFile(pdf),"sample.pdf","PDF");
-            AppState.setGridView(context,true);AppState.setGridColumns(context,3);AppState.put(context,"list_type",2);
+            AppState.setGridView(context,true);AppState.put(context,"grid_columns",3);AppState.put(context,"list_type",2);
             AppState.put(context,"theme",1);
             MainActivity lightLibrary=(MainActivity)startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             runOnMainSync(() -> {try{java.lang.reflect.Method mode=MainActivity.class.getDeclaredMethod("selectMode",int.class);mode.setAccessible(true);mode.invoke(lightLibrary,2);}catch(Exception e){throw new RuntimeException(e);}});
@@ -420,9 +532,8 @@ public final class ParityInstrumentation extends Instrumentation {
                 return root!=null && !root.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_list_type)).isEmpty();
             },"Library menu shows list type");
             android.view.accessibility.AccessibilityNodeInfo libraryMenu=getUiAutomation().getRootInActiveWindow();
-            check(!libraryMenu.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_sort)).isEmpty()
-                    && libraryMenu.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_favorites)).isEmpty(),
-                    "Library menu moves view and sort controls without favorites");
+            check(!libraryMenu.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_sort)).isEmpty(),
+                    "Library menu moves view and sort controls");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); waitForIdleSync();
             android.view.View firstCell=((android.widget.GridView)field(lightLibrary,"gridView")).getChildAt(0);
             int labelColor=((android.widget.TextView)field(firstCell.getTag(),"name")).getCurrentTextColor();
@@ -446,9 +557,31 @@ public final class ParityInstrumentation extends Instrumentation {
                 try { java.lang.reflect.Method method=MainActivity.class.getDeclaredMethod("showActions",LibraryEntry.class);method.setAccessible(true);method.invoke(lightLibrary,actionItem); }
                 catch(Exception error) { throw new RuntimeException(error); }
             });
+            waitForIdleSync();
+            check(getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText("お気に入り").isEmpty(),"Book actions omit retired favorites");
             awaitReady(() -> clickText(I18n.t(R.string.ui_delete_all_bookmarks_2)),"Select conditional bookmark action");
             check(AppState.bookmarks(context,actionItem.uri).isEmpty() && AppState.hasCover(context,actionItem.uri),"Conditional library actions clear bookmarks without removing cover");
-            runOnMainSync(lightLibrary::finish); waitForIdleSync();
+            LibraryEntry folderAction=new LibraryEntry(android.provider.DocumentsContract.buildDocumentUri(context.getPackageName()+".network","root"),"folder",android.provider.DocumentsContract.Document.MIME_TYPE_DIR,"",true,0,0);
+            runOnMainSync(() -> {
+                try { java.lang.reflect.Method method=MainActivity.class.getDeclaredMethod("showActions",LibraryEntry.class);method.setAccessible(true);method.invoke(lightLibrary,folderAction); }
+                catch(Exception error) { throw new RuntimeException(error); }
+            });
+            waitForIdleSync();
+            awaitReady(() -> { android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow(); return root!=null && !root.findAccessibilityNodeInfosByText("folder").isEmpty(); },"Folder action menu visible");
+            android.view.accessibility.AccessibilityNodeInfo folderMenu=getUiAutomation().getRootInActiveWindow();
+            check(!folderMenu.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_rename)).isEmpty()
+                    && !folderMenu.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_copy)).isEmpty()
+                    && folderMenu.findAccessibilityNodeInfosByText("ディレクトリに登録").isEmpty(),"Folder actions retain file operations without saved folders");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); waitForIdleSync();
+            android.app.Instrumentation.ActivityMonitor restoredMonitor=addMonitor(MainActivity.class.getName(),null,false);
+            runOnMainSync(() -> {
+                try { java.lang.reflect.Field mode=MainActivity.class.getDeclaredField("mode");mode.setAccessible(true);mode.setInt(lightLibrary,7); }
+                catch(Exception error) { throw new RuntimeException(error); }
+                lightLibrary.recreate();
+            });
+            Activity restoredLibrary=waitForMonitorWithTimeout(restoredMonitor,10000); removeMonitor(restoredMonitor);
+            check(restoredLibrary!=null && ((Integer)field(restoredLibrary,"mode"))==0,"Retired gallery state restores to the library");
+            runOnMainSync(restoredLibrary::finish); waitForIdleSync();
             if(screenshots!=null) {
                 ViewerActivity unavailable=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(Uri.fromFile(new File(fixtures,"missing.cbz"))).putExtra(ViewerActivity.EXTRA_TITLE,"missing.cbz").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 awaitReady(() -> ((android.view.View)field(unavailable,"errorPanel")).getVisibility()==android.view.View.VISIBLE,"Missing book error visible");
@@ -546,6 +679,7 @@ public final class ParityInstrumentation extends Instrumentation {
         check(Ui.light,"Legacy light theme ID retains its meaning");
         AppState.put(context,"theme",2); Ui.configure(context);
         check(!Ui.light && Ui.themeStyle==R.style.AppTheme,"Legacy dark theme ID retains its meaning");
+        java.util.Set<Integer> backgrounds=new java.util.HashSet<>();
         for (int theme=1;theme<Ui.THEMES.length;theme++) {
             AppState.put(context,"theme",theme); Ui.configure(context);
             boolean contrast = androidx.core.graphics.ColorUtils.calculateContrast(Ui.TEXT_PRIMARY,Ui.SURFACE)>=4.5
@@ -553,6 +687,8 @@ public final class ParityInstrumentation extends Instrumentation {
                     && androidx.core.graphics.ColorUtils.calculateContrast(Ui.BRAND,Ui.SURFACE_RAISED)>=4.5
                     && androidx.core.graphics.ColorUtils.calculateContrast(Ui.ON_BRAND,Ui.BRAND)>=4.5
                     && androidx.core.graphics.ColorUtils.calculateContrast(Ui.TEXT_PRIMARY,Ui.TOOLBAR)>=4.5;
+            check(backgrounds.add(Ui.BACKGROUND),"Each theme has a distinct base surface");
+            check(Ui.light==(theme==1 || theme==7 || theme==8),"Light palettes use light UI behavior");
             android.util.TypedValue accent=new android.util.TypedValue();
             new android.view.ContextThemeWrapper(context,Ui.themeStyle).getTheme().resolveAttribute(android.R.attr.colorAccent,accent,true);
             check(contrast && accent.data==Ui.BRAND,"Theme "+theme+" has readable controls and matching native accent");
@@ -564,40 +700,30 @@ public final class ParityInstrumentation extends Instrumentation {
         ActivityMonitor monitor=addMonitor(SettingsActivity.class.getName(),null,false);
         try {
             runOnMainSync(() -> invoke(settings,"showThemePicker"));
-            awaitReady(() -> clickText(I18n.t(R.string.ui_theme_orange)),"Select orange in the actual theme picker");
+            capture("theme-picker");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_theme_orange)),"Select sepia in the actual theme picker");
             Activity changed=waitForMonitorWithTimeout(monitor,10000);
             check(changed!=null && AppState.number(context,"theme",0)==8 && Ui.BRAND==Ui.themeAccent(context,8),
                     "Selecting a theme saves it and recreates settings with the selected palette");
+            capture("theme-sepia");
             runOnMainSync(() -> invoke(changed,"showThemePicker"));
             awaitReady(() -> clickText(I18n.t(R.string.ui_cancel)),"Cancel theme picker");
             check(AppState.number(context,"theme",0)==8,"Cancelling the picker preserves the selected theme");
             runOnMainSync(changed::finish);
-        } finally { removeMonitor(monitor); AppState.put(context,"theme",original); Ui.configure(context); }
-    }
+            if(screenshots!=null)for(int theme:new int[]{1,2,4}) {
+                AppState.put(context,"theme",theme);
+                SettingsActivity sample=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                capture("theme-"+theme);
+                runOnMainSync(sample::finish);
+            }
+            AppState.put(context,"grid_color",0xff123456);
+            SettingsActivity backgroundSettings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            runOnMainSync(() -> ReaderOptions.color(backgroundSettings,"grid_color",() -> {}));
+            awaitReady(() -> clickText(I18n.t(R.string.ui_match_theme)),"Restore theme-managed background");
+            await(() -> !AppState.prefs(context).contains("setting.grid_color"),"Theme background reset removes only the explicit color override");
+            runOnMainSync(backgroundSettings::finish);
 
-    private void checkReferenceImport(Context context,File fixtures) throws Exception {
-        File xml=new File(fixtures,"basedata.xml");
-        java.nio.file.Files.write(xml.toPath(),"<map><boolean name=\"set_img_filter_gray_yn\" value=\"true\"/><int name=\"set_img_doubleTap_mode\" value=\"2\"/><string name=\"account\">ignore</string></map>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        ReferenceImport settings=ReferenceImport.read(context,Uri.fromFile(xml));
-        check(settings.count()==2 && settings.skipped==1,"Only supported reference settings are planned");
-        settings.apply(context);check(AppState.doubleTapMode(context)==AppState.DOUBLE_TAP_ZOOM && AppState.enabled(context,"filter_gray",false),"Reference enum values map to existing settings");
-        AppState.put(context,"filter_gray",false);
-        java.nio.file.Files.write(xml.toPath(),"<!DOCTYPE map [<!ENTITY x SYSTEM 'file:///etc/passwd'>]><map/>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        boolean rejected=false;try {ReferenceImport.read(context,Uri.fromFile(xml));}catch(Exception expected){rejected=true;}
-        check(rejected,"External entities are rejected before parsing");
-        File database=new File(fixtures,"reference.db");database.delete();
-        try(android.database.sqlite.SQLiteDatabase db=android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(database,null)) {
-            db.execSQL("CREATE TABLE TB_HISTORY (NAME TEXT, PATH TEXT, CONTENTURI TEXT, VIEWPAGE INTEGER, INFOPAGE INTEGER, FULLPAGE INTEGER, TIMESTAMP INTEGER)");
-            db.execSQL("INSERT INTO TB_HISTORY VALUES ('ref.cbz','/books/ref.cbz','content://test/imported',4,3,10,1234)");
-            db.execSQL("CREATE TABLE TB_BOOKMARK (NAME TEXT, PATH TEXT, CONTENTURI TEXT, VIEWPAGE INTEGER, FULLPAGE INTEGER, TIMESTAMP INTEGER, REMARK TEXT)");
-            db.execSQL("INSERT INTO TB_BOOKMARK VALUES ('ref.cbz','/books/ref.cbz','content://test/imported',4,10,1234,'memo')");
-        }
-        ReferenceImport plan=ReferenceImport.read(context,Uri.fromFile(database));
-        Uri imported=Uri.parse("content://test/imported");
-        check(plan.history.size()==1 && plan.entries.size()==1,"Reference history and bookmark schema recognized");
-        plan.apply(context);check(AppState.getPosition(context,imported)==3 && AppState.hasBookmark(context,imported,3),"Import reconciles zero-based absolute and one-based display page");
-        AppState.setPosition(context,imported,8);AppState.setBookmarkMemo(context,imported,3,"local");plan.apply(context);
-        check(AppState.getPosition(context,imported)==8 && AppState.bookmarkMemo(context,imported,3).equals("local"),"Repeated import preserves existing reading data");
+        } finally { removeMonitor(monitor); AppState.put(context,"theme",original); Ui.configure(context); }
     }
 
     private void checkReaderGestures(Context context) {
@@ -671,17 +797,14 @@ public final class ParityInstrumentation extends Instrumentation {
         java.io.ByteArrayOutputStream png=new java.io.ByteArrayOutputStream();
         image.compress(Bitmap.CompressFormat.PNG,100,png); image.recycle();
         Uri newBook=Uri.parse("content://test/cropped");
-        android.graphics.RectF crop=new android.graphics.RectF(.1f,.2f,.8f,.9f); AppState.setCrop(context,newBook,crop);
-        boolean invalid=false;try{AppState.setCrop(context,newBook,new android.graphics.RectF(-1,0,1,1));}catch(IllegalArgumentException expected){invalid=true;}check(invalid,"Reject invalid saved crop");
-        Uri album=Albums.rename(context,null,"Album"); LibraryEntry albumImage=new LibraryEntry(newBook,"page.png","image/png","画像",false,0,0);
-        Albums.update(context,album,java.util.Arrays.asList(albumImage,albumImage),true);check(Albums.list(context,album).size()==1,"Album additions deduplicate images");
-        Albums.rename(context,album,"Renamed album");check(Albums.list(context,null).get(0).name.equals("Renamed album"),"Album rename persists");
-        Uri movedImage=Uri.parse("content://test/album-moved");
-        Albums.update(context,album,java.util.Collections.singletonList(new LibraryEntry(movedImage,"existing.png","image/png","画像",false,0,0)),true);
-        Albums.relocate(context,newBook,movedImage,"moved.png");
-        java.util.List<LibraryEntry> relocated=Albums.list(context,album);
-        check(relocated.size()==1 && relocated.get(0).uri.equals(movedImage) && relocated.get(0).name.equals("moved.png"),"Album relocation replaces an existing destination without duplicate references");
-        Albums.delete(context,album);check(AppState.crop(context,newBook).equals(crop),"Deleting album preserves source reading data");
+        android.graphics.RectF crop=new android.graphics.RectF(.1f,.2f,.8f,.9f);
+        AppState.prefs(context).edit().putString("crop."+AppState.key(newBook),"[-1,0,1,1]").apply();
+        check(AppState.crop(context,newBook)==null,"Reject out-of-bounds legacy crop on read");
+        AppState.prefs(context).edit().putString("crop."+AppState.key(newBook),"invalid").apply();
+        check(AppState.crop(context,newBook)==null,"Reject malformed legacy crop on read");
+        String savedCrop="[0.1,0.2,0.8,0.9]";
+        AppState.prefs(context).edit().putString("crop."+AppState.key(newBook),savedCrop).apply();
+        check(AppState.crop(context,newBook).equals(crop),"Read valid legacy crop without the retired editor");
         String unique="run-"+System.nanoTime();
         getUiAutomation().adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");
         String providerAuthority=getContext().getPackageName()+".parity.documents";
@@ -696,7 +819,7 @@ public final class ParityInstrumentation extends Instrumentation {
             Uri note=android.provider.DocumentsContract.createDocument(context.getContentResolver(),sourceDir,"text/plain","notes.txt");
             try(java.io.OutputStream out=context.getContentResolver().openOutputStream(note)){out.write(new byte[]{1,2,3});}
             check(LibraryDirectoryReader.read(context.getContentResolver(),sourceDir,sourceDir,false).size()==2,"Read actual document folder, not tree root");
-            AppState.addRecent(context,page,"page.png","画像"); AppState.updateReadingProgress(context,page,2,8); AppState.setBookmark(context,page,2,true,"page.png","画像"); AppState.setCrop(context,page,crop);
+            AppState.addRecent(context,page,"page.png","画像"); AppState.updateReadingProgress(context,page,2,8); AppState.setBookmark(context,page,2,true,"page.png","画像"); AppState.prefs(context).edit().putString("crop."+AppState.key(page),savedCrop).apply();
             LibraryEntry source=new LibraryEntry(sourceDir,"source",android.provider.DocumentsContract.Document.MIME_TYPE_DIR,"",true,0,0);
             Uri copied=new DocumentTransfer(context).transfer(source,target,false,DocumentTransfer.KEEP_BOTH);
             check(LibraryDirectoryReader.read(context.getContentResolver(),copied,copied,false).size()==2,"Copy folder includes non-comic files");
@@ -845,6 +968,33 @@ public final class ParityInstrumentation extends Instrumentation {
         try(FileOutputStream output=new FileOutputStream(new File(getTargetContext().getExternalFilesDir(null),"reader-"+screenshots+"-"+name+".png"))) {
             bitmap.compress(Bitmap.CompressFormat.PNG,100,output);
         } finally {bitmap.recycle();}
+    }
+    private void capturePageButtons(Activity activity,String name) throws Exception {
+        if(screenshots==null)return;
+        PageButtonDialog[] draft=new PageButtonDialog[1];
+        runOnMainSync(() -> {draft[0]=new PageButtonDialog(activity,() -> {});draft[0].show();});
+        capture(name+"-layout");
+        android.view.View content=(android.view.View)field(draft[0],"content");
+        android.widget.ScrollView scroll=(android.widget.ScrollView)content.getParent();
+        runOnMainSync(() -> scroll.scrollTo(0,content.findViewById(R.id.pop_pagebtn_layout_btn).getTop()));
+        capture(name+"-preview");
+        runOnMainSync(() -> ((android.widget.RadioGroup)content.findViewById(R.id.pop_pagebtn_rdgp_position1)).check(R.id.pop_pagebtn_rdo_position_horizontal_both));
+        capture(name+"-both-horizontal");
+        runOnMainSync(() -> {
+            ((android.widget.RadioGroup)content.findViewById(R.id.pop_pagebtn_rdgp_type)).check(R.id.pop_pagebtn_rdo_type1);
+            ((android.widget.RadioGroup)content.findViewById(R.id.pop_pagebtn_rdgp_position2)).check(R.id.pop_pagebtn_rdo_position_vertical_both);
+        });
+        capture(name+"-both-vertical");
+
+        runOnMainSync(() -> {
+            ((android.widget.SeekBar)content.findViewById(R.id.pop_pagebtn_alpha_seek)).setProgress(0);
+            ((android.widget.CheckBox)content.findViewById(R.id.pop_pagebtn_plpl_chk)).setChecked(true);
+        });
+        capture(name+"-transparent");
+        runOnMainSync(() -> scroll.fullScroll(android.view.View.FOCUS_DOWN));
+        capture(name+"-actions");
+        sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+        waitForIdleSync();
     }
     private boolean clickText(String text) {
         android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();

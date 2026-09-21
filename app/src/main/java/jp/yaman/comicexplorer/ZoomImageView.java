@@ -33,7 +33,6 @@ public final class ZoomImageView extends ImageView {
     private int activePointer;
     private final int touchSlop;
     private boolean verticalPaging;
-    private boolean inverted;
     private int filterMode;
     private int fitMode = AppState.FIT_SCREEN;
     private InteractionListener listener;
@@ -110,11 +109,6 @@ public final class ZoomImageView extends ImageView {
     public void setVerticalPaging(boolean enabled) { verticalPaging = enabled; }
     public void setFilterMode(int mode) { filterMode = mode; applyColorFilter(); }
 
-    public void setInverted(boolean inverted) {
-        this.inverted = inverted;
-        applyColorFilter();
-    }
-
     private void applyColorFilter() {
         ColorMatrix matrix = new ColorMatrix();
         if (filterMode == AppState.FILTER_GRAYSCALE) {
@@ -141,15 +135,7 @@ public final class ZoomImageView extends ImageView {
                     0, 0, 0, 1, 0
             });
         }
-        if (inverted) {
-            matrix.postConcat(new ColorMatrix(new float[]{
-                    -1, 0, 0, 0, 255,
-                    0, -1, 0, 0, 255,
-                    0, 0, -1, 0, 255,
-                    0, 0, 0, 1, 0
-            }));
-        }
-        if (filterMode == AppState.FILTER_NONE && !inverted) clearColorFilter();
+        if (filterMode == AppState.FILTER_NONE) clearColorFilter();
         else setColorFilter(new ColorMatrixColorFilter(matrix));
     }
 

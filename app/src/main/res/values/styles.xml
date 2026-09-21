@@ -29,35 +29,73 @@
         <item name="android:windowBackground">?android:attr/colorBackground</item>
     </style>
     <style name="AppThemeRed" parent="AppTheme">
-        <item name="android:colorAccent">#FFB4AB</item>
-        <item name="android:colorPrimary">#46292B</item>
+        <item name="android:colorAccent">#FFB4C5</item>
+        <item name="android:colorPrimary">#552538</item>
+        <item name="android:colorBackground">#2B101C</item>
+        <item name="android:colorBackgroundFloating">#3B1928</item>
+        <item name="android:colorButtonNormal">#4A2233</item>
+        <item name="android:colorForeground">#FFE9F0</item>
+        <item name="android:textColorSecondary">#D8AFBD</item>
+        <item name="android:colorControlNormal">#BD859B</item>
     </style>
     <style name="AppThemeBlue" parent="AppTheme">
-        <item name="android:colorAccent">#A5C8FF</item>
-        <item name="android:colorPrimary">#25364D</item>
+        <item name="android:colorAccent">#9DCCFF</item>
+        <item name="android:colorPrimary">#173B63</item>
+        <item name="android:colorBackground">#071A30</item>
+        <item name="android:colorBackgroundFloating">#102B49</item>
+        <item name="android:colorButtonNormal">#1B3B60</item>
+        <item name="android:colorForeground">#EAF4FF</item>
+        <item name="android:textColorSecondary">#AFC5DE</item>
+        <item name="android:colorControlNormal">#7D9FBE</item>
     </style>
     <style name="AppThemeGreen" parent="AppTheme">
-        <item name="android:colorAccent">#A7DDB2</item>
-        <item name="android:colorPrimary">#283E30</item>
+        <item name="android:colorAccent">#A5DEA8</item>
+        <item name="android:colorPrimary">#244C36</item>
+        <item name="android:colorBackground">#0B2417</item>
+        <item name="android:colorBackgroundFloating">#153522</item>
+        <item name="android:colorButtonNormal">#214831</item>
+        <item name="android:colorForeground">#E8F6E9</item>
+        <item name="android:textColorSecondary">#ADCEB7</item>
+        <item name="android:colorControlNormal">#78A889</item>
     </style>
     <style name="AppThemePurple" parent="AppTheme">
         <item name="android:colorAccent">#D4BBFF</item>
-        <item name="android:colorPrimary">#3B304F</item>
+        <item name="android:colorPrimary">#4B326A</item>
+        <item name="android:colorBackground">#211337</item>
+        <item name="android:colorBackgroundFloating">#302047</item>
+        <item name="android:colorButtonNormal">#43305C</item>
+        <item name="android:colorForeground">#F5EEFF</item>
+        <item name="android:textColorSecondary">#C9B6DD</item>
+        <item name="android:colorControlNormal">#A189BE</item>
     </style>
-    <style name="AppThemePink" parent="AppTheme">
-        <item name="android:colorAccent">#FFAFD2</item>
-        <item name="android:colorPrimary">#482D3C</item>
+    <style name="AppThemePink" parent="AppThemeLight">
+        <item name="android:colorAccent">#9D365B</item>
+        <item name="android:colorPrimary">#F0D1DD</item>
+        <item name="android:colorBackground">#FFF0F4</item>
+        <item name="android:colorBackgroundFloating">#FFF8FA</item>
+        <item name="android:colorButtonNormal">#F1D8E1</item>
+        <item name="android:colorForeground">#40202D</item>
+        <item name="android:textColorSecondary">#765363</item>
+        <item name="android:colorControlNormal">#9D6C7E</item>
     </style>
-    <style name="AppThemeOrange" parent="AppTheme">
-        <item name="android:colorAccent">#FFBF85</item>
-        <item name="android:colorPrimary">#473426</item>
+    <style name="AppThemeOrange" parent="AppThemeLight">
+        <item name="android:colorAccent">#805022</item>
+        <item name="android:colorPrimary">#E3CBA4</item>
+        <item name="android:colorBackground">#F2E6D0</item>
+        <item name="android:colorBackgroundFloating">#FFF5E3</item>
+        <item name="android:colorButtonNormal">#E8D5B6</item>
+        <item name="android:colorForeground">#392B1E</item>
+        <item name="android:textColorSecondary">#71573C</item>
+        <item name="android:colorControlNormal">#92704B</item>
     </style>
     <style name="AppThemeGray" parent="AppTheme">
-        <item name="android:colorAccent">#D6D6D6</item>
-        <item name="android:colorPrimary">#393939</item>
-        <item name="android:colorBackground">#303030</item>
-        <item name="android:colorBackgroundFloating">#3A3A3A</item>
-        <item name="android:colorButtonNormal">#484848</item>
-        <item name="android:colorControlNormal">#AAAAAA</item>
+        <item name="android:colorAccent">#C4D8E8</item>
+        <item name="android:colorPrimary">#3E5060</item>
+        <item name="android:colorBackground">#263441</item>
+        <item name="android:colorBackgroundFloating">#314251</item>
+        <item name="android:colorButtonNormal">#3B5061</item>
+        <item name="android:colorForeground">#F0F5F8</item>
+        <item name="android:textColorSecondary">#C0CED8</item>
+        <item name="android:colorControlNormal">#8DA6B9</item>
     </style>
 </resources>
