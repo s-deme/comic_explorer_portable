@@ -103,7 +103,7 @@ final class PageSource implements AutoCloseable {
     static boolean supportsSevenZipZipMethod(int method) {
         return method==ZipMethod.STORED.getCode() || method==ZipMethod.UNSHRINKING.getCode() || method==ZipMethod.IMPLODING.getCode()
                 || method==ZipMethod.DEFLATED.getCode() || method==ZipMethod.ENHANCED_DEFLATED.getCode() || method==ZipMethod.BZIP2.getCode()
-                || method==ZipMethod.XZ.getCode() || method==98 || method==99;
+                || method==ZipMethod.XZ.getCode() || method==ZipMethod.LZMA.getCode() || method==98 || method==99;
     }
     static final class UnsupportedZipMethod extends IOException {
         UnsupportedZipMethod(int method) { super(I18n.t(R.string.ui_zip_compression_method_not_supported)+" ("+method+")"); }

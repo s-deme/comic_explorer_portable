@@ -574,7 +574,7 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             if(destroyed || pageSource==null)return;
             android.graphics.drawable.Drawable drawable=readerDrawable(target,bitmap);
             if(drawable instanceof AnimatedPageDrawable)runOnUiThread(() -> {
-                if(!destroyed && token==loadToken && generation==renderGeneration){imageView.setImageDrawable(drawable);imageView.fitImage();}
+                if(!destroyed && token==loadToken && generation==renderGeneration){imageView.setImageDrawable(drawable);imageView.fitImage();((AnimatedPageDrawable)drawable).start();}
             });
         });
     }

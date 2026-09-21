@@ -25,6 +25,7 @@ def missingReleaseSigning = releaseSigning.findAll { entry ->
     entry.value == null || entry.value.trim().isEmpty()
 }.keySet()
 def validationApplicationIdSuffix = providers.gradleProperty('comicExplorerValidationSuffix').orElse('.validation')
+def validationBuild = providers.gradleProperty('comicExplorerValidation').orNull == 'true'
 
 android {
     namespace 'jp.yaman.comicexplorer'
@@ -37,6 +38,7 @@ android {
         minSdk 29
         targetSdk 35
         testInstrumentationRunner 'jp.yaman.comicexplorer.ParityInstrumentation'
+        manifestPlaceholders.parityDocumentsEnabled = validationBuild.toString()
         versionCode providers.gradleProperty('comicExplorerVersionCode').get().toInteger()
         versionName providers.gradleProperty('comicExplorerVersionName').get()
     }
@@ -54,11 +56,11 @@ android {
 
     buildTypes {
         debug {
-            if (providers.gradleProperty('comicExplorerValidation').orNull == 'true') applicationIdSuffix validationApplicationIdSuffix.get()
+            if (validationBuild) applicationIdSuffix validationApplicationIdSuffix.get()
         }
         release {
             signingConfig signingConfigs.release
-            if (providers.gradleProperty('comicExplorerValidation').orNull == 'true') applicationIdSuffix validationApplicationIdSuffix.get()
+            if (validationBuild) applicationIdSuffix validationApplicationIdSuffix.get()
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

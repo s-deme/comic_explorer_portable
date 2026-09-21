@@ -806,8 +806,7 @@ public final class ParityInstrumentation extends Instrumentation {
         AppState.prefs(context).edit().putString("crop."+AppState.key(newBook),savedCrop).apply();
         check(AppState.crop(context,newBook).equals(crop),"Read valid legacy crop without the retired editor");
         String unique="run-"+System.nanoTime();
-        getUiAutomation().adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");
-        String providerAuthority=getContext().getPackageName()+".parity.documents";
+        String providerAuthority=context.getPackageName()+".parity.documents";
         Uri tree=android.provider.DocumentsContract.buildTreeDocumentUri(providerAuthority,"root");
         Uri root=android.provider.DocumentsContract.buildDocumentUriUsingTree(tree,"root");
         Uri run=android.provider.DocumentsContract.createDocument(context.getContentResolver(),root,android.provider.DocumentsContract.Document.MIME_TYPE_DIR,unique);
@@ -842,7 +841,7 @@ public final class ParityInstrumentation extends Instrumentation {
             try(java.io.InputStream in=context.getContentResolver().openInputStream(fail)){check(failed && in.read()==137,"Failed move retains source bytes");}
             boolean partial=false;for(LibraryEntry child:LibraryDirectoryReader.read(context.getContentResolver(),target,target,false))if(child.name.equals("fail.png"))partial=true;
             check(!partial,"Failed transfer removes partial destination");
-        } finally {android.provider.DocumentsContract.deleteDocument(context.getContentResolver(),run); getUiAutomation().dropShellPermissionIdentity();}
+        } finally {android.provider.DocumentsContract.deleteDocument(context.getContentResolver(),run);}
     }
     private void checkAdvancedFormats(Context context,File fixtures) throws Exception {
         org.apache.commons.compress.archivers.zip.ZipArchiveEntry deflated=new org.apache.commons.compress.archivers.zip.ZipArchiveEntry("page.png");deflated.setMethod(8);

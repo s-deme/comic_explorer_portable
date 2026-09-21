@@ -9,7 +9,7 @@ import android.provider.DocumentsProvider;
 import java.io.*;
 import java.util.*;
 
-/** Exposes only disposable fixtures in the test APK's cache. Not packaged in the application. */
+/** Exposes disposable fixtures only while the isolated validation build enables it. */
 public class TransferTestProvider extends DocumentsProvider {
     public static final class Second extends TransferTestProvider { }
     private static final String[] COLUMNS = {"document_id","_display_name","mime_type","flags","_size","last_modified"};

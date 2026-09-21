@@ -13,6 +13,14 @@
             android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
             <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
         </provider>
+        <provider android:name=".TransferTestProvider" android:authorities="${applicationId}.parity.documents"
+            android:enabled="${parityDocumentsEnabled}" android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
+        </provider>
+        <provider android:name=".TransferTestProvider$Second" android:authorities="${applicationId}.parity.documents2"
+            android:enabled="${parityDocumentsEnabled}" android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
+        </provider>
         <activity
             android:name=".ViewerActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
