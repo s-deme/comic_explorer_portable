@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation project(':sevenzip')
+    implementation 'org.aomedia.avif.android:avif:1.3.0.841110fd'
     implementation('com.tom-roush:pdfbox-android:2.0.27.0') { exclude group: 'org.bouncycastle' }
     implementation 'org.bouncycastle:bcpkix-jdk18on:1.86'
     implementation 'org.bouncycastle:bcprov-jdk18on:1.86'

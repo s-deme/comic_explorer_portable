@@ -21,10 +21,12 @@ public final class ParityInstrumentation extends Instrumentation {
     private int checks;
     private String suite;
     private String screenshots;
+    private String sourceArchive;
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
         suite=arguments==null ? "all" : arguments.getString("suite","all");
         screenshots=arguments==null ? null : arguments.getString("screenshots");
+        sourceArchive=arguments==null ? null : arguments.getString("sourceArchive");
         start();
     }
     @Override public void onStart() {
@@ -32,11 +34,11 @@ public final class ParityInstrumentation extends Instrumentation {
         try {
             Context context=getTargetContext();
             if (!context.getPackageName().endsWith(".validation")) throw new AssertionError("Refusing to modify non-validation app");
-            if (!java.util.Arrays.asList("all","data","network","formats","engine","reader","themes").contains(suite))
-                throw new IllegalArgumentException("Unknown suite: "+suite+" (all, data, network, formats, reader, themes)");
+            if (!java.util.Arrays.asList("all","data","network","formats","engine","reader","themes","avif","images").contains(suite))
+                throw new IllegalArgumentException("Unknown suite: "+suite+" (all, data, network, formats, engine, reader, themes, avif, images)");
             File fixtures=new File(context.getFilesDir(),"parity-fixtures");
             if (!fixtures.isDirectory() && !fixtures.mkdirs()) throw new java.io.IOException("Fixture directory");
-            for(String group:new String[]{"data","network","formats","engine","reader","themes"}) {
+            for(String group:new String[]{"data","network","formats","engine","reader","themes","avif","images"}) {
                 if (!suite.equals("all") && !suite.equals(group)) continue;
                 AppState.prefs(context).edit().clear().commit();
                 AppState.put(context,"language","ja"); I18n.configure(context);
@@ -48,6 +50,8 @@ public final class ParityInstrumentation extends Instrumentation {
                     case "formats": case "engine": checkFormats(context,fixtures); break;
                     case "reader": checkReader(context,fixtures); break;
                     case "themes": checkThemes(context); break;
+                    case "avif": checkAvif(context,fixtures); break;
+                    case "images": checkImages(context,fixtures); break;
                 }
                 result.putInt(group,checks-before);
             }
@@ -55,6 +59,100 @@ public final class ParityInstrumentation extends Instrumentation {
         } catch(Throwable error) {
             result.putString("stream","FAIL ["+suite+"]: "+error+"\n"+android.util.Log.getStackTraceString(error));
             finish(Activity.RESULT_CANCELED,result);
+        }
+    }
+    private void checkImages(Context context,File fixtures) throws Exception {
+        ArrayList<String> failures=new ArrayList<>();
+        for(String name:getContext().getAssets().list("image-formats")) {
+            File image=new File(fixtures,name),zip=new File(fixtures,name+".zip");
+            try(java.io.InputStream in=getContext().getAssets().open("image-formats/"+name);FileOutputStream out=new FileOutputStream(image)){StreamCopy.copy(in,out,null);}
+            try(ZipOutputStream out=new ZipOutputStream(new FileOutputStream(zip));java.io.InputStream in=new java.io.FileInputStream(image)) {
+                out.putNextEntry(new ZipEntry("pages/"+name));StreamCopy.copy(in,out,null);out.closeEntry();
+            }
+            for(boolean archived:new boolean[]{false,true}) {
+                String label=name+(archived ? " ZIP" : " single");
+                Uri uri=Uri.fromFile(archived ? zip : image);ArrayList<Uri> images=new ArrayList<>();if(!archived)images.add(uri);
+                int budget=name.startsWith("odd.") ? 1600 : 2000;
+                try(PageSource source=new PageSource(context,uri,archived ? zip.getName() : name,images,java.nio.charset.StandardCharsets.UTF_8,budget)) {
+                    boolean portrait=name.matches("orientation-[5-8].*");
+                    check(source.pageCount()==1 && source.isLandscape(0)!=portrait,label+" orientation");
+                    Bitmap page=source.decode(0,100);
+                    try {
+                        check(page!=null,label+" non-null pixels");
+                        check((long)page.getWidth()*page.getHeight()<=budget,label+" pixel budget");
+                        if(!name.startsWith("odd."))check(page.getWidth()==(portrait ? 32 : 48) && page.getHeight()==(portrait ? 48 : 32),label+" sampled dimensions "+page.getWidth()+"x"+page.getHeight());
+                        if(name.startsWith("alpha"))check(Math.abs(android.graphics.Color.alpha(page.getPixel(8,8))-128)<=1,label+" transparency");
+                        else if(!name.startsWith("gray") && !name.startsWith("mono")) {
+                            boolean reversed=name.matches("orientation-[2378].*");
+                            int first=page.getPixel(8,8),last=page.getPixel(page.getWidth()-9,page.getHeight()-9);
+                            check((reversed ? android.graphics.Color.blue(first) : android.graphics.Color.red(first))>220
+                                    && (reversed ? android.graphics.Color.red(last) : android.graphics.Color.blue(last))>220,label+" colors / EXIF transform");
+                        }
+                    } finally {if(page!=null)page.recycle();}
+                } catch(Exception | AssertionError error) {failures.add(label+": "+error);}
+            }
+        }
+        for(String name:new String[]{"rgb.png","baseline.jpg","rgb.bmp"}) {
+            File broken=new File(fixtures,"broken-"+name);
+            try(java.io.InputStream in=getContext().getAssets().open("image-formats/"+name);FileOutputStream out=new FileOutputStream(broken)) {
+                byte[] header=new byte[16];int length=in.read(header);out.write(header,0,length);
+            }
+            ArrayList<Uri> images=new ArrayList<>();images.add(Uri.fromFile(broken));
+            try(PageSource source=new PageSource(context,images.get(0),broken.getName(),images,java.nio.charset.StandardCharsets.UTF_8,2000)) {
+                boolean rejected=false;
+                try {Bitmap page=source.decode(0,100);if(page!=null)page.recycle();}catch(java.io.IOException expected){rejected=true;}
+                check(rejected,"Incomplete "+name+" header reports an error instead of returning null");
+            }
+        }
+        Activity activity=startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try(LibraryThumbnails thumbnails=new LibraryThumbnails(activity)) {
+            for(String name:getContext().getAssets().list("image-formats")) {
+                File image=new File(fixtures,name);boolean portrait=name.matches("orientation-[5-8].*");
+                LibraryEntry entry=new LibraryEntry(Uri.fromFile(image),name,"image/"+ComicFile.extension(name),"画像",false,image.length(),image.lastModified());
+                Bitmap thumb=thumbnails.load(entry,"format-test:"+name+":"+System.nanoTime());
+                try {check(thumb!=null && (thumb.getWidth()<thumb.getHeight())==portrait,name+" thumbnail without provider thumbnail support");}
+                finally {if(thumb!=null)thumb.recycle();}
+            }
+        } finally {runOnMainSync(activity::finish);}
+        check(failures.isEmpty(),"Image format failures: "+failures);
+    }
+    private void checkAvif(Context context,File fixtures) throws Exception {
+        if(sourceArchive!=null) {
+            File original=new File(sourceArchive);
+            try(PageSource source=new PageSource(context,Uri.fromFile(original),original.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2_000_000)) {
+                for(int i=0;i<source.pageCount();i++) {
+                    Bitmap page=source.decode(i,1080);
+                    try {check(page!=null && page.getWidth()>0 && page.getHeight()>0,"Original archive page "+i);}
+                    finally {if(page!=null)page.recycle();}
+                }
+            }
+        }
+        File image=new File(fixtures,"landscape.avif"),zip=new File(fixtures,"avif.zip");
+        try(java.io.InputStream input=getContext().getAssets().open("landscape.avif");FileOutputStream out=new FileOutputStream(image)) {
+            StreamCopy.copy(input,out,null);
+        }
+        try(ZipOutputStream out=new ZipOutputStream(new FileOutputStream(zip));java.io.InputStream input=new java.io.FileInputStream(image)) {
+            out.putNextEntry(new ZipEntry("01/page.avif"));StreamCopy.copy(input,out,null);out.closeEntry();
+        }
+        for(boolean archived:new boolean[]{false,true}) {
+            Uri uri=Uri.fromFile(archived ? zip : image);
+            ArrayList<Uri> images=new ArrayList<>();if(!archived)images.add(uri);
+            try(PageSource source=new PageSource(context,uri,archived ? "avif.zip" : "landscape.avif",images,java.nio.charset.StandardCharsets.UTF_8,2000)) {
+                check(source.pageCount()==1 && source.isLandscape(0),"AVIF dimensions, archive="+archived);
+                Bitmap page=source.decode(0,100);
+                try {
+                    check(page!=null && page.getWidth()==48 && page.getHeight()==32,"AVIF respects pixel budget");
+                    check(android.graphics.Color.red(page.getPixel(8,8))>220 && android.graphics.Color.blue(page.getPixel(40,8))>220,"AVIF decodes page pixels");
+                } finally {if(page!=null)page.recycle();}
+            }
+        }
+        File invalid=new File(fixtures,"invalid.avif");
+        try(FileOutputStream out=new FileOutputStream(invalid)){out.write(new byte[]{0,1,2,3});}
+        ArrayList<Uri> invalidImages=new ArrayList<>();invalidImages.add(Uri.fromFile(invalid));
+        try(PageSource source=new PageSource(context,Uri.fromFile(invalid),invalid.getName(),invalidImages,java.nio.charset.StandardCharsets.UTF_8,2000)) {
+            boolean rejected=false;
+            try {source.decode(0,100);}catch(java.io.IOException expected){rejected=true;}
+            check(rejected,"Malformed AVIF reports a readable error");
         }
     }
     private void checkData(Context context) throws Exception {

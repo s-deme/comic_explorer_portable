@@ -3,7 +3,6 @@ package jp.yaman.comicexplorer;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.util.Size;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -39,7 +38,7 @@ final class LibraryThumbnails implements AutoCloseable {
         formatMark.setVisibility(View.VISIBLE);
         File cover = AppState.coverFile(activity, item.uri);
         boolean custom = cover.isFile();
-        String key = custom ? "cover:" + item.uri : item.uri + "#" + item.modified + ":" + item.size;
+        String key = custom ? "cover:" + item.uri : "image-v2:" + item.uri + "#" + item.modified + ":" + item.size;
         view.setImageResource(custom ? R.drawable.ic_archive : R.drawable.ic_image_file);
         Bitmap cached = cache.get(key);
         if (cached != null) { display(view, cached); return; }
@@ -59,12 +58,11 @@ final class LibraryThumbnails implements AutoCloseable {
         });
     }
 
-    private Bitmap load(LibraryEntry item, String key) throws Exception {
+    Bitmap load(LibraryEntry item, String key) throws Exception {
         Bitmap bitmap = BookCache.thumbnail(activity, key);
         if (bitmap != null) return bitmap;
-        if (ComicFile.isImage(item.name, item.mime))
-            bitmap = activity.getContentResolver().loadThumbnail(item.uri, new Size(Ui.dp(activity, 112), Ui.dp(activity, 144)), null);
-        else try (PageSource source = new PageSource(activity, item.uri, item.name, null,
+        try (PageSource source = new PageSource(activity, item.uri, item.name,
+                ComicFile.isImage(item.name, item.mime) ? new java.util.ArrayList<>(java.util.Collections.singletonList(item.uri)) : null,
                 java.nio.charset.Charset.forName(ReaderOptions.ENCODINGS[Math.max(0, Math.min(ReaderOptions.ENCODINGS.length - 1, AppState.archiveEncoding(activity)))]), 240 * 480)) {
             bitmap = source.decode(0, 240);
         }

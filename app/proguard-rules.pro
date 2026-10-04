@@ -1,3 +1,6 @@
+# libavif JNI looks up Info and its fields by their original names.
+-keep class org.aomedia.avif.android.AvifDecoder$Info { *; }
+
 # 7-Zip-JBinding has no consumer rules. Its JNI bridge reads fields and invokes
 # stream/callback methods by name; keep those names without retaining classes.
 -keepclassmembers class net.sf.sevenzipjbinding.** {

@@ -15,6 +15,7 @@ import java.util.Collections;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.commons.compress.archivers.zip.ZipMethod;
+import org.aomedia.avif.android.AvifDecoder;
 
 /** Owns file handles and raw decoding. Open, decode and close on the reader's single worker. */
 final class PageSource implements AutoCloseable {
@@ -126,7 +127,12 @@ final class PageSource implements AutoCloseable {
             try (InputStream input = openImage(uri, uri == null ? archiveEntries.get(index) : null)) {
                 BitmapFactory.decodeStream(input, null, bounds);
             }
-            return bounds.outWidth > bounds.outHeight && bounds.outHeight > 0;
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                AvifDecoder.Info info = avifInfo(readAvif(uri, uri == null ? archiveEntries.get(index) : null));
+                return info.width > info.height;
+            }
+            int orientation = imageOrientation(uri, uri == null ? archiveEntries.get(index) : null, bounds.outMimeType);
+            return orientation >= 5 && orientation <= 8 ? bounds.outHeight > bounds.outWidth : bounds.outWidth > bounds.outHeight;
         } finally { if (temporary != null) temporary.delete(); }
     }
     private java.io.File readPdf(java.io.File file,String password) throws IOException {
@@ -235,11 +241,65 @@ final class PageSource implements AutoCloseable {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         try (InputStream input = openImage(uri, target)) { BitmapFactory.decodeStream(input, null, bounds); }
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0)
-            throw new IOException(I18n.t(uri == null ? R.string.ui_invalid_image_in_archive : R.string.ui_the_image_is_invalid_or_unsupported));
-        try (InputStream input = openImage(uri, target)) {
-            return BitmapFactory.decodeStream(input, null, decodeOptions(bounds.outWidth, bounds.outHeight));
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0 || "image/avif".equals(bounds.outMimeType)) {
+            java.nio.ByteBuffer encoded = readAvif(uri, target);
+            AvifDecoder.Info info = avifInfo(encoded);
+            int sample = bitmapSampleSize(info.width, info.height, maxBitmapPixels);
+            Bitmap bitmap = Bitmap.createBitmap(Math.max(1, info.width / sample), Math.max(1, info.height / sample), Bitmap.Config.ARGB_8888);
+            boolean decoded = false;
+            try {
+                decoded = AvifDecoder.decode(encoded, encoded.remaining(), bitmap, 2);
+                if (!decoded) throw new IOException(I18n.t(R.string.ui_the_image_is_invalid_or_unsupported));
+                return bitmap;
+            } finally { if (!decoded) bitmap.recycle(); }
         }
+        int orientation = imageOrientation(uri, target, bounds.outMimeType);
+        Bitmap bitmap;
+        try (InputStream input = openImage(uri, target)) {
+            bitmap = BitmapFactory.decodeStream(input, null, decodeOptions(bounds.outWidth, bounds.outHeight));
+        }
+        if (bitmap == null) throw new IOException(I18n.t(R.string.ui_the_image_is_invalid_or_unsupported));
+        android.graphics.Matrix transform = new android.graphics.Matrix();
+        switch (orientation) {
+            case 2: transform.setScale(-1, 1); break;
+            case 3: transform.setRotate(180); break;
+            case 4: transform.setScale(1, -1); break;
+            case 5: transform.setRotate(90); transform.postScale(-1, 1); break;
+            case 6: transform.setRotate(90); break;
+            case 7: transform.setRotate(90); transform.postScale(1, -1); break;
+            case 8: transform.setRotate(270); break;
+            default: return bitmap;
+        }
+        try { return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), transform, false); }
+        finally { bitmap.recycle(); }
+    }
+
+    private int imageOrientation(Uri uri, String target, String mime) throws IOException {
+        if (!"image/jpeg".equals(mime) && !"image/png".equals(mime) && !"image/webp".equals(mime)) return 1;
+        try (InputStream input = openImage(uri, target)) {
+            return new android.media.ExifInterface(input).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1);
+        }
+    }
+
+    private java.nio.ByteBuffer readAvif(Uri uri, String target) throws IOException {
+        try (InputStream input = new BoundedInputStream(openImage(uri, target), MAX_ARCHIVE_ENTRY_BYTES);
+             java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream()) {
+            StreamCopy.copy(input, output, null);
+            java.nio.ByteBuffer encoded = java.nio.ByteBuffer.allocateDirect(output.size());
+            encoded.put(output.toByteArray()).flip();
+            return encoded;
+        }
+    }
+
+    private static AvifDecoder.Info avifInfo(java.nio.ByteBuffer encoded) throws IOException {
+        AvifDecoder.Info info = new AvifDecoder.Info();
+        if (!AvifDecoder.isAvifImage(encoded) || !AvifDecoder.getInfo(encoded, encoded.remaining(), info)
+                || info.width <= 0 || info.height <= 0)
+            throw new IOException(I18n.t(R.string.ui_the_image_is_invalid_or_unsupported));
+        // libavif decodes full-size YUV before resizing the output bitmap.
+        if ((long) info.width * info.height > 64L * 1024 * 1024)
+            throw new IOException("AVIF image exceeds the 64 megapixel decode limit");
+        return info;
     }
 
     private InputStream openImage(Uri uri, String target) throws IOException {
@@ -275,8 +335,8 @@ final class PageSource implements AutoCloseable {
 
     static int bitmapSampleSize(int width, int height, int maxPixels) {
         int sample = 1;
-        while ((long) Math.max(1, width / sample) * Math.max(1, height / sample) > maxPixels
-                || Math.max(width / sample, height / sample) > MAX_PAGE_DIMENSION) sample *= 2;
+        while (Math.max(1, (width + (long) sample - 1) / sample) * Math.max(1, (height + (long) sample - 1) / sample) > maxPixels
+                || (Math.max(width, height) + (long) sample - 1) / sample > MAX_PAGE_DIMENSION) sample *= 2;
         return sample;
     }
 
