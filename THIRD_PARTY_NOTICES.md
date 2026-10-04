@@ -1,12 +1,12 @@
 # Additional libraries
 
-- 7-Zip-JBinding-4Android Release-16.02-2.03: https://github.com/omicronapps/7-Zip-JBinding-4Android/tree/Release-16.02-2.03
-  - Copyright Igor Pavlov, Boris Brodski, Fredrik Claesson and contributors. LGPL 2.1 or later; the RAR decoder additionally carries the unRAR restriction. Do not use the RAR decoding code to recreate the RAR compression algorithm or develop a RAR-compatible archiver.
-  - Unmodified library from JitPack. License texts are bundled as `sevenzip-LGPL.txt` and `sevenzip-LICENSE.txt` under APK `assets/licenses/`.
-  - Corresponding source, including native code and build scripts, accompanies the APK as `dist/sevenzip-source-16.02-2.03.zip`. It is also available at https://github.com/omicronapps/7-Zip-JBinding-4Android/archive/refs/tags/Release-16.02-2.03.zip . Build the Android library using its Gradle/CMake scripts and substitute the resulting AAR to relink this application; reverse engineering for debugging modifications to this LGPL library is permitted.
+- Official 7-Zip 26.03: https://github.com/ip7z/7zip/tree/0766b733fe3e06dd2a7f9a3cfbf2108ac73abd17
+  - The vendored engine is built from unmodified official source in the local `sevenzip` Android library. JNI/Java adapters derive from 7-Zip-JBinding-4Android commit 875f38aac441f41e6eb693177e020e97971dca97 and are adapted locally.
+  - LGPL 2.1 or later, BSD components, and the unRAR restriction apply. License texts are bundled under APK `assets/licenses/sevenzip26-*`. Do not use the RAR decoding code to recreate the RAR compression algorithm or develop a RAR-compatible archiver.
+  - Corresponding modified source and build scripts are in `sevenzip/` in this repository and accompany the candidate APK as `sevenzip-source-26.03.zip`. Build with NDK r28c using `./gradlew :sevenzip:assembleRelease` to relink. Reverse engineering for debugging modifications to this LGPL library is permitted.
 - PDFBox-Android 2.0.27.0: https://github.com/TomRoush/PdfBox-Android/tree/v2.0.27.0
   - Apache License 2.0. License and notice are bundled as `pdfbox-LICENSE.txt` and `pdfbox-NOTICE.txt`. Reads PDF outlines and opens password-protected PDFs; page rendering continues to use Android PdfRenderer.
-  - Uses the same Bouncy Castle 1.75 family as SMBJ to avoid duplicate cryptography classes.
+  - Uses the same Bouncy Castle 1.86 family as SMBJ to avoid duplicate cryptography classes.
 
 - AndroidX DrawerLayout 1.2.0: https://developer.android.com/jetpack/androidx/releases/drawerlayout
   - Copyright The Android Open Source Project. Apache License 2.0. Provides native edge dragging and drawer navigation.

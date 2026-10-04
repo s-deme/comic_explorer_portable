@@ -11,3 +11,5 @@ dist/
 *.keystore.base64
 release-signing.properties
 local.properties
+
+.cxx/

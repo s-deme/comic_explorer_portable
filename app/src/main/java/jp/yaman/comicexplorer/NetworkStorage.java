@@ -66,8 +66,8 @@ public final class NetworkStorage {
     private static void edit(Activity activity, String existingId) {
         JSONObject hosts = hosts(activity), old = existingId == null ? new JSONObject() : hosts.optJSONObject(existingId);
         LinearLayout form = new LinearLayout(activity); form.setOrientation(LinearLayout.VERTICAL); form.setPadding(Ui.dp(activity, 16), 0, Ui.dp(activity, 16), 0);
-        Spinner protocol = new Spinner(activity); protocol.setAdapter(new ArrayAdapter<>(activity, android.R.layout.simple_spinner_dropdown_item, new String[]{"SMB", "FTP", "FTPS"}));
-        protocol.setSelection(old.optInt("protocol", 0)); form.addView(protocol);
+        Spinner protocol = new Spinner(activity); protocol.setAdapter(new ArrayAdapter<>(activity, android.R.layout.simple_spinner_dropdown_item, new String[]{"SMB", "FTPS"}));
+        protocol.setSelection(old.optInt("protocol", 0) == 0 ? 0 : 1); form.addView(protocol);
         String[] keys = {"name", "host", "port", "share", "path", "user", "password", "domain"};
         String[] labels = {I18n.t(R.string.ui_name), I18n.t(R.string.ui_host_name), I18n.t(R.string.ui_port_blank_for_default), I18n.t(R.string.ui_share_name_smb), I18n.t(R.string.ui_path), I18n.t(R.string.ui_userid), I18n.t(R.string.ui_passwd), I18n.t(R.string.ui_domain_smb)};
         EditText[] fields = new EditText[keys.length];
@@ -82,7 +82,7 @@ public final class NetworkStorage {
                 if (host.isEmpty() || host.contains("/") || host.contains("@") || host.contains("\n")) throw new IllegalArgumentException(I18n.t(R.string.ui_enter_a_host_name));
                 if (protocol.getSelectedItemPosition() == 0 && fields[3].getText().toString().trim().isEmpty()) throw new IllegalArgumentException(I18n.t(R.string.ui_enter_a_share_name));
                 String port = fields[2].getText().toString().trim(); if (!port.isEmpty() && (Integer.parseInt(port)<1 || Integer.parseInt(port)>65535)) throw new IllegalArgumentException(I18n.t(R.string.ui_port_must_be_between_1_and_65535));
-                JSONObject record = new JSONObject(); record.put("protocol", protocol.getSelectedItemPosition()); record.put("passive", passive.isChecked());
+                JSONObject record = new JSONObject(); record.put("protocol", protocol.getSelectedItemPosition() == 0 ? 0 : 2); record.put("passive", passive.isChecked());
                 for (int i=0; i<keys.length; i++) {
                     String value = fields[i].getText().toString();
                     if (keys[i].equals("password")) value = value.isEmpty() ? old.optString("password") : encrypt(value);
@@ -127,7 +127,9 @@ public final class NetworkStorage {
         final String base;
         Remote(JSONObject host) throws Exception {
             base = host.optString("path").replace('\\','/').replaceAll("^/+|/+$", ""); validatePath(base);
-            int protocol = host.optInt("protocol"); String rawPort=host.optString("port"); int port=rawPort.isEmpty() ? protocol==0 ? 445 : 21 : Integer.parseInt(rawPort);
+            int protocol = host.optInt("protocol");
+            if (protocol != 0 && protocol != 2) throw new IOException(I18n.t(R.string.ui_plain_ftp_disabled));
+            String rawPort=host.optString("port"); int port=rawPort.isEmpty() ? protocol==0 ? 445 : 21 : Integer.parseInt(rawPort);
             String user=host.optString("user"), password=decrypt(host.optString("password"));
             try {
                 if (protocol == 0) {
@@ -136,7 +138,7 @@ public final class NetworkStorage {
                     session = connection.authenticate(user.isEmpty() ? AuthenticationContext.anonymous() : new AuthenticationContext(user, password.toCharArray(), host.optString("domain")));
                     share = (DiskShare) session.connectShare(host.getString("share"));
                 } else {
-                    ftp = protocol == 2 ? new org.apache.commons.net.ftp.FTPSClient() : new FTPClient();
+                    ftp = new org.apache.commons.net.ftp.FTPSClient();
                     if (ftp instanceof org.apache.commons.net.ftp.FTPSClient) {
                         org.apache.commons.net.ftp.FTPSClient secure = (org.apache.commons.net.ftp.FTPSClient)ftp;
                         secure.setTrustManager(null); // Use platform CA validation, not the library's validity-only manager.

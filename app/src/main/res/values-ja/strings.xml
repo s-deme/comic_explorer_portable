@@ -1,0 +1,3 @@
+<resources>
+    <string name="ui_plain_ftp_disabled">平文FTPは利用できません。接続を編集してFTPSを選択してください。</string>
+</resources>

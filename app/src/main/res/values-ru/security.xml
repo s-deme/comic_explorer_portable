@@ -1,0 +1,3 @@
+<resources>
+    <string name="ui_plain_ftp_disabled">Незашифрованный FTP отключён. Измените подключение и выберите FTPS.</string>
+</resources>

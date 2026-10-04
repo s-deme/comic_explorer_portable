@@ -32,11 +32,11 @@ public final class ParityInstrumentation extends Instrumentation {
         try {
             Context context=getTargetContext();
             if (!context.getPackageName().endsWith(".validation")) throw new AssertionError("Refusing to modify non-validation app");
-            if (!java.util.Arrays.asList("all","data","network","formats","reader","themes").contains(suite))
+            if (!java.util.Arrays.asList("all","data","network","formats","engine","reader","themes").contains(suite))
                 throw new IllegalArgumentException("Unknown suite: "+suite+" (all, data, network, formats, reader, themes)");
             File fixtures=new File(context.getFilesDir(),"parity-fixtures");
             if (!fixtures.isDirectory() && !fixtures.mkdirs()) throw new java.io.IOException("Fixture directory");
-            for(String group:new String[]{"data","network","formats","reader","themes"}) {
+            for(String group:new String[]{"data","network","formats","engine","reader","themes"}) {
                 if (!suite.equals("all") && !suite.equals(group)) continue;
                 AppState.prefs(context).edit().clear().commit();
                 AppState.put(context,"language","ja"); I18n.configure(context);
@@ -45,7 +45,7 @@ public final class ParityInstrumentation extends Instrumentation {
                 switch(group) {
                     case "data": checkData(context); checkTransfers(context); break;
                     case "network": checkNetwork(); checkFtp(fixtures); break;
-                    case "formats": checkFormats(context,fixtures); break;
+                    case "formats": case "engine": checkFormats(context,fixtures); break;
                     case "reader": checkReader(context,fixtures); break;
                     case "themes": checkThemes(context); break;
                 }
@@ -772,6 +772,12 @@ public final class ParityInstrumentation extends Instrumentation {
     }
     private void checkFormats(Context context, File fixtures) throws Exception {
         checkAdvancedFormats(context,fixtures);
+        File ppmdZip = new File(fixtures, "ppmd.zip");
+        try(java.io.InputStream in=getContext().getAssets().open("ppmd.zip"); FileOutputStream out=new FileOutputStream(ppmdZip)) { DocumentTransfer.copyAndHash(in,out,null); }
+        try(PageSource source=new PageSource(context,Uri.fromFile(ppmdZip),ppmdZip.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2000000)) {
+            Bitmap page=source.decode(0,100);
+            check(source.pageCount()==1 && source.pageName(0).equals("日本語/page2.png") && page.getPixel(0,0)==0xffff0000,"Native PPMd ZIP preserves Japanese names and image data"); page.recycle();
+        }
         File rar = new File(fixtures, "stored.cbr");
         try (java.io.InputStream in = getContext().getAssets().open("stored.rar"); FileOutputStream out = new FileOutputStream(rar)) { DocumentTransfer.copyAndHash(in, out, null); }
         try (PageSource source = new PageSource(context, Uri.fromFile(rar), rar.getName(), null, java.nio.charset.StandardCharsets.UTF_8, 2_000_000)) {
@@ -781,13 +787,13 @@ public final class ParityInstrumentation extends Instrumentation {
         File seven = new File(fixtures, "pages.7z"); Bitmap image = Bitmap.createBitmap(30, 40, Bitmap.Config.ARGB_8888); image.eraseColor(0xff2468ab);
         java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream(); image.compress(Bitmap.CompressFormat.PNG,100,png); image.recycle();
         try (org.apache.commons.compress.archivers.sevenz.SevenZOutputFile output = new org.apache.commons.compress.archivers.sevenz.SevenZOutputFile(seven)) {
-            for (String name : new String[]{"chapter/page10.png", "chapter/page2.png"}) {
+            for (String name : new String[]{"章/page10.png", "章/page2.png"}) {
                 org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry entry = new org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry(); entry.setName(name);
                 output.putArchiveEntry(entry); output.write(png.toByteArray()); output.closeArchiveEntry();
             }
         }
         try (PageSource source = new PageSource(context,Uri.fromFile(seven),seven.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2_000_000)) {
-            check(source.pageCount()==2 && source.pageName(0).equals("chapter/page2.png"),"7z page count and sorting");
+            check(source.pageCount()==2 && source.pageName(0).equals("章/page2.png"),"7z page count and sorting");
             image=source.decode(1,1080); check(image.getWidth()==30 && image.getPixel(0,0)==0xff2468ab,"7z LZMA2 image decoded"); image.recycle();
             image=source.decode(0,1080); check(image.getHeight()==40,"7z reverse navigation"); image.recycle();
         }
@@ -869,6 +875,7 @@ public final class ParityInstrumentation extends Instrumentation {
         try(PageSource source=new PageSource(context,Uri.fromFile(encrypted),encrypted.getName(),null,java.nio.charset.StandardCharsets.UTF_8,2000000,"parity",java.util.Collections.emptyMap())) {
             Bitmap page=source.decode(0,100);check(page.getPixel(0,0)==0xffff0000,"Decrypt 7z page");page.recycle();
         }
+        if(suite.equals("engine")) return;
         Uri gif=Uri.fromFile(new File(fixtures,"animated.gif"));ArrayList<Uri> images=new ArrayList<>();images.add(gif);
         try(PageSource source=new PageSource(context,gif,"animated.gif",images,java.nio.charset.StandardCharsets.UTF_8,2000000)) {
             Bitmap first=source.decode(0,100,0),second=source.decode(0,100,110);
@@ -911,50 +918,22 @@ public final class ParityInstrumentation extends Instrumentation {
     }
 
     private void checkFtp(File directory) throws Exception {
-        try(java.net.ServerSocket control=new java.net.ServerSocket(0,1,java.net.InetAddress.getByName("127.0.0.1"))) {
-            control.setSoTimeout(10000);
-            java.util.concurrent.atomic.AtomicReference<Throwable> failure=new java.util.concurrent.atomic.AtomicReference<>();
-            java.util.concurrent.atomic.AtomicReference<byte[]> uploaded=new java.util.concurrent.atomic.AtomicReference<>();
-            Thread server=new Thread(() -> {
-                java.net.ServerSocket data=null;
-                try(java.net.Socket socket=control.accept()) {
-                    socket.setSoTimeout(10000);
-                    java.io.BufferedReader input=new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream(),java.nio.charset.StandardCharsets.UTF_8));
-                    java.io.PrintWriter output=new java.io.PrintWriter(new java.io.OutputStreamWriter(socket.getOutputStream(),java.nio.charset.StandardCharsets.UTF_8),true);
-                    output.print("220 Test FTP\r\n");output.flush(); String line;
-                    while((line=input.readLine())!=null) {
-                        String command=line.split(" ",2)[0]; String reply="200 OK";
-                        if(command.equals("USER")) reply="331 Password required";
-                        else if(command.equals("PASS")) reply="230 Logged in";
-                        else if(command.equals("SYST")) reply="215 UNIX Type: L8";
-                        else if(command.equals("PASV")) {
-                            if(data!=null)data.close(); data=new java.net.ServerSocket(0,1,java.net.InetAddress.getByName("127.0.0.1"));data.setSoTimeout(10000);
-                            reply="227 Entering Passive Mode (127,0,0,1,"+(data.getLocalPort()/256)+","+(data.getLocalPort()%256)+")";
-                        } else if(command.equals("LIST") || command.equals("RETR")) {
-                            output.print("150 Opening data\r\n");output.flush();
-                            try(java.net.Socket transfer=data.accept()) {transfer.getOutputStream().write((command.equals("LIST")?"-rw-r--r-- 1 test test 7 Jan 01 2026 page.cbz\r\n":"fixture").getBytes(java.nio.charset.StandardCharsets.UTF_8));}
-                            data.close();data=null;reply="226 Complete";
-                        } else if(command.equals("STOR")) {
-                            output.print("150 Opening data\r\n"); output.flush();
-                            try(java.net.Socket transfer=data.accept();java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream()) {
-                                DocumentTransfer.copyAndHash(transfer.getInputStream(),bytes,null);uploaded.set(bytes.toByteArray());
-                            }
-                            data.close();data=null;reply="226 Complete";
-                        } else if(command.equals("QUIT")) {output.print("221 Bye\r\n");output.flush();break;}
-                        else if(command.equals("FEAT"))reply="500 Unsupported";
-                        output.print(reply+"\r\n");output.flush();
-                    }
-                } catch(Throwable e) {failure.set(e);} finally {if(data!=null)try{data.close();}catch(Exception ignored){}}
-            },"test-ftp");server.start();
-            JSONObject host=new JSONObject().put("protocol",1).put("host","127.0.0.1").put("port",control.getLocalPort()).put("passive",true);
-            try(NetworkStorage.Remote remote=new NetworkStorage.Remote(host)) {
-                java.util.ArrayList<NetworkStorage.Entry> files=remote.list("");
-                check(files.size()==1 && files.get(0).name.equals("page.cbz"),"FTP passive directory listing");
-                File copy=new File(directory,"ftp-download");remote.download("page.cbz",copy);
-                check(new String(java.nio.file.Files.readAllBytes(copy.toPath()),java.nio.charset.StandardCharsets.UTF_8).equals("fixture"),"FTP binary retrieval");
-                remote.upload("uploaded.cbz",copy);check(java.util.Arrays.equals(uploaded.get(),java.nio.file.Files.readAllBytes(copy.toPath())),"FTP binary upload");
+        try (java.net.ServerSocket control = new java.net.ServerSocket(0, 1,
+                java.net.InetAddress.getByName("127.0.0.1"))) {
+            control.setSoTimeout(250);
+            JSONObject host = new JSONObject().put("protocol", 1)
+                    .put("host", "127.0.0.1").put("port", control.getLocalPort());
+            boolean rejected = false;
+            try (NetworkStorage.Remote ignored = new NetworkStorage.Remote(host)) {
+                throw new AssertionError("Plain FTP was accepted");
+            } catch (java.io.IOException expected) {
+                rejected = expected.getMessage().equals(I18n.t(R.string.ui_plain_ftp_disabled));
             }
-            server.join(10000);check(!server.isAlive() && failure.get()==null,"FTP connection closes cleanly");
+            check(rejected, "Saved plain FTP requests FTPS reconfiguration");
+            boolean connected = false;
+            try (java.net.Socket ignored = control.accept()) { connected = true; }
+            catch (java.net.SocketTimeoutException expected) { }
+            check(!connected, "Plain FTP is rejected before any network connection");
         }
     }
     private void check(boolean value,String message){if(!value)throw new AssertionError(message);checks++;}
