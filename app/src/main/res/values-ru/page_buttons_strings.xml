@@ -23,9 +23,6 @@
     <string name="pb_both_next">Все кнопки листают вперёд</string>
     <string name="pb_reverse">Поменять местами назад и вперёд</string>
     <string name="pb_fixed">Не менять порядок кнопок при смене направления чтения</string>
-    <string name="pb_scroll">Вертикальная прокрутка</string>
-    <string name="pb_overlap">Перекрытие после прокрутки</string>
-    <string name="pb_overlap_hint">В единицах размера текста (sp). Чем больше перекрытие, тем короче прокрутка.</string>
     <string name="pb_reset">Сброс</string>
     <string name="pb_previous">− Назад</string>
     <string name="pb_next">+ Вперёд</string>

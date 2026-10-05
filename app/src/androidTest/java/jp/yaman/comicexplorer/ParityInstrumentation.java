@@ -257,6 +257,11 @@ public final class ParityInstrumentation extends Instrumentation {
             check(PageSource.bitmapSampleSize(4000,6000,2_000_000)==4,"Large images are sampled within the pixel budget");
             int[] tallPdf=PageSource.pdfBitmapSize(1,100_000,1080,2_000_000);
             check(tallPdf[0]<=8192 && tallPdf[1]<=8192 && (long)tallPdf[0]*tallPdf[1]<=2_000_000,"Extreme PDF dimensions stay within texture and pixel limits");
+            AppState.put(context,"page_swipe_direction",-2);
+            check(AppState.pageSwipeDirection(context)==AppState.PAGE_SWIPE_LEFT,"Legacy upward direction falls back to current reading order");
+            AppState.put(context,"page_swipe_direction",2);
+            AppState.setDirection(context,AppState.DIRECTION_RTL);
+            check(AppState.pageSwipeDirection(context)==AppState.PAGE_SWIPE_RIGHT,"Legacy downward direction falls back to manga reading order");
             checkReaderGestures(context);
             File zip=new File(fixtures,"sample.cbz");
             try(ZipOutputStream output=new ZipOutputStream(new FileOutputStream(zip))){
@@ -303,6 +308,7 @@ public final class ParityInstrumentation extends Instrumentation {
             });
             awaitReady(() -> (Boolean)field(viewer,"initialized"),"ZIP reader initialized");
             awaitReady(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"ZIP first page decoded");
+            checkPageButtonGestures(viewer);
             runOnMainSync(() -> {
                 try {
                     java.lang.reflect.Method next=ViewerActivity.class.getDeclaredMethod("nextIndex",int.class,boolean.class);next.setAccessible(true);
@@ -325,17 +331,18 @@ public final class ParityInstrumentation extends Instrumentation {
             runOnMainSync(() -> ReaderOptions.direction(viewer,() -> invoke(viewer,"refreshReader")));
             awaitReady(() -> {
                 android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
-                return root!=null && !root.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_up)).isEmpty()
-                        && !root.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_down)).isEmpty();
-            },"Page swipe direction offers vertical choices");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_up)),"Set upward page swipe");
-            awaitReady(() -> AppState.pageSwipeDirection(context)==AppState.PAGE_SWIPE_UP
-                    && (Boolean)field(field(viewer,"imageView"),"verticalPaging"),"Upward page swipe updates the reader gesture");
-            runOnMainSync(() -> viewer.onSwipe(AppState.PAGE_SWIPE_UP));
-            awaitReady(() -> (Integer)field(viewer,"page")==1,"Upward page swipe advances the page");
-            runOnMainSync(() -> viewer.onSwipe(AppState.PAGE_SWIPE_DOWN));
-            awaitReady(() -> (Integer)field(viewer,"page")==0,"Opposite vertical swipe returns to the previous page");
-            runOnMainSync(() -> { AppState.setPageSwipeDirection(context,AppState.PAGE_SWIPE_RIGHT); invoke(viewer,"refreshReader"); });
+                return root!=null && !root.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_left)).isEmpty();
+            },"Page swipe direction offers horizontal choices");
+            android.view.accessibility.AccessibilityNodeInfo directions=getUiAutomation().getRootInActiveWindow();
+            check(directions.findAccessibilityNodeInfosByText("上へ").isEmpty() && directions.findAccessibilityNodeInfosByText("下へ").isEmpty(),"Vertical page directions are removed");
+            awaitReady(() -> clickText(I18n.t(R.string.ui_left)),"Set leftward page swipe");
+            check(AppState.pageSwipeDirection(context)==AppState.PAGE_SWIPE_LEFT,"Leftward page swipe is saved");
+            runOnMainSync(() -> viewer.onSwipe(AppState.PAGE_SWIPE_LEFT));
+            awaitReady(() -> (Integer)field(viewer,"page")==1,"Leftward page swipe advances the page");
+            runOnMainSync(() -> viewer.onSwipe(AppState.PAGE_SWIPE_RIGHT));
+            awaitReady(() -> (Integer)field(viewer,"page")==0,"Opposite horizontal swipe returns to the previous page");
+            checkPageLayoutOrder(viewer);
+            runOnMainSync(() -> { AppState.setPageSwipeDirection(context,AppState.PAGE_SWIPE_RIGHT); AppState.setDirection(context,AppState.DIRECTION_RTL); invoke(viewer,"refreshReader"); });
             runOnMainSync(() -> {
                 PageButtonDialog draft=new PageButtonDialog(viewer,() -> {});
                 android.view.View content=(android.view.View)field(draft,"content");
@@ -410,8 +417,7 @@ public final class ParityInstrumentation extends Instrumentation {
             awaitReady(() -> AppState.number(context,"page_type",-1)==0,"Wait for committed defaults");
             waitForIdleSync();
             check(AppState.number(context,"page_type",-1)==0 && PageButtonDialog.sizePercent(context)==10
-                    && AppState.pageButtonOpacity(context)==100 && !AppState.enabled(context,"page_fixed",true)
-                    && !AppState.enabled(context,"scroll_smooth",true) && AppState.number(context,"scroll_overlap",-1)==23,"Reference defaults persist together");
+                    && AppState.pageButtonOpacity(context)==100 && !AppState.enabled(context,"page_fixed",true),"Page button defaults persist together");
             android.widget.FrameLayout.LayoutParams[] buttonBounds=PageButtonDialog.layouts(1,false,false,false,10,1000,2000);
             check(buttonBounds[0].width==100 && buttonBounds[0].height==1000
                     && buttonBounds[0].gravity==(android.view.Gravity.RIGHT|android.view.Gravity.TOP),"Type1 splits the selected vertical edge");
@@ -470,9 +476,16 @@ public final class ParityInstrumentation extends Instrumentation {
                 boolean primary=toolbar.getChildCount()==labels.length;
                 for(int i=0;primary && i<labels.length;i++)primary=I18n.t(labels[i]).contentEquals(toolbar.getChildAt(i).getContentDescription());
                 check(primary,"Reader toolbar exposes only page list, direction, layout and filters");
-                AppState.put(context,"key."+android.view.KeyEvent.KEYCODE_F1,5);
-                check(ReaderOptions.keyAction(viewer,android.view.KeyEvent.KEYCODE_F1)==0,"Legacy fullscreen key assignment becomes disabled");
-                AppState.prefs(context).edit().remove("setting.key."+android.view.KeyEvent.KEYCODE_F1).apply();
+                AppState.put(context,"key."+android.view.KeyEvent.KEYCODE_F1,2);
+                AppState.put(context,"volume_navigation",true);
+                int current=(Integer)field(viewer,"page");boolean chrome=(Boolean)field(viewer,"chromeVisible");
+                for(int code:new int[]{android.view.KeyEvent.KEYCODE_F1,android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+                        android.view.KeyEvent.KEYCODE_DPAD_RIGHT,android.view.KeyEvent.KEYCODE_PAGE_UP,
+                        android.view.KeyEvent.KEYCODE_PAGE_DOWN,android.view.KeyEvent.KEYCODE_SPACE,
+                        android.view.KeyEvent.KEYCODE_ENTER,android.view.KeyEvent.KEYCODE_VOLUME_DOWN})
+                    check(!viewer.onKeyDown(code,new android.view.KeyEvent(0,code)),"Reader does not intercept hardware key "+code);
+                check((Integer)field(viewer,"page")==current && (Boolean)field(viewer,"chromeVisible")==chrome,
+                        "Legacy hardware bindings do not change pages or menus");
             });
             capture("dark-reader");
             runOnMainSync(() -> invoke(viewer,"showPageList"));
@@ -488,6 +501,8 @@ public final class ParityInstrumentation extends Instrumentation {
             await(() -> (Boolean)field(closingAdapter,"closed"),"Closing page list cancels thumbnail work");
             runOnMainSync(() -> invoke(viewer,"showReaderMenu"));
             capture("dark-menu");
+            for(String removed:new String[]{"ページを探す","ハードウェアキー","スクロール方式"})
+                check(getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText(removed).isEmpty(),"Reader menu omits "+removed);
             android.view.accessibility.AccessibilityNodeInfo readerMenu=getUiAutomation().getRootInActiveWindow();
             for(int removed:new int[]{R.string.ui_brightness,R.string.ui_double_tap_zoom,R.string.ui_crop_this_book,R.string.ui_book_actions,R.string.ui_settings}) {
                 check(readerMenu.findAccessibilityNodeInfosByText(I18n.t(removed)).isEmpty(),"Reader menu omits "+I18n.t(removed));
@@ -502,11 +517,6 @@ public final class ParityInstrumentation extends Instrumentation {
             awaitReady(() -> clickText(I18n.t(R.string.ui_bookmark_actions)),"Bookmarks are reachable from reader menu");
             awaitReady(() -> clickText(I18n.t(R.string.ui_bookmark_this_page)),"Add bookmark through relocated control");
             check(AppState.hasBookmark(context,Uri.fromFile(zip),0),"Relocated bookmark action marks current page");
-
-            runOnMainSync(() -> invoke(viewer,"showReaderMenu"));
-            awaitReady(() -> clickText(I18n.t(R.string.ui_scroll_mode)),"Scroll mode opens directly from reader menu");
-            awaitReady(() -> clickText(I18n.t(R.string.ui_horizontal_swipe)),"Select horizontal scrolling without intermediate categories");
-            check(AppState.readingFlow(context)==AppState.FLOW_HORIZONTAL,"Flat reader menu applies scroll mode");
 
             SettingsActivity readerSettings=(SettingsActivity)startActivitySync(new Intent(context,SettingsActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             runOnMainSync(() -> {
@@ -548,44 +558,19 @@ public final class ParityInstrumentation extends Instrumentation {
             awaitReady(() -> ((android.app.AlertDialog)field(viewer,"pageListDialog")).getWindow().getDecorView().hasWindowFocus(),"Page list receives input focus");
             sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
             await(() -> field(viewer,"pageListDialog")==null && !viewer.isFinishing(),"Back closes page list without closing reader");
-            runOnMainSync(() -> { AppState.setReadingFlow(context,1); invoke(viewer,"refreshReader"); });
-            awaitReady(() -> ((ContinuousReader)field(viewer,"continuous")).getChildCount()>0,"Continuous pages rendered");
-            runOnMainSync(() -> { AppState.setReadingFlow(context,AppState.FLOW_HORIZONTAL); invoke(viewer,"refreshReader"); });
-            awaitReady(() -> !((Boolean)field(field(viewer,"imageView"),"verticalPaging"))
-                    && ((android.view.View)field(viewer,"imageView")).getVisibility()==android.view.View.VISIBLE
-                    && ((android.view.View)field(viewer,"continuous")).getVisibility()==android.view.View.GONE,
-                    "Returning to horizontal swipe updates the visible reader and gesture direction");
-            runOnMainSync(() -> { AppState.setReadingFlow(context,AppState.FLOW_VERTICAL); invoke(viewer,"refreshReader"); });
-            awaitReady(() -> ((ContinuousReader)field(viewer,"continuous")).getChildCount()>0,"Continuous pages return after horizontal swipe check");
-            runOnMainSync(() -> {
-                AppState.setDirection(context,AppState.DIRECTION_LTR);
-                ((android.widget.LinearLayout)field(viewer,"readerMenuRow")).getChildAt(1).performClick();
-            });
-            awaitReady(() -> clickText(I18n.t(R.string.ui_left)), "Change direction through the toolbar");
-            check(AppState.readingFlow(context)==AppState.FLOW_VERTICAL && AppState.pageSwipeDirection(context)==AppState.PAGE_SWIPE_LEFT,
-                    "Page swipe direction changes preserve vertical scrolling");
-            awaitReady(() -> ((android.view.View)field(viewer,"loading")).getVisibility()==android.view.View.GONE, "Direction change finished rendering");
-            waitForIdleSync();
-            runOnMainSync(() -> ((ContinuousReader)field(viewer,"continuous")).setSelection(3));
-            await(() -> (Integer)field(viewer,"page")==3,"Continuous scrolling updates position");
-            check(ContinuousReader.edgeDirection(false,true,-100,20)==1
-                    && ContinuousReader.edgeDirection(true,false,100,20)==-1
-                    && ContinuousReader.edgeDirection(false,true,100,20)==0
-                    && ContinuousReader.edgeDirection(false,true,-20,20)==0,
-                    "Continuous reader only exits a book on an outward edge swipe");
-
+            runOnMainSync(() -> {AppState.put(context,"reading_flow",1);invoke(viewer,"refreshReader");});
+            awaitReady(() -> ((ZoomImageView)field(viewer,"imageView")).getDrawable()!=null,"Horizontal reader ignores legacy vertical flow");
+            check(((android.view.View)field(viewer,"pageCanvas")).getVisibility()==android.view.View.VISIBLE
+                    && ((ZoomImageView)field(viewer,"imageView")).getVisibility()==android.view.View.VISIBLE,
+                    "Legacy vertical flow keeps the horizontal image reader visible");
             runOnMainSync(() -> {AppState.put(context,"crop_percent",5);invoke(viewer,"refreshReader");});
             await(() -> {
-                ContinuousReader list=(ContinuousReader)field(viewer,"continuous");
-                if(list.getChildCount()==0)return false;
-                android.graphics.drawable.Drawable drawable=((ZoomImageView)list.getChildAt(0)).getDrawable();
+                android.graphics.drawable.Drawable drawable=((ZoomImageView)field(viewer,"imageView")).getDrawable();
                 return drawable instanceof android.graphics.drawable.BitmapDrawable && ((android.graphics.drawable.BitmapDrawable)drawable).getBitmap().getWidth()==540;
             },"Existing saved crop still renders after removing its reader controls");
             runOnMainSync(() -> { AppState.put(context,"filter_contrast",true);AppState.put(context,"filter_gray",true);invoke(viewer,"refreshReader"); });
             await(() -> {
-                ContinuousReader list=(ContinuousReader)field(viewer,"continuous");
-                if(list.getChildCount()==0)return false;
-                android.graphics.drawable.Drawable drawable=((ZoomImageView)list.getChildAt(0)).getDrawable();
+                android.graphics.drawable.Drawable drawable=((ZoomImageView)field(viewer,"imageView")).getDrawable();
                 if(!(drawable instanceof android.graphics.drawable.BitmapDrawable))return false;
                 Bitmap page=((android.graphics.drawable.BitmapDrawable)drawable).getBitmap();
                 int pixel=page.getPixel(page.getWidth()/2,100);
@@ -593,7 +578,7 @@ public final class ParityInstrumentation extends Instrumentation {
                         && android.graphics.Color.green(pixel)==android.graphics.Color.blue(pixel);
             },"Filter change replaces the visible colored page with grayscale pixels");
             runOnMainSync(viewer::finish); waitForIdleSync();
-            AppState.setReadingFlow(context,0); AppState.put(context,"theme",1);
+            AppState.put(context,"theme",1);
             ViewerActivity pdfViewer=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(Uri.fromFile(pdf)).putExtra(ViewerActivity.EXTRA_TITLE,pdf.getName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             awaitReady(() -> (Boolean)field(pdfViewer,"initialized"),"PDF reader initialized");
             awaitReady(() -> ((ZoomImageView)field(pdfViewer,"imageView")).getDrawable()!=null,"PDF first page decoded");
@@ -622,17 +607,17 @@ public final class ParityInstrumentation extends Instrumentation {
             AppState.setGridView(context,true);AppState.put(context,"grid_columns",3);AppState.put(context,"list_type",2);
             AppState.put(context,"theme",1);
             MainActivity lightLibrary=(MainActivity)startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            runOnMainSync(() -> invoke(lightLibrary,"showAppMenu"));
+            awaitReady(() -> !getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText(I18n.t(R.string.ui_settings)).isEmpty(),"Library menu visible");
+            check(getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText("ファイルを開く").isEmpty(),"Library menu omits open file");
+            for(int label:new int[]{R.string.ui_parent_folder,R.string.ui_refresh,R.string.ui_list_type,R.string.ui_sort})
+                check(getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText(I18n.t(label)).isEmpty(),"Library menu omits toolbar action: "+I18n.t(label));
+            capture("library-menu-simplified");
+            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            waitForIdleSync();
             runOnMainSync(() -> {try{java.lang.reflect.Method mode=MainActivity.class.getDeclaredMethod("selectMode",int.class);mode.setAccessible(true);mode.invoke(lightLibrary,2);}catch(Exception e){throw new RuntimeException(e);}});
             awaitReady(() -> ((android.widget.GridView)field(lightLibrary,"gridView")).getChildCount()>0,"Light-theme grid has visible books");
-            runOnMainSync(() -> invoke(lightLibrary,"showAppMenu"));
-            awaitReady(() -> {
-                android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
-                return root!=null && !root.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_list_type)).isEmpty();
-            },"Library menu shows list type");
-            android.view.accessibility.AccessibilityNodeInfo libraryMenu=getUiAutomation().getRootInActiveWindow();
-            check(!libraryMenu.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_sort)).isEmpty(),
-                    "Library menu moves view and sort controls");
-            sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK); waitForIdleSync();
+            checkLibraryActionButtons(lightLibrary);
             android.view.View firstCell=((android.widget.GridView)field(lightLibrary,"gridView")).getChildAt(0);
             int labelColor=((android.widget.TextView)field(firstCell.getTag(),"name")).getCurrentTextColor();
             check(androidx.core.graphics.ColorUtils.calculateContrast(labelColor,AppState.number(context,"grid_color",Ui.BACKGROUND))>=4.5,"Grid filename contrast follows selected background");
@@ -680,6 +665,7 @@ public final class ParityInstrumentation extends Instrumentation {
             Activity restoredLibrary=waitForMonitorWithTimeout(restoredMonitor,10000); removeMonitor(restoredMonitor);
             check(restoredLibrary!=null && ((Integer)field(restoredLibrary,"mode"))==0,"Retired gallery state restores to the library");
             runOnMainSync(restoredLibrary::finish); waitForIdleSync();
+            checkLibraryParentButton(context);
             if(screenshots!=null) {
                 ViewerActivity unavailable=(ViewerActivity)startActivitySync(new Intent(context,ViewerActivity.class).setData(Uri.fromFile(new File(fixtures,"missing.cbz"))).putExtra(ViewerActivity.EXTRA_TITLE,"missing.cbz").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 awaitReady(() -> ((android.view.View)field(unavailable,"errorPanel")).getVisibility()==android.view.View.VISIBLE,"Missing book error visible");
@@ -688,6 +674,82 @@ public final class ParityInstrumentation extends Instrumentation {
 
             checkForcedSinglePage(context,fixtures);
     }
+    private void checkLibraryActionButtons(MainActivity activity) throws Exception {
+        android.view.ViewGroup actions=(android.view.ViewGroup)((android.view.View)field(activity,"upButton")).getParent();
+        int[] labels={R.string.ui_parent_folder,R.string.ui_refresh,R.string.ui_list_type,R.string.ui_sort};
+        check(actions.getChildCount()==4,"Library has four direct actions");
+        for(int i=0;i<labels.length;i++) {
+            android.view.View button=actions.getChildAt(i);
+            check(button.isShown() && button.getWidth()>=Ui.dp(activity,48) && button.getHeight()>=Ui.dp(activity,48)
+                    && I18n.t(labels[i]).contentEquals(button.getContentDescription())
+                    && I18n.t(labels[i]).contentEquals(button.getTooltipText()),"Library action visible, labelled and touch-sized: "+I18n.t(labels[i]));
+        }
+        check(!actions.getChildAt(0).isEnabled(),"Parent action disabled in history");
+        int token=(Integer)field(activity,"directoryLoadToken");
+        runOnMainSync(() -> actions.getChildAt(1).performClick());
+        check((Integer)field(activity,"directoryLoadToken")>token,"Refresh button reloads history");
+        runOnMainSync(() -> actions.getChildAt(2).performClick());
+        awaitReady(() -> clickLibraryListChoice(),"Open list type choice from direct button");
+        awaitReady(() -> clickText(I18n.t(R.string.ui_thumbnails)),"Choose thumbnails");
+        awaitReady(() -> !AppState.gridView(activity) && ((android.view.View)field(activity,"listView")).isShown(),"List button changes presentation");
+        awaitReady(() -> clickLibraryListChoice(),"Reopen list type choice");
+        awaitReady(() -> clickText(I18n.t(R.string.ui_grid)),"Restore grid");
+        awaitReady(() -> AppState.gridView(activity),"Grid restored");
+        awaitReady(() -> clickText(I18n.t(R.string.ui_close)),"Close list settings");
+        waitForIdleSync();
+        runOnMainSync(() -> actions.getChildAt(3).performClick());
+        awaitReady(() -> clickText(I18n.t(R.string.ui_modified_date_2)),"Sort button opens options");
+        check((Integer)field(activity,"sortMode")==1,"Sort button changes ordering");
+        runOnMainSync(() -> actions.getChildAt(3).performClick());
+        awaitReady(() -> clickText(I18n.t(R.string.ui_descending)),"Sort button changes descending order");
+        check((Boolean)field(activity,"descending"),"Descending order enabled");
+        capture("library-actions-light");
+    }
+
+    private boolean clickLibraryListChoice() {
+        android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
+        if(root==null)return false;
+        for(android.view.accessibility.AccessibilityNodeInfo node:root.findAccessibilityNodeInfosByText(I18n.t(R.string.ui_list_type)))
+            if(node.isClickable() && node.getContentDescription()!=null
+                    && node.getContentDescription().toString().startsWith(I18n.t(R.string.ui_list_type)+", "))
+                return node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+        return false;
+    }
+
+    private void checkLibraryParentButton(Context context) throws Exception {
+        Uri previousTree=AppState.getTree(context);
+        int previousTheme=AppState.number(context,"theme",0);
+        File root=new File(context.getCacheDir(),"transfer-fixtures/library-buttons-"+System.nanoTime());
+        check(new File(root,"child").mkdirs(),"Create toolbar navigation fixture");
+        Uri tree=android.provider.DocumentsContract.buildTreeDocumentUri(context.getPackageName()+".parity.documents","root/"+root.getName());
+        AppState.setTree(context,tree);AppState.put(context,"theme",2);
+        MainActivity activity=(MainActivity)startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            awaitReady(() -> ((java.util.List<?>)field(activity,"visibleRows")).size()==1,"Selected root loads");
+            android.view.View up=(android.view.View)field(activity,"upButton");
+            check(up.isShown() && !up.isEnabled(),"Parent disabled at selected root");
+            LibraryEntry child=(LibraryEntry)((java.util.List<?>)field(activity,"visibleRows")).get(0);
+            runOnMainSync(() -> {
+                try {java.lang.reflect.Method open=MainActivity.class.getDeclaredMethod("open",LibraryEntry.class);open.setAccessible(true);open.invoke(activity,child);}
+                catch(Exception error){throw new RuntimeException(error);}
+            });
+            awaitReady(() -> up.isEnabled() && ((java.util.List<?>)field(activity,"visibleRows")).isEmpty()
+                    && !((android.view.View)field(activity,"emptyProgress")).isShown(),"Parent enabled inside child folder");
+            capture("library-actions-child");
+            runOnMainSync(up::performClick);
+            awaitReady(() -> tree.equals(field(activity,"directoryUri")) && !up.isEnabled()
+                    && ((java.util.List<?>)field(activity,"visibleRows")).size()==1,"Parent returns to selected root and disables");
+            check(new File(root,"new-folder").mkdirs(),"Add refresh fixture");
+            android.view.ViewGroup actions=(android.view.ViewGroup)up.getParent();
+            runOnMainSync(() -> actions.getChildAt(1).performClick());
+            awaitReady(() -> ((java.util.List<?>)field(activity,"visibleRows")).size()==2,"Refresh button discovers new folder");
+            capture("library-actions-dark");
+        } finally {
+            runOnMainSync(activity::finish);waitForIdleSync();
+            AppState.setTree(context,previousTree);AppState.put(context,"theme",previousTheme);
+        }
+    }
+
     private void checkForcedSinglePage(Context context,File fixtures) throws Exception {
         AppState.prefs(context).edit().clear().commit(); AppState.put(context,"language","ja"); AppState.put(context,"theme",2);
         AppState.markReaderHintSeen(context);
@@ -738,15 +800,13 @@ public final class ParityInstrumentation extends Instrumentation {
         runOnMainSync(() -> {AppState.setPageLayout(context,AppState.PAGE_SINGLE);invoke(resumed,"refreshReader");});
         awaitReady(() -> (Boolean)field(resumed,"initialized") && (Integer)field(resumed,"totalPages")==3,"Return to normal single page");
         check((Integer)field(resumed,"page")==1,"Leaving split mode preserves the original image");
-        runOnMainSync(() -> {AppState.setPageLayout(context,AppState.PAGE_FORCE_SINGLE);AppState.setReadingFlow(context,AppState.FLOW_VERTICAL);invoke(resumed,"refreshReader");});
-        awaitReady(() -> (Boolean)field(resumed,"initialized") && ((ContinuousReader)field(resumed,"continuous")).getCount()==4,"Continuous scrolling uses split display pages");
-        capture("force-single-vertical");
+        runOnMainSync(() -> {AppState.setPageLayout(context,AppState.PAGE_FORCE_SINGLE);invoke(resumed,"refreshReader");});
+        awaitReady(() -> (Boolean)field(resumed,"initialized") && (Integer)field(resumed,"totalPages")==4,"Force single uses split display pages");
         runOnMainSync(resumed::finish);waitForIdleSync();
         check(java.util.Arrays.equals(original,java.nio.file.Files.readAllBytes(book.toPath())),"Force single never changes archive bytes");
         AppState.clearPosition(context,uri);
         check(!AppState.prefs(context).contains("position_half."+AppState.key(uri)),"Reading position reset clears the saved half");
         AppState.setPageLayout(context,AppState.PAGE_SINGLE);
-        AppState.setReadingFlow(context,AppState.FLOW_HORIZONTAL);
         AppState.prefs(context).edit().remove("page_swipe_direction").apply();
     }
 
@@ -838,7 +898,6 @@ public final class ParityInstrumentation extends Instrumentation {
                 public void onTap(float x) { }
                 public void onSwipe(int direction) { swipes[0]++; }
             });
-            image.setVerticalPaging(true);
             long now = android.os.SystemClock.uptimeMillis();
             touch(image, now, now, 0, 100, 100);
             touch(image, now, now+30, 2, 100, 1000);
@@ -867,6 +926,164 @@ public final class ParityInstrumentation extends Instrumentation {
     private static void touch(ZoomImageView view, long down, long time, int action, float x, float y) {
         android.view.MotionEvent event = android.view.MotionEvent.obtain(down,time,action,x,y,0);
         view.onTouchEvent(event); event.recycle();
+    }
+
+    private void checkPageLayoutOrder(ViewerActivity viewer) throws Exception {
+        int original=AppState.pageLayout(viewer);
+        int[] modes={AppState.PAGE_AUTO,AppState.PAGE_SINGLE,AppState.PAGE_DUAL,AppState.PAGE_FORCE_SINGLE};
+        int[] labels={R.string.ui_auto_two_pages_in_landscape,R.string.ui_single_page,R.string.ui_two_pages,R.string.ui_force_single_page};
+        try {
+            for(int i=0;i<modes.length;i++) {
+                final int index=i;
+                runOnMainSync(() -> {AppState.setPageLayout(viewer,modes[index]);ReaderOptions.pageLayout(viewer,() -> {});});
+                awaitReady(() -> !getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText(I18n.t(labels[index])).isEmpty(),"Layout options visible");
+                android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
+                int previousTop=-1;
+                for(int j=0;j<labels.length;j++) {
+                    String label=I18n.t(labels[j]);
+                    android.view.accessibility.AccessibilityNodeInfo option=null;
+                    for(android.view.accessibility.AccessibilityNodeInfo candidate:root.findAccessibilityNodeInfosByText(label))
+                        if(label.contentEquals(candidate.getText()==null ? "" : candidate.getText())) {option=candidate;break;}
+                    check(option!=null,"Exact layout option exists: "+label);
+                    android.graphics.Rect bounds=new android.graphics.Rect();option.getBoundsInScreen(bounds);
+                    check(bounds.top>previousTop && option.isChecked()==(i==j),"Layout order and saved selection "+i+"/"+j);
+                    previousTop=bounds.top;
+                }
+                if(i==0)capture("layout-auto-first");
+                int next=(i+1)%modes.length;
+                awaitReady(() -> clickText(I18n.t(labels[next])),"Choose reordered layout");
+                check(AppState.pageLayout(viewer)==modes[next],"Reordered layout preserves stored IDs");
+            }
+        } finally {AppState.setPageLayout(viewer,original);}
+    }
+
+    private void checkPageButtonGestures(Activity context) {
+        ReaderPageCanvas[] holder=new ReaderPageCanvas[1];
+        ZoomImageView[] images=new ZoomImageView[1];
+        Bitmap bitmap=Bitmap.createBitmap(800,800,Bitmap.Config.ARGB_8888);
+        int[] clicks = {0}, swipes = {0}, taps = {0};
+        android.widget.TextView[] buttons = new android.widget.TextView[4];
+        runOnMainSync(() -> {
+            ZoomImageView image = new ZoomImageView(context);
+            ReaderPageCanvas canvas = new ReaderPageCanvas(context, image);
+            holder[0]=canvas;images[0]=image;
+            canvas.addView(image, new android.widget.FrameLayout.LayoutParams(-1,-1));
+            image.setInteractionListener(new ZoomImageView.InteractionListener() {
+                public void onTap(float x) { taps[0]++; }
+                public void onSwipe(int direction) { swipes[0] = direction; }
+            });
+            for (int i=0;i<buttons.length;i++) {
+                buttons[i] = PageButtonDialog.button(context);
+                buttons[i].setOnClickListener(v -> clicks[0]++);
+                canvas.addView(buttons[i], new android.widget.FrameLayout.LayoutParams(160,160,
+                        (i%2==0 ? android.view.Gravity.LEFT : android.view.Gravity.RIGHT)
+                        | (i<2 ? android.view.Gravity.TOP : android.view.Gravity.BOTTOM)));
+                canvas.bindPageButton(buttons[i]);
+            }
+            context.addContentView(canvas,new android.view.ViewGroup.LayoutParams(800,800));
+            canvas.measure(android.view.View.MeasureSpec.makeMeasureSpec(800,android.view.View.MeasureSpec.EXACTLY),
+                    android.view.View.MeasureSpec.makeMeasureSpec(800,android.view.View.MeasureSpec.EXACTLY));
+            canvas.layout(0,0,800,800);
+            image.setImageBitmap(bitmap); image.fitImage();
+        });
+        waitForIdleSync();
+        ReaderPageCanvas canvas=holder[0];ZoomImageView image=images[0];
+        try {
+            for (int i=0;i<buttons.length;i++) {
+                final int index=i;
+                runOnMainSync(() -> {
+                    long now=android.os.SystemClock.uptimeMillis();
+                    float x=buttons[index].getLeft()+80, y=buttons[index].getTop()+80;
+                    dispatchTouch(canvas,now,now,0,x,y);
+                    check(buttons[index].isPressed(),"Page button shows native pressed state "+index);
+                    dispatchTouch(canvas,now,now+30,1,x,y);
+                });
+                waitForIdleSync();
+                check(clicks[0]==i+1,"Page button tap clicks exactly once "+i);
+            }
+            runOnMainSync(() -> {
+                long now=android.os.SystemClock.uptimeMillis()+1000;
+                dispatchTouch(canvas,now,now,0,80,80);
+                dispatchTouch(canvas,now,now+20,2,300,80);
+                dispatchTouch(canvas,now,now+40,1,700,80);
+                check(swipes[0]==1 && clicks[0]==4 && !buttons[0].isPressed(),"Horizontal swipe crosses button regions without a click");
+                now+=1000; swipes[0]=0;
+                dispatchTouch(canvas,now,now,0,80,720);
+                dispatchTouch(canvas,now,now+20,2,80,500);
+                dispatchTouch(canvas,now,now+40,1,80,80);
+                check(swipes[0]==0 && clicks[0]==4,"Vertical swipe over a page button does not navigate");
+                for (float start : new float[]{80,300}) {
+                    now+=1000; image.fitImage(); swipes[0]=0;
+                    dispatchTouch(canvas,now,now,0,start,80);
+                    dispatchTouch(canvas,now,now+20,5 | (1<<8),start,80,720,80);
+                    for(int step=1;step<=5;step++)dispatchTouch(canvas,now,now+20+step*20,2,start-step*35,80,720+step*35,80);
+                    float enlarged=(Float)field(image,"relativeScale");
+                    check(enlarged>1.1f,"Pinch out works with first finger "+(start==80 ? "on button" : "on image"));
+                    for(int step=4;step>=0;step--)dispatchTouch(canvas,now,now+240-step*20,2,start-step*35,80,720+step*35,80);
+                    check((Float)field(image,"relativeScale")<enlarged,"Pinch in works over page buttons");
+                    dispatchTouch(canvas,now,now+260,6 | (1<<8),start,80,720,80);
+                    dispatchTouch(canvas,now,now+280,1,start,80);
+                    check(clicks[0]==4 && swipes[0]==0 && taps[0]==0,"Pinch does not click, swipe or open menus");
+                }
+                now+=1000;
+                dispatchTouch(canvas,now,now,0,80,80);
+                dispatchTouch(canvas,now,now+20,5 | (1<<8),80,80,720,80);
+                for(int step=1;step<=5;step++)dispatchTouch(canvas,now,now+20+step*20,2,80-step*35,80,720+step*35,80);
+                dispatchTouch(canvas,now,now+160,3,-95,80,895,80);
+                float[] before=new float[9], after=new float[9];image.getImageMatrix().getValues(before);
+                now+=1000;
+                dispatchTouch(canvas,now,now,0,80,80);
+                dispatchTouch(canvas,now,now+20,2,280,80);
+                dispatchTouch(canvas,now,now+40,3,280,80);
+                image.getImageMatrix().getValues(after);
+                check(after[android.graphics.Matrix.MTRANS_X]>before[android.graphics.Matrix.MTRANS_X] && clicks[0]==4,
+                        "Dragging a zoomed page from a button pans without clicking");
+                image.fitImage();
+                now+=1000;
+                dispatchTouch(canvas,now,now,0,80,80);
+                dispatchTouch(canvas,now,now+20,3,80,80);
+                check(clicks[0]==4 && !buttons[0].isPressed(),"Cancelled button touch does not click");
+                now+=1000;
+                dispatchTouch(canvas,now,now,0,80,80);
+                dispatchTouch(canvas,now,now+20,2,300,80);
+                dispatchTouch(canvas,now,now+30,3,300,80);
+                now+=1000;
+                dispatchTouch(canvas,now,now,0,80,80);
+                dispatchTouch(canvas,now,now+20,1,80,80);
+                });
+            waitForIdleSync();
+            check(clicks[0]==5,"Button taps recover after a cancelled forwarded gesture");
+            runOnMainSync(() -> {
+                buttons[0].performClick();
+                check(clicks[0]==6,"Accessibility and keyboard click path remains available");
+                android.widget.Button retry=new android.widget.Button(context);
+                retry.setOnClickListener(v -> clicks[0]+=10);
+                canvas.addView(retry,new android.widget.FrameLayout.LayoutParams(160,160));
+                retry.layout(0,0,160,160);
+                long now=android.os.SystemClock.uptimeMillis()+20000;
+                dispatchTouch(canvas,now,now,0,80,80);
+                dispatchTouch(canvas,now,now+20,1,80,80);
+                });
+            waitForIdleSync();
+            check(clicks[0]==16,"An overlay control keeps its native touch handling");
+        } finally {
+            runOnMainSync(() -> {
+                ((android.view.ViewGroup)canvas.getParent()).removeView(canvas);
+                image.setImageDrawable(null); bitmap.recycle();
+            });
+        }
+    }
+
+    private static void dispatchTouch(android.view.View view,long down,long time,int action,float... coordinates) {
+        int count=coordinates.length/2;
+        android.view.MotionEvent.PointerProperties[] properties=new android.view.MotionEvent.PointerProperties[count];
+        android.view.MotionEvent.PointerCoords[] points=new android.view.MotionEvent.PointerCoords[count];
+        for(int i=0;i<count;i++) {
+            properties[i]=new android.view.MotionEvent.PointerProperties();properties[i].id=i;properties[i].toolType=1;
+            points[i]=new android.view.MotionEvent.PointerCoords();points[i].x=coordinates[i*2];points[i].y=coordinates[i*2+1];points[i].pressure=1;points[i].size=1;
+        }
+        android.view.MotionEvent event=android.view.MotionEvent.obtain(down,time,action,count,properties,points,0,0,1,1,0,0,android.view.InputDevice.SOURCE_TOUCHSCREEN,0);
+        view.dispatchTouchEvent(event);event.recycle();
     }
     private void checkFormats(Context context, File fixtures) throws Exception {
         checkAdvancedFormats(context,fixtures);

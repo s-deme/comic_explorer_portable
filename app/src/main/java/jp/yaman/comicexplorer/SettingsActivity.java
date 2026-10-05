@@ -46,7 +46,6 @@ public final class SettingsActivity extends BaseActivity {
         rows.action(I18n.t(R.string.ui_sync_resume_page_beta), I18n.t(R.string.ui_sync_your_resume_page_using_google_drive), () -> ReadingSync.show(this));
         rows.section("IMAGE VIEW");
         rows.check(I18n.t(R.string.ui_page_dividing_line_dual_pages), I18n.t(R.string.ui_show_a_dividing_line_between_dual_pages), "dual_page_divider", true, unchanged);
-        rows.check(I18n.t(R.string.ui_page_dividing_line_scroll_pages), I18n.t(R.string.ui_show_a_dividing_line_between_scroll_pages), "scroll_divider", false, unchanged);
         rows.check(I18n.t(R.string.ui_punch_hole_display_portrait), I18n.t(R.string.ui_expands_the_image_area_to_punch_holes), "cutout_port", false, unchanged);
         rows.check(I18n.t(R.string.ui_punch_hole_display_landscape), I18n.t(R.string.ui_expands_the_image_area_to_punch_holes), "cutout_land", false, unchanged);
         rows.section("CACHE DATA");

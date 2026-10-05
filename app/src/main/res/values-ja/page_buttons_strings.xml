@@ -23,9 +23,6 @@
     <string name="pb_both_next">すべて次へ</string>
     <string name="pb_reverse">前へ／次へを入れ替える</string>
     <string name="pb_fixed">読書方向による自動入れ替えをしない</string>
-    <string name="pb_scroll">縦スクロール時の動作</string>
-    <string name="pb_overlap">スクロール後に残す重なり</string>
-    <string name="pb_overlap_hint">単位は文字サイズ基準（sp）。大きいほど1回の移動が短くなります。</string>
     <string name="pb_reset">初期値</string>
     <string name="pb_previous">− 前へ</string>
     <string name="pb_next">＋ 次へ</string>

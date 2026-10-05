@@ -18,7 +18,6 @@ import android.os.Looper;
 
 import android.text.InputType;
 import android.view.Gravity;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -107,7 +106,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private TextView rightPageButton;
     private final TextView[] extraPageButtons = new TextView[2];
     private FrameLayout pageCanvas;
-    private ContinuousReader continuous;
     private String bookPassword;
     private final java.util.Map<String,File> archiveVolumes=new java.util.HashMap<>();
     private boolean requestingBookAccess;
@@ -168,17 +166,11 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         topChrome.addView(buildReaderMenu(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
         chromeTop = topChrome;
 
-        FrameLayout canvas = new FrameLayout(this);
-        pageCanvas = canvas;
         imageView = new ZoomImageView(this);
+        ReaderPageCanvas canvas = new ReaderPageCanvas(this, imageView);
+        pageCanvas = canvas;
         imageView.setInteractionListener(this);
         canvas.addView(imageView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        continuous = new ContinuousReader(this, worker, index -> readerDrawable(index,decodeLayout(index)), index -> {
-            if (!initialized || !vertical() || page == index) return;
-            page = index; updateControls(); saveReadingPosition(page);
-        }, forward -> { if (forward) forward(); else back(); }, this);
-        continuous.setVisibility(View.GONE);
-        canvas.addView(continuous, new FrameLayout.LayoutParams(-1, -1));
         leftPageButton = PageButtonDialog.button(this);
         rightPageButton = PageButtonDialog.button(this);
         leftPageButton.setOnClickListener(view -> pageButton(false));
@@ -194,6 +186,8 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
             extraPageButtons[i].setVisibility(View.GONE);
             canvas.addView(extraPageButtons[i]);
         }
+        for (TextView button : new TextView[]{leftPageButton, rightPageButton, extraPageButtons[0], extraPageButtons[1]})
+            canvas.bindPageButton(button);
         canvas.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
             if(r-l!=or-ol || b-t!=ob-ot) updatePageButtons();
         });
@@ -291,7 +285,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         imageView.setFitMode(AppState.fitMode(this));
         imageView.setDoubleTapScale(AppState.doubleTapScale(this) / 100f);
         imageView.setDoubleTapMode(AppState.doubleTapMode(this));
-        imageView.setVerticalPaging(AppState.verticalPageSwipe(this));
         imageView.setFilterMode(AppState.FILTER_NONE);
         updatePageButtons();
         applyBrightness(AppState.brightness(this));
@@ -332,7 +325,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
 
     private void initializeSource(int savedPage, int savedHalf) {
         if(imageView!=null)imageView.setImageDrawable(null);
-        if(continuous!=null)continuous.reset(0,0);
         initialized = false;
         showLoading(true);
         showError(null);
@@ -355,9 +347,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
                     page = openedPage;
                     if (usesDualPageLayout()) page -= page % 2;
                     initialized = true;
-                    continuous.setVisibility(vertical() ? View.VISIBLE : View.GONE);
-                    imageView.setVisibility(vertical() ? View.GONE : View.VISIBLE);
-                    if (vertical()) continuous.reset(totalPages, page);
                     updatePageCount(totalPages);
                     loadPage(page, false);
                     if (!openedSequence.complete()) scanRemainingPages(openedSequence,openedSource,openToken);
@@ -568,7 +557,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private void displayBitmap(Bitmap bitmap) {
         imageView.setImageBitmap(bitmap);
         imageView.setFilterMode(AppState.FILTER_NONE);
-        if(vertical())return;
         int target=page,token=loadToken,generation=renderGeneration;
         worker.execute(() -> {
             if(destroyed || pageSource==null)return;
@@ -586,7 +574,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     }
 
     private void goToPage(int target) {
-        if (vertical() && target >= 0 && target < totalPages) continuous.setSelection(target);
         if (usesDualPageLayout()) target -= target % 2;
         if (target < 0 || target >= totalPages || target == page && imageView.getDrawable() != null) return;
         prefetchForward = target > page;
@@ -599,8 +586,8 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         return next >= 0 && next < totalPages ? next : -1;
     }
 
-    private void forward() { prefetchForward=true;if (vertical()) { if (continuous.canScrollVertically(1)) { continuous.move(true); return; } if(pageCountReady()){nextBook(true);return;} } int next = nextIndex(page, true); if (next >= 0) goToPage(next); else if(pageCountReady())nextBook(true); }
-    private void back() { prefetchForward=false;if (vertical()) { if (continuous.canScrollVertically(-1)) { continuous.move(false); return; } if(pageCountReady()){nextBook(false);return;} } int previous = nextIndex(page, false); if (previous >= 0) goToPage(previous); else nextBook(false); }
+    private void forward() { prefetchForward=true;int next = nextIndex(page, true); if (next >= 0) goToPage(next); else if(pageCountReady())nextBook(true); }
+    private void back() { prefetchForward=false;int previous = nextIndex(page, false); if (previous >= 0) goToPage(previous); else nextBook(false); }
 
     private void updateControls() {
         boolean dualPage = usesDualPageLayout();
@@ -614,7 +601,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private void updatePageCount(int count) {
         if(totalPages!=count) {
             totalPages=count;
-            if(vertical())continuous.setPageCount(totalPages);
         }
         pageSlider.setMax(Math.max(0,totalPages-1));
         pageSlider.setEnabled(pageCountReady());updateControls();
@@ -650,31 +636,15 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     private void showReaderMenu() {
         Ui.Actions menu = new Ui.Actions();
         if (initialized) {
-            menu.add(I18n.t(R.string.ui_find_page), this::showPageNavigation);
             menu.add(I18n.t(R.string.ui_bookmark_actions), this::showBookmarkActions);
         }
         if (initialized) menu.add(I18n.t(autoDelayMs > 0 ? R.string.ui_stop_auto_page_turn : R.string.ui_auto_page_turn), () -> {
             if (autoDelayMs > 0) stopAutoPage(); else showAutoPageDialog();
         });
-        menu.add(I18n.t(R.string.ui_scroll_mode), this::showReadingFlowDialog);
         menu.add(I18n.t(R.string.ui_fit_screen), this::showFitDialog);
         menu.add(I18n.t(R.string.ui_screen_rotation), this::showOrientationDialog);
-        if (vertical()) menu.add(I18n.t(R.string.ui_page_spacing), () -> {
-            PreferenceRows rows = new PreferenceRows(this);
-            rows.slider(I18n.t(R.string.ui_page_spacing), "page_gap", 0, 0, 100, " dp", this::refreshReader);
-            rows.show(I18n.t(R.string.ui_page_spacing));
-        });
         menu.add(I18n.t(R.string.ui_page_button_area), () -> ReaderOptions.pageButtons(this, this::refreshReader));
-        menu.add(I18n.t(R.string.ui_hardware_key), () -> ReaderOptions.hardware(this, () -> { }));
         menu.show(this, I18n.t(R.string.ui_reader_menu));
-    }
-
-    private void showPageNavigation() {
-        Ui.Actions menu = new Ui.Actions();
-        menu.add(I18n.t(R.string.ui_page_thumbnails), this::showPageList);
-        menu.add(I18n.t(R.string.ui_chapters), this::showChapters);
-        menu.add(I18n.t(R.string.ui_go_to_page), this::showPageJump);
-        menu.show(this, I18n.t(R.string.ui_find_page));
     }
 
     private void showPageList() {
@@ -734,24 +704,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         }
     }
 
-    private void showChapters() {
-        if(!requirePageCount())return;
-        ArrayList<Integer> indices = new ArrayList<>(); ArrayList<String> labels = new ArrayList<>();
-        if (!pageSource.chapters.isEmpty()) {
-            for (PageSource.Chapter chapter : pageSource.chapters) { indices.add(sequence.display(chapter.page,0)); labels.add(chapter.title); }
-        } else {
-            String previous = null;
-            for (int i = 0; i < totalPages; i++) {
-                String name = pageSource.pageName(sequence.original(i));
-                String chapter = name.contains("/") ? name.substring(0, name.lastIndexOf('/')) : I18n.t(R.string.ui_first_chapter);
-                if (!chapter.equals(previous)) { indices.add(i); labels.add(chapter); }
-                previous = chapter;
-            }
-        }
-        Ui.show(new AlertDialog.Builder(this).setTitle(I18n.t(R.string.ui_chapters)).setItems(labels.toArray(new String[0]),
-                (dialog, selected) -> goToPage(indices.get(selected))).setNegativeButton(I18n.t(R.string.ui_close), null));
-    }
-
     private void showBookmarkActions() {
         Ui.Actions menu = new Ui.Actions();
         menu.add(I18n.t(AppState.hasBookmark(this, sourceUri, originalPage()) ? R.string.ui_remove_this_bookmark : R.string.ui_bookmark_this_page), this::toggleBookmark);
@@ -766,8 +718,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     }
 
     private void showPageLayoutDialog() { ReaderOptions.pageLayout(this, this::refreshReader); }
-
-    private void showReadingFlowDialog() { ReaderOptions.readingFlow(this, this::refreshReader); }
 
     private void showFilterDialog() { ReaderOptions.filters(this, this::refreshReader); }
 
@@ -860,30 +810,8 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     }
 
     @Override public void onSwipe(int direction) {
-        if (!initialized) return;
+        if (!initialized || (direction != AppState.PAGE_SWIPE_LEFT && direction != AppState.PAGE_SWIPE_RIGHT)) return;
         if (direction == AppState.pageSwipeDirection(this)) forward(); else back();
-    }
-
-    @Override public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (AppState.prefs(this).contains("setting.key." + keyCode)) {
-            switch (ReaderOptions.keyAction(this, keyCode)) {
-                case 1: back(); break; case 2: forward(); break; case 3: toggleChrome(); break;
-                case 4: toggleBookmark(); break; default: break;
-            }
-            return true;
-        }
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_PAGE_UP) { if (AppState.direction(this) == AppState.DIRECTION_RTL) forward(); else back(); return true; }
-        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_PAGE_DOWN) { if (AppState.direction(this) == AppState.DIRECTION_RTL) back(); else forward(); return true; }
-        if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) { toggleChrome(); return true; }
-        if (AppState.volumeNavigation(this) && keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-            if (AppState.reverseVolumeNavigation(this)) back(); else forward();
-            return true;
-        }
-        if (AppState.volumeNavigation(this) && keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-            if (AppState.reverseVolumeNavigation(this)) forward(); else back();
-            return true;
-        }
-        return super.onKeyDown(keyCode, event);
     }
 
     @Override protected void onResume() {
@@ -918,7 +846,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     @Override protected void onDestroy() {
         destroyed = true;
         if (pageListDialog != null) pageListDialog.dismiss();
-        if (continuous != null) continuous.stop();
         loadToken++;
         sourceToken++;
         stopAutoPage();
@@ -934,10 +861,9 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
     }
 
     private boolean usesDualPageLayout() {
-        return !vertical() && usesDualPageLayout(pageLayout, getResources().getConfiguration().orientation);
+        return usesDualPageLayout(pageLayout, getResources().getConfiguration().orientation);
     }
 
-    private boolean vertical() { return AppState.readingFlow(this) == AppState.FLOW_VERTICAL; }
     private void refreshReader() {
         if (!initialized) return;
         if (sequence.split != (AppState.pageLayout(this)==AppState.PAGE_FORCE_SINGLE)) {
@@ -951,10 +877,6 @@ public final class ViewerActivity extends BaseActivity implements ZoomImageView.
         cropPercent = AppState.cropPercent(this);
         pageLayout = AppState.pageLayout(this); dualPageDivider = AppState.dualPageDivider(this);
         imageView.setDoubleTapScale(AppState.doubleTapScale(this)/100f); imageView.setDoubleTapMode(AppState.doubleTapMode(this));
-        imageView.setVerticalPaging(AppState.verticalPageSwipe(this));
-        imageView.setVisibility(vertical() ? View.GONE : View.VISIBLE); continuous.setVisibility(vertical() ? View.VISIBLE : View.GONE);
-        continuous.setDividerHeight(dp(AppState.number(this, "page_gap", 0)) + (AppState.enabled(this, "scroll_divider", false) ? 1 : 0));
-        if (vertical()) continuous.reset(totalPages, page);
         invalidatePages(); updatePageButtons(); loadPage(usesDualPageLayout() ? page - page % 2 : page, false); applyDisplayCutout();
     }
     private boolean pageButtonForward(boolean right) {

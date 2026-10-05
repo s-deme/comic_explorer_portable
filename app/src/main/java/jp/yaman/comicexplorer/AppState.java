@@ -22,14 +22,10 @@ public final class AppState {
     public static final int DIRECTION_RTL = 1;
     public static final int PAGE_SWIPE_LEFT = -1;
     public static final int PAGE_SWIPE_RIGHT = 1;
-    public static final int PAGE_SWIPE_UP = -2;
-    public static final int PAGE_SWIPE_DOWN = 2;
     public static final int FIT_SCREEN = 0;
     public static final int FIT_WIDTH = 1;
     public static final int FIT_HEIGHT = 2;
     public static final int FIT_STRETCH = 3;
-    public static final int FLOW_HORIZONTAL = 0;
-    public static final int FLOW_VERTICAL = 1;
     public static final int PAGE_SINGLE = 0;
     public static final int PAGE_DUAL = 1;
     public static final int PAGE_AUTO = 2;
@@ -349,15 +345,13 @@ public final class AppState {
 
     public static int pageSwipeDirection(Context context) {
         int stored = number(context, "page_swipe_direction", 0);
-        if (stored == PAGE_SWIPE_LEFT || stored == PAGE_SWIPE_RIGHT || stored == PAGE_SWIPE_UP || stored == PAGE_SWIPE_DOWN) return stored;
+        if (stored == PAGE_SWIPE_LEFT || stored == PAGE_SWIPE_RIGHT) return stored;
         return direction(context) == DIRECTION_RTL ? PAGE_SWIPE_RIGHT : PAGE_SWIPE_LEFT;
     }
 
     public static void setPageSwipeDirection(Context context, int direction) {
-        if (direction == PAGE_SWIPE_LEFT || direction == PAGE_SWIPE_RIGHT || direction == PAGE_SWIPE_UP || direction == PAGE_SWIPE_DOWN) put(context, "page_swipe_direction", direction);
+        if (direction == PAGE_SWIPE_LEFT || direction == PAGE_SWIPE_RIGHT) put(context, "page_swipe_direction", direction);
     }
-
-    public static boolean verticalPageSwipe(Context context) { return Math.abs(pageSwipeDirection(context)) == 2; }
 
     public static int fitMode(Context context) {
         return number(context, "fit", FIT_SCREEN);
@@ -375,11 +369,6 @@ public final class AppState {
         return enabled(context, "resume_last_position", true);
     }
 
-    public static boolean volumeNavigation(Context context) {
-        return enabled(context, "volume_navigation", false);
-    }
-
-    public static boolean reverseVolumeNavigation(Context context) { return enabled(context, "reverse_volume_navigation", false); }
     public static boolean gridView(Context context) { return enabled(context, "grid_view", false); }
     public static void setGridView(Context context, boolean enabled) { put(context, "grid_view", enabled); }
     public static int gridColumns(Context context) { return Math.max(1, Math.min(10, number(context, "grid_columns", 4))); }
@@ -387,8 +376,6 @@ public final class AppState {
     public static boolean leftLibraryScrollbar(Context context) { return enabled(context, "left_library_scrollbar", false); }
     public static boolean pageButtons(Context context) { return enabled(context, "page_buttons", true); }
     public static int pageButtonOpacity(Context context) { return Math.max(0, Math.min(100, number(context, "page_button_opacity", 100))); }
-    public static int readingFlow(Context context) { return number(context, "reading_flow", FLOW_HORIZONTAL); }
-    public static void setReadingFlow(Context context, int mode) { put(context, "reading_flow", mode); }
     public static int pageLayout(Context context) { return Math.max(PAGE_SINGLE, Math.min(PAGE_FORCE_SINGLE, number(context, "page_layout", PAGE_SINGLE))); }
     public static void setPageLayout(Context context, int mode) { put(context, "page_layout", Math.max(PAGE_SINGLE, Math.min(PAGE_FORCE_SINGLE, mode))); }
     public static boolean dualPageDivider(Context context) { return enabled(context, "dual_page_divider", true); }

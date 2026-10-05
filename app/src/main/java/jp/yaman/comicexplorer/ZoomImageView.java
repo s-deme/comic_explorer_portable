@@ -32,7 +32,6 @@ public final class ZoomImageView extends ImageView {
     private boolean multiTouch;
     private int activePointer;
     private final int touchSlop;
-    private boolean verticalPaging;
     private int filterMode;
     private int fitMode = AppState.FIT_SCREEN;
     private InteractionListener listener;
@@ -89,11 +88,7 @@ public final class ZoomImageView extends ImageView {
                 if (listener == null || relativeScale > 1.05f) return false;
                 float dx = end.getX() - start.getX();
                 float dy = end.getY() - start.getY();
-                if (verticalPaging && !canPan(false) && Math.abs(dy) > touchSlop * 4 && Math.abs(dy) > Math.abs(dx) * 1.5f && Math.abs(velocityY) > 400) {
-                    listener.onSwipe(dy < 0 ? -2 : 2);
-                    return true;
-                }
-                if (!verticalPaging && !canPan(true) && Math.abs(dx) > touchSlop * 4 && Math.abs(dx) > Math.abs(dy) * 1.5f && Math.abs(velocityX) > 400) {
+                if (!canPan(true) && Math.abs(dx) > touchSlop * 4 && Math.abs(dx) > Math.abs(dy) * 1.5f && Math.abs(velocityX) > 400) {
                     listener.onSwipe(dx < 0 ? -1 : 1);
                     return true;
                 }
@@ -106,7 +101,6 @@ public final class ZoomImageView extends ImageView {
     public void setFitMode(int mode) { fitMode = mode; fitImage(); }
     public void setDoubleTapScale(float scale) { doubleTapScale = Math.max(1f, Math.min(6f, scale)); }
     public void setDoubleTapMode(int mode) { doubleTapMode = mode; }
-    public void setVerticalPaging(boolean enabled) { verticalPaging = enabled; }
     public void setFilterMode(int mode) { filterMode = mode; applyColorFilter(); }
 
     private void applyColorFilter() {

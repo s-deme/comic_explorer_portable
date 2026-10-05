@@ -40,7 +40,6 @@ import java.util.concurrent.Executors;
 /** Product-facing local library: folder browsing, filtering, history and bookmarks. */
 public final class MainActivity extends BaseActivity {
     private static final int REQUEST_TREE = 41;
-    private static final int REQUEST_FILE = 42;
     private static final int REQUEST_MOVE = 43;
     private static final int MODE_LIBRARY = 0;
     private static final int MODE_RECENTS = 2;
@@ -154,9 +153,6 @@ public final class MainActivity extends BaseActivity {
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
         toolbar.setPadding(dp(4), 0, dp(4), 0);
         toolbar.setBackgroundColor(Ui.TOOLBAR);
-        upButton = toolbarButton(R.drawable.ic_arrow_back, I18n.t(R.string.ui_parent_folder));
-        upButton.setOnClickListener(view -> goUp());
-        toolbar.addView(upButton, new LinearLayout.LayoutParams(dp(48), dp(56)));
         screenTitle = text("Comic Explorer", 20, Ui.TEXT_PRIMARY);
         Ui.title(screenTitle);
         screenTitle.setGravity(Gravity.CENTER_VERTICAL);
@@ -182,6 +178,14 @@ public final class MainActivity extends BaseActivity {
         tabs.addView(recentsDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         tabs.addView(bookmarksDestination, new LinearLayout.LayoutParams(0, dp(48), 1f));
         root.addView(tabs, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setBackgroundColor(Ui.SURFACE_RAISED);
+        upButton = addLibraryAction(actions, R.drawable.ic_folder_up, R.string.ui_parent_folder, this::goUp);
+        addLibraryAction(actions, R.drawable.ic_toolbar_refresh, R.string.ui_refresh, this::refresh);
+        addLibraryAction(actions, R.drawable.ic_library_view, R.string.ui_list_type, this::toggleCollectionView);
+        addLibraryAction(actions, R.drawable.ic_toolbar_sort, R.string.ui_sort, this::chooseSort);
+        root.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
 
         search = new EditText(this);
         search.setSingleLine(true);
@@ -280,6 +284,13 @@ public final class MainActivity extends BaseActivity {
         return button;
     }
 
+    private ImageButton addLibraryAction(LinearLayout row, int icon, int label, Runnable action) {
+        ImageButton button = Ui.iconButton(this, icon, I18n.t(label));
+        button.setOnClickListener(view -> action.run());
+        row.addView(button, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        return button;
+    }
+
     private Button tabButton(String label, int targetMode, String description) {
         Button button = new Button(this);
         button.setText(label);
@@ -329,15 +340,6 @@ public final class MainActivity extends BaseActivity {
         startActivityForResult(intent, REQUEST_TREE);
     }
 
-    private void chooseFile() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.setType("*/*");
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf", "application/zip", "application/x-cbz", "application/vnd.rar", "application/x-rar-compressed", "application/x-cbr", "application/vnd.comicbook-rar", "application/x-7z-compressed", "image/*"});
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-        startActivityForResult(intent, REQUEST_FILE);
-    }
-
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null) { transferring = null; return; }
@@ -350,12 +352,6 @@ public final class MainActivity extends BaseActivity {
             Uri destination = DocumentsContract.buildDocumentUriUsingTree(target, DocumentsContract.getTreeDocumentId(target));
             final boolean move = movingFiles; final int conflict = transferConflict;
             fileOperation(() -> { for (LibraryEntry item : items) new DocumentTransfer(this).transfer(item, destination, move, conflict); }); return;
-        }
-        if (requestCode == REQUEST_FILE) {
-            Uri uri = data.getData();
-            try { getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (SecurityException ignored) { }
-            openExternal(uri);
-            return;
         }
         if (requestCode != REQUEST_TREE) return;
         treeUri = data.getData();
@@ -405,7 +401,11 @@ public final class MainActivity extends BaseActivity {
         Ui.styleTopTab(recentsDestination, mode == MODE_RECENTS);
         Ui.styleTopTab(bookmarksDestination, mode == MODE_BOOKMARKS);
         if (screenTitle != null) screenTitle.setText(mode == MODE_RECENTS ? I18n.t(R.string.ui_history) : mode == MODE_BOOKMARKS ? I18n.t(R.string.ui_add_bookmark) : "Comic Explorer");
-        if (upButton != null) upButton.setVisibility(mode == MODE_LIBRARY && treeUri != null && directoryUri != null && !directoryUri.equals(treeUri) ? View.VISIBLE : View.GONE);
+        if (upButton != null) {
+            boolean canGoUp = canGoUp();
+            upButton.setEnabled(canGoUp);
+            upButton.setAlpha(canGoUp ? 1f : .38f);
+        }
     }
 
     private void toggleSearchPanel() {
@@ -435,14 +435,8 @@ public final class MainActivity extends BaseActivity {
 
     private void showAppMenu() {
         Ui.Actions menu = new Ui.Actions();
-        menu.add(I18n.t(R.string.ui_refresh), this::refresh);
-        menu.add(I18n.t(R.string.ui_open_file), this::chooseFile);
-        menu.add(I18n.t(R.string.ui_list_type), this::toggleCollectionView);
-        menu.add(I18n.t(R.string.ui_sort), this::chooseSort);
         if (mode == MODE_LIBRARY) {
             menu.add(I18n.t(R.string.ui_select_folder_again), this::chooseFolder);
-            if (treeUri != null && directoryUri != null && !directoryUri.equals(treeUri))
-                menu.add(I18n.t(R.string.ui_parent_folder), this::goUp);
         }
         menu.add(I18n.t(R.string.ui_settings), () -> startActivity(new Intent(this, SettingsActivity.class)));
         menu.show(this, I18n.t(R.string.ui_menu));
@@ -504,6 +498,7 @@ public final class MainActivity extends BaseActivity {
                 if (finalError == null) allRows.addAll(finalLoaded);
                 pathText.setText(finalError == null ? LibraryDirectoryReader.displayName(getContentResolver(), requestedDirectory) : I18n.t(R.string.ui_cannot_open_folder));
                 stateText.setText(finalError == null ? finalLoaded.size() + I18n.t(R.string.ui_items) : finalError);
+                emptyProgress.setVisibility(View.GONE);
                 if (finalError != null) showEmptyState(I18n.t(R.string.ui_cannot_open_folder), finalError + I18n.t(R.string.ui_select_the_folder_again), I18n.t(R.string.ui_choose_again), false);
                 applyFilters();
             });
@@ -567,11 +562,19 @@ public final class MainActivity extends BaseActivity {
         if (emptyPanel != null) emptyPanel.setVisibility(View.GONE);
     }
 
+    private boolean canGoUp() {
+        return mode == MODE_LIBRARY && treeUri != null && directoryUri != null
+                && !directoryUri.equals(treeUri)
+                && !DocumentsContract.getDocumentId(directoryUri).equals(DocumentsContract.getTreeDocumentId(treeUri));
+    }
+
     private void goUp() {
-        if (treeUri == null || directoryUri == null || directoryUri.equals(treeUri)) return;
+        if (!canGoUp()) return;
         String currentId = DocumentsContract.getDocumentId(directoryUri);
         int cut = currentId.lastIndexOf('/');
-        directoryUri = cut <= 0 ? treeUri : DocumentsContract.buildDocumentUriUsingTree(treeUri, currentId.substring(0, cut));
+        String parentId = cut <= 0 ? DocumentsContract.getTreeDocumentId(treeUri) : currentId.substring(0, cut);
+        directoryUri = parentId.equals(DocumentsContract.getTreeDocumentId(treeUri))
+                ? treeUri : DocumentsContract.buildDocumentUriUsingTree(treeUri, parentId);
         loadDirectory();
     }
 
@@ -703,7 +706,7 @@ public final class MainActivity extends BaseActivity {
     }
     @Override public void onBackPressed() {
         if (mode != MODE_LIBRARY) { mode = MODE_LIBRARY; if (treeUri == null) showEmptyLibrary(); else loadDirectory(); }
-        else if (directoryUri != null && !directoryUri.equals(treeUri)) goUp(); else super.onBackPressed();
+        else if (canGoUp()) goUp(); else super.onBackPressed();
     }
 
     @Override protected void onDestroy() {

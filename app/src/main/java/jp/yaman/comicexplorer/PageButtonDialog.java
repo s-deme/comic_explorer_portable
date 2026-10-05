@@ -25,12 +25,12 @@ final class PageButtonDialog {
     private final Runnable changed;
     private final View content;
     private final FrameLayout preview;
-    private final CheckBox[] checks = new CheckBox[5];
-    private final String[] keys = {"page_buttons", "page_both_next", "page_reverse", "page_fixed", "scroll_smooth"};
-    private final boolean[] defaults = {true, false, false, false, false};
+    private final CheckBox[] checks = new CheckBox[4];
+    private final String[] keys = {"page_buttons", "page_both_next", "page_reverse", "page_fixed"};
+    private final boolean[] defaults = {true, false, false, false};
     private final int[] typeIds = {R.id.pop_pagebtn_rdo_type0, R.id.pop_pagebtn_rdo_type1, R.id.pop_pagebtn_rdo_type2, R.id.pop_pagebtn_rdo_type3};
     private final RadioGroup types, horizontal, vertical;
-    private final SeekBar opacity, size, offset;
+    private final SeekBar opacity, size;
     private final TextView minus, plus;
     private final TextView[] previewAreas = new TextView[4];
     private final TextView[] previewIcons = new TextView[4];
@@ -49,7 +49,7 @@ final class PageButtonDialog {
         types = content.findViewById(R.id.pop_pagebtn_rdgp_type);
         horizontal = content.findViewById(R.id.pop_pagebtn_rdgp_position1);
         vertical = content.findViewById(R.id.pop_pagebtn_rdgp_position2);
-        int[] ids = {R.id.pop_pagebtn_use_chk, R.id.pop_pagebtn_plpl_chk, R.id.pop_pagebtn_reverse_chk, R.id.pop_pagebtn_fix_chk, R.id.pop_pagebtn_smooth};
+        int[] ids = {R.id.pop_pagebtn_use_chk, R.id.pop_pagebtn_plpl_chk, R.id.pop_pagebtn_reverse_chk, R.id.pop_pagebtn_fix_chk};
         for (int i = 0; i < ids.length; i++) {
             checks[i] = content.findViewById(ids[i]);
             checks[i].setChecked(AppState.enabled(activity, keys[i], defaults[i]));
@@ -72,9 +72,8 @@ final class PageButtonDialog {
             TextView choice = content.findViewById(typeIds[i]);
             choice.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, layoutIcon(i), null);
         }
-        opacity = slider(R.id.pop_pagebtn_alpha_seek, R.id.pop_pagebtn_alpha_value, AppState.pageButtonOpacity(activity), R.string.ui_opacity, false);
-        size = slider(R.id.pop_pagebtn_thick_seek, R.id.pop_pagebtn_thick_value, sizePercent(activity), R.string.ui_size, false);
-        offset = slider(R.id.pop_pagebtn_offset_seek, R.id.pop_pagebtn_offset_value, AppState.number(activity, "scroll_overlap", 23), R.string.pb_overlap, true);
+        opacity = slider(R.id.pop_pagebtn_alpha_seek, R.id.pop_pagebtn_alpha_value, AppState.pageButtonOpacity(activity), R.string.ui_opacity);
+        size = slider(R.id.pop_pagebtn_thick_seek, R.id.pop_pagebtn_thick_value, sizePercent(activity), R.string.ui_size);
         types.check(typeIds[Math.max(0, Math.min(3, AppState.number(activity, "page_type", 0)))]);
         horizontal.check(AppState.enabled(activity,"page_horizontal_both",false) ? R.id.pop_pagebtn_rdo_position_horizontal_both
                 : AppState.enabled(activity, "page_bottom", AppState.number(activity,"page_position",0) != 1) ? R.id.pop_pagebtn_rdo_position_bottom : R.id.pop_pagebtn_rdo_position_top);
@@ -101,21 +100,21 @@ final class PageButtonDialog {
             types.check(typeIds[0]);
             horizontal.check(R.id.pop_pagebtn_rdo_position_bottom);
             vertical.check(R.id.pop_pagebtn_rdo_position_left);
-            opacity.setProgress(100); size.setProgress(10); offset.setProgress(23);
+            opacity.setProgress(100); size.setProgress(10);
             update();
         });
         content.post(this::update);
     }
 
-    private SeekBar slider(int id, int labelId, int value, int description, boolean overlap) {
+    private SeekBar slider(int id, int labelId, int value, int description) {
         SeekBar bar = content.findViewById(id);
         TextView label = content.findViewById(labelId);
         bar.setContentDescription(I18n.t(description));
         bar.setProgress(value);
-        label.setText(bar.getProgress() + (overlap ? " sp" : "%"));
+        label.setText(bar.getProgress() + "%");
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar view,int progress,boolean user) {
-                label.setText(progress + (overlap ? " sp" : "%")); update();
+                label.setText(progress + "%"); update();
             }
             public void onStartTrackingTouch(SeekBar view) { }
             public void onStopTrackingTouch(SeekBar view) { }
@@ -129,7 +128,7 @@ final class PageButtonDialog {
     }
 
     private void update() {
-        if (offset == null) return;
+        if (size == null) return;
         int type = type();
         horizontal.setVisibility(type==0 ? View.VISIBLE : View.GONE);
         vertical.setVisibility(type==1 ? View.VISIBLE : View.GONE);
@@ -141,7 +140,7 @@ final class PageButtonDialog {
         for (RadioGroup group : new RadioGroup[]{types,horizontal,vertical}) {
             for(int i=0;i<group.getChildCount();i++) group.getChildAt(i).setEnabled(enabled);
         }
-        opacity.setEnabled(enabled); size.setEnabled(enabled); offset.setEnabled(enabled);
+        opacity.setEnabled(enabled); size.setEnabled(enabled);
         boolean bothEdges = type==0 ? horizontal.getCheckedRadioButtonId()==R.id.pop_pagebtn_rdo_position_horizontal_both
                 : type==1 && vertical.getCheckedRadioButtonId()==R.id.pop_pagebtn_rdo_position_vertical_both;
         FrameLayout.LayoutParams[] params = layouts(type, horizontal.getCheckedRadioButtonId()==R.id.pop_pagebtn_rdo_position_bottom,
@@ -204,8 +203,7 @@ final class PageButtonDialog {
                 .putBoolean("setting.page_horizontal_both",horizontal.getCheckedRadioButtonId()==R.id.pop_pagebtn_rdo_position_horizontal_both)
                 .putBoolean("setting.page_vertical_both",vertical.getCheckedRadioButtonId()==R.id.pop_pagebtn_rdo_position_vertical_both)
                 .putInt("setting.page_button_opacity",opacity.getProgress())
-                .putInt("setting.page_button_percent",size.getProgress())
-                .putInt("setting.scroll_overlap",offset.getProgress()).apply();
+                .putInt("setting.page_button_percent",size.getProgress()).apply();
         changed.run();
     }
 

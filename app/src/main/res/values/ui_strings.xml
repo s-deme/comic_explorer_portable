@@ -8,7 +8,6 @@
     <string name="ui_double_tap_zoom" formatted="false">"Double tap zoom"</string>
     <string name="ui_delete_cache" formatted="false">"Delete cache?"</string>
     <string name="ui_language" formatted="false">"Language"</string>
-    <string name="ui_could_not_load_page" formatted="false">" Could not load page: "</string>
     <string name="ui_clear_thumbnails" formatted="false">"Clear Thumbnails"</string>
     <string name="ui_bookmark_this_page" formatted="false">"Bookmark this page"</string>
     <string name="ui_reset_all_settings" formatted="false">"Reset all settings?"</string>
@@ -27,9 +26,6 @@
     <string name="ui_single_page" formatted="false">"Single page"</string>
     <string name="ui_sync_data_is_too_large" formatted="false">"Sync data is too large"</string>
     <string name="ui_left" formatted="false">"Left"</string>
-    <string name="ui_up" formatted="false">"Up"</string>
-    <string name="ui_scroll_animation" formatted="false">"Scroll animation"</string>
-    <string name="ui_add_hardware_key" formatted="false">"Add hardware key"</string>
     <string name="ui_delete_reading_data_and_library_registrations_book_files_will_be" formatted="false">"Delete reading data and library registrations? Book files will be kept."</string>
     <string name="ui_two_pages" formatted="false">"Two pages"</string>
     <string name="ui_open_the_last_compressed_file" formatted="false">"Open the last compressed file"</string>
@@ -52,9 +48,7 @@
     <string name="ui_cannot_open_file" formatted="false">"Cannot open file."</string>
     <string name="ui_search_library" formatted="false">"Search library"</string>
     <string name="ui_descending" formatted="false">"Descending"</string>
-    <string name="ui_continuous_vertical_scrolling" formatted="false">"Continuous vertical scrolling"</string>
     <string name="ui_right" formatted="false">"Right"</string>
-    <string name="ui_down" formatted="false">"Down"</string>
     <string name="ui_try_a_different_name" formatted="false">"Try a different name."</string>
     <string name="ui_reader_menu" formatted="false">"Reader menu "</string>
     <string name="ui_refresh" formatted="false">"Refresh"</string>
@@ -65,15 +59,12 @@
     <string name="ui_delete_archive_cache" formatted="false">"Delete archive cache"</string>
     <string name="ui_reset_all_settings_2" formatted="false">"Reset all settings"</string>
     <string name="ui_enter_a_color_as_rrggbb" formatted="false">"Enter a color as #RRGGBB"</string>
-    <string name="ui_page_dividing_line_scroll_pages" formatted="false">"Page dividing line - scroll pages"</string>
     <string name="ui_choose_another_folder" formatted="false">"Choose another folder"</string>
     <string name="ui_cannot_read_folder" formatted="false">"Cannot read folder."</string>
     <string name="ui_retention" formatted="false">"Retention"</string>
     <string name="ui_cannot_read_cache" formatted="false">"Cannot read cache"</string>
     <string name="ui_stretch_to_fill_screen" formatted="false">"Stretch to fill screen"</string>
-    <string name="ui_key_binding_saved" formatted="false">"Key binding saved"</string>
     <string name="ui_screen_rotation" formatted="false">"Screen rotation"</string>
-    <string name="ui_disabled" formatted="false">"Disabled"</string>
     <string name="ui_open" formatted="false">"Open"</string>
     <string name="ui_unsupported_format_choose_pdf_cbz_zip_or_images" formatted="false">"Unsupported format. Choose PDF, ZIP/CBZ, RAR/CBR, 7z or images."</string>
     <string name="ui_zip_compression_method_not_supported" formatted="false">"This ZIP compression method is not supported"</string>
@@ -85,14 +76,12 @@
     <string name="ui_select_the_folder_again" formatted="false">" Select the folder again."</string>
     <string name="ui_items" formatted="false">" items"</string>
     <string name="ui_delete_permanently" formatted="false">" Delete permanently?"</string>
-    <string name="ui_page_spacing" formatted="false">"Page spacing"</string>
     <string name="ui_file_explorer" formatted="false">"File Explorer"</string>
     <string name="ui_google_authorization_failed_check_the_app_oauth_registration_and_google" formatted="false">"Google authorization failed. Check the app OAuth registration and Google Play services."</string>
     <string name="ui_cannot_read_image" formatted="false">"Cannot read image."</string>
     <string name="ui_sharpening_strength" formatted="false">"Sharpening strength"</string>
     <string name="ui_no_supported_files" formatted="false">"No supported files"</string>
     <string name="ui_sort" formatted="false">"Sort"</string>
-    <string name="ui_use_volume_keys" formatted="false">"Use volume keys"</string>
     <string name="ui_image_fit_to_screen" formatted="false">"Image fit to screen"</string>
     <string name="ui_choose_the_folder_containing_your_comics" formatted="false">"Choose the folder containing your comics."</string>
     <string name="ui_books" formatted="false">"Books"</string>
@@ -105,7 +94,6 @@
     <string name="ui_list_type" formatted="false">"List type"</string>
     <string name="ui_cache_size" formatted="false">"Cache size"</string>
     <string name="ui_untitled" formatted="false">"Untitled"</string>
-    <string name="ui_first_chapter" formatted="false">"First chapter"</string>
     <string name="ui_ftp_transfer_did_not_complete" formatted="false">"FTP transfer did not complete"</string>
     <string name="ui_no_history" formatted="false">"No history"</string>
     <string name="ui_files_inside_this_folder_will_also_be_deleted" formatted="false">"\nFiles inside this folder will also be deleted."</string>
@@ -140,13 +128,11 @@
     <string name="ui_bookmark_removed" formatted="false">"Bookmark removed"</string>
     <string name="ui_ascending_2" formatted="false">"Ascending"</string>
     <string name="ui_network_connections" formatted="false">"Network connections"</string>
-    <string name="ui_chapters" formatted="false">"Chapters"</string>
     <string name="ui_enter_a_valid_name" formatted="false">"Enter a valid name"</string>
     <string name="ui_name_2" formatted="false">"Name"</string>
     <string name="ui_parent_folder" formatted="false">"Parent folder"</string>
     <string name="ui_invert_color" formatted="false">"Invert Color"</string>
     <string name="ui_apply" formatted="false">"Apply"</string>
-    <string name="ui_hardware_key" formatted="false">"Hardware key"</string>
     <string name="ui_delete_all_user_data_including_bookmarks_and_thumbnails" formatted="false">"Delete all user data, including bookmarks and thumbnails"</string>
     <string name="ui_bookmarks" formatted="false">"\nBookmarks: "</string>
     <string name="ui_choose_folder" formatted="false">"Choose folder"</string>
@@ -168,17 +154,14 @@
     <string name="ui_previous_page" formatted="false">"Previous page"</string>
     <string name="ui_select_whether_to_use_the_resume_page" formatted="false">"Select whether to use the resume page"</string>
     <string name="ui_every_10_seconds" formatted="false">"Every 10 seconds"</string>
-    <string name="ui_change" formatted="false">"Change"</string>
     <string name="ui_page_thumbnails" formatted="false">"Page thumbnails"</string>
     <string name="ui_lock_portrait" formatted="false">"Lock portrait"</string>
-    <string name="ui_horizontal_swipe" formatted="false">"Horizontal swipe"</string>
     <string name="ui_clear_reading_position" formatted="false">"Clear reading position"</string>
     <string name="ui_brightness" formatted="false">"Brightness"</string>
     <string name="ui_every_5_seconds" formatted="false">"Every 5 seconds"</string>
     <string name="ui_file_not_found" formatted="false">"File not found"</string>
     <string name="ui_cannot_open_image" formatted="false">"Cannot open image."</string>
     <string name="ui_bookmarks_2" formatted="false">"Bookmarks"</string>
-    <string name="ui_press_a_key_to_bind" formatted="false">"Press a key to bind"</string>
     <string name="ui_history" formatted="false">"History"</string>
     <string name="ui_book_thumbnails" formatted="false">"Book thumbnails"</string>
     <string name="ui_remove_from_history" formatted="false">"Remove from history"</string>
@@ -203,7 +186,6 @@
     <string name="ui_show_time_and_battery_status" formatted="false">"Show time and battery status"</string>
     <string name="ui_details" formatted="false">"Details"</string>
     <string name="ui_cannot_open_ftp_file" formatted="false">"Cannot open FTP file"</string>
-    <string name="ui_show_a_dividing_line_between_scroll_pages" formatted="false">"Show a dividing line between scroll pages"</string>
     <string name="ui_google_authorization_did_not_complete" formatted="false">"Google authorization did not complete"</string>
     <string name="ui_encoding" formatted="false">"Encoding"</string>
     <string name="ui_bookmark_added" formatted="false">"Bookmark added"</string>
@@ -215,7 +197,6 @@
     <string name="ui_external_file" formatted="false">"External file"</string>
     <string name="ui_show_reading_history" formatted="false">"Show reading history"</string>
     <string name="ui_clear_all_bookmarks" formatted="false">"Clear all bookmarks"</string>
-    <string name="ui_open_file" formatted="false">"Open file"</string>
     <string name="ui_cannot_update_thumbnail" formatted="false">"Cannot update thumbnail"</string>
     <string name="ui_invalid_image_in_archive" formatted="false">"Invalid image in archive."</string>
     <string name="ui_cancel" formatted="false">"Cancel"</string>
@@ -272,7 +253,6 @@
     <string name="ui_opened_books_appear_here" formatted="false">"Opened books appear here."</string>
     <string name="ui_cannot_connect" formatted="false">"Cannot connect"</string>
     <string name="ui_folder_access_was_revoked" formatted="false">"Folder access was revoked."</string>
-    <string name="ui_reverse_volume_keys" formatted="false">"Reverse volume keys"</string>
     <string name="ui_restore_default_cover" formatted="false">"Restore default cover"</string>
     <string name="ui_cannot_save_cache" formatted="false">"Cannot save cache"</string>
     <string name="ui_sync_failed_check_your_connection_and_google_drive_permissions" formatted="false">"Sync failed. Check your connection and Google Drive permissions."</string>
@@ -300,9 +280,7 @@
     <string name="ui_cannot_open_a_folder_as_a_file" formatted="false">"Cannot open a folder as a file"</string>
     <string name="ui_reading_position" formatted="false">"Reading position: "</string>
     <string name="ui_bookmarked_books" formatted="false">"Bookmarked books"</string>
-    <string name="ui_find_page">Find a page</string>
     <string name="ui_book_actions">Book actions</string>
-    <string name="ui_scroll_mode">Scrolling mode</string>
     <string name="ui_crop_this_book">Select crop area (this book)</string>
     <string name="ui_bookmark_actions">Bookmarks</string>
     <string name="ui_theme_red">Wine</string>

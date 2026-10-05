@@ -33,10 +33,4 @@
     <CheckBox android:id="@+id/pop_pagebtn_plpl_chk" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_both_next" />
     <CheckBox android:id="@+id/pop_pagebtn_reverse_chk" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_reverse" />
     <CheckBox android:id="@+id/pop_pagebtn_fix_chk" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/pb_fixed" />
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_scroll" android:textSize="16sp" android:textStyle="bold" android:layout_marginTop="16dp" android:layout_marginBottom="8dp" android:accessibilityHeading="true" />
-    <CheckBox android:id="@+id/pop_pagebtn_smooth" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/ui_scroll_animation" />
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_overlap" android:textSize="14sp" android:id="@+id/pop_pagebtn_offset_txt" android:layout_marginTop="4dp" />
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/pb_overlap_hint" android:textSize="14sp" android:layout_marginTop="4dp" />
-    <TextView android:id="@+id/pop_pagebtn_offset_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="14sp" />
-    <SeekBar android:id="@+id/pop_pagebtn_offset_seek" android:layout_width="match_parent" android:layout_height="48dp" android:max="50" />
 </LinearLayout>

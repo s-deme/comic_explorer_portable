@@ -5,17 +5,15 @@ import android.content.pm.ActivityInfo;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.app.AlertDialog;
-import android.view.KeyEvent;
 import android.widget.EditText;
-import android.widget.Toast;
 
 public final class ReaderOptions {
     public static final String[] ENCODINGS = {"UTF-8", "Shift_JIS", "IBM437", "GB18030", "Big5", "EUC-KR", "windows-1252"};
     private ReaderOptions() { }
 
     public static void direction(Activity activity, Runnable changed) {
-        int[] directions = {AppState.PAGE_SWIPE_RIGHT, AppState.PAGE_SWIPE_LEFT, AppState.PAGE_SWIPE_UP, AppState.PAGE_SWIPE_DOWN};
-        String[] choices = {I18n.t(R.string.ui_right), I18n.t(R.string.ui_left), I18n.t(R.string.ui_up), I18n.t(R.string.ui_down)};
+        int[] directions = {AppState.PAGE_SWIPE_RIGHT, AppState.PAGE_SWIPE_LEFT};
+        String[] choices = {I18n.t(R.string.ui_right), I18n.t(R.string.ui_left)};
         int checked = 0;
         for (int i = 0; i < directions.length; i++) if (directions[i] == AppState.pageSwipeDirection(activity)) checked = i;
         Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_reading_direction))
@@ -45,19 +43,13 @@ public final class ReaderOptions {
         }));
     }
 
-    public static void readingFlow(Activity activity, Runnable changed) {
-        Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_scroll_mode))
-                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_horizontal_swipe), I18n.t(R.string.ui_continuous_vertical_scrolling)}, AppState.readingFlow(activity), (dialog, selected) -> {
-                    AppState.setReadingFlow(activity, selected);
-                    changed.run();
-                    dialog.dismiss();
-                }));
-    }
-
     public static void pageLayout(Activity activity, Runnable changed) {
+        int[] layouts = {AppState.PAGE_AUTO, AppState.PAGE_SINGLE, AppState.PAGE_DUAL, AppState.PAGE_FORCE_SINGLE};
+        int checked = 0;
+        for (int i = 0; i < layouts.length; i++) if (layouts[i] == AppState.pageLayout(activity)) checked = i;
         Ui.show(new AlertDialog.Builder(activity).setTitle(I18n.t(R.string.ui_page_layout))
-                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_single_page), I18n.t(R.string.ui_two_pages), I18n.t(R.string.ui_auto_two_pages_in_landscape), I18n.t(R.string.ui_force_single_page)}, AppState.pageLayout(activity), (dialog, selected) -> {
-                    AppState.setPageLayout(activity, selected);
+                .setSingleChoiceItems(new String[]{I18n.t(R.string.ui_auto_two_pages_in_landscape), I18n.t(R.string.ui_single_page), I18n.t(R.string.ui_two_pages), I18n.t(R.string.ui_force_single_page)}, checked, (dialog, selected) -> {
+                    AppState.setPageLayout(activity, layouts[selected]);
                     dialog.dismiss();
                     changed.run();
                 }));
@@ -144,38 +136,5 @@ public final class ReaderOptions {
     }
     private static void tagOptions(PreferenceRows rows,int first,String key) {
         for(int i=first;i<rows.content.getChildCount();i++)rows.content.getChildAt(i).setTag(key);
-    }
-    static int keyAction(Activity activity, int code) {
-        int action = AppState.number(activity, "key." + code, 0);
-        return action >= 0 && action <= 4 ? action : 0;
-    }
-    public static void hardware(Activity activity, Runnable changed) {
-        PreferenceRows rows = new PreferenceRows(activity);
-        rows.check(I18n.t(R.string.ui_use_volume_keys), null, "volume_navigation", false, changed);
-        rows.check(I18n.t(R.string.ui_reverse_volume_keys), null, "reverse_volume_navigation", false, changed);
-        String[] actions = {I18n.t(R.string.ui_disabled), I18n.t(R.string.ui_previous_page), I18n.t(R.string.ui_next_page), I18n.t(R.string.ui_menu), I18n.t(R.string.ui_add_bookmark)};
-        for (String key : AppState.prefs(activity).getAll().keySet()) if (key.startsWith("setting.key.")) {
-            int code = Integer.parseInt(key.substring("setting.key.".length()));
-            rows.action(KeyEvent.keyCodeToString(code), actions[keyAction(activity, code)], () -> {
-                Ui.show(new AlertDialog.Builder(activity).setTitle(KeyEvent.keyCodeToString(code)).setItems(new String[]{I18n.t(R.string.ui_change), I18n.t(R.string.ui_delete)}, (d, i) -> {
-                    if (i == 1) { AppState.prefs(activity).edit().remove(key).apply(); changed.run(); }
-                    else bind(activity, code, actions, changed);
-                }));
-            });
-        }
-        rows.action(I18n.t(R.string.ui_add_hardware_key), I18n.t(R.string.ui_press_a_key_to_bind), () -> {
-            AlertDialog capture = Ui.show(new AlertDialog.Builder(activity).setMessage(I18n.t(R.string.ui_press_a_key_to_bind)).setNegativeButton(I18n.t(R.string.ui_cancel), null));
-            capture.setOnKeyListener((dialog, code, event) -> {
-                if (code == KeyEvent.KEYCODE_BACK) return false;
-                if (event.getAction() == KeyEvent.ACTION_UP) { dialog.dismiss(); bind(activity, code, actions, changed); }
-                return true;
-            });
-        });
-        rows.show(I18n.t(R.string.ui_hardware_key));
-    }
-    private static void bind(Activity activity, int code, String[] actions, Runnable changed) {
-        Ui.show(new AlertDialog.Builder(activity).setTitle(KeyEvent.keyCodeToString(code)).setItems(actions, (d, i) -> {
-            AppState.put(activity, "key." + code, i); changed.run(); Toast.makeText(activity, I18n.t(R.string.ui_key_binding_saved), Toast.LENGTH_SHORT).show();
-        }));
     }
 }

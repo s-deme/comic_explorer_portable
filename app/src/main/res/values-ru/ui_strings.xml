@@ -10,8 +10,6 @@
     <string name="ui_path" formatted="false">"Путь"</string>
     <string name="ui_edit" formatted="false">"Править"</string>
     <string name="ui_left" formatted="false">"Справа налево"</string>
-    <string name="ui_up" formatted="false">"Вверх"</string>
-    <string name="ui_scroll_animation" formatted="false">"анимация прокрутки"</string>
     <string name="ui_open_the_last_compressed_file" formatted="false">"Открыть последний архив"</string>
     <string name="ui_background_color" formatted="false">"Цвет фона"</string>
     <string name="ui_columns" formatted="false">"Столбцы"</string>
@@ -19,15 +17,12 @@
     <string name="ui_fit_height" formatted="false">"Подогнать по высоте"</string>
     <string name="ui_delete_item" formatted="false">"Удаление"</string>
     <string name="ui_right" formatted="false">"Слева направо"</string>
-    <string name="ui_down" formatted="false">"Вниз"</string>
     <string name="ui_refresh" formatted="false">"Обновить"</string>
     <string name="ui_thumbnails" formatted="false">"Миниатюры"</string>
     <string name="ui_square" formatted="false">"Квадратные"</string>
     <string name="ui_reset_all_settings_2" formatted="false">"Сбросить все настройки"</string>
-    <string name="ui_page_dividing_line_scroll_pages" formatted="false">"Разделительная линия - свиток страницы"</string>
     <string name="ui_open" formatted="false">"Открыть"</string>
     <string name="ui_show_folder_path" formatted="false">"Показывать полный путь"</string>
-    <string name="ui_page_spacing" formatted="false">"страница интервал"</string>
     <string name="ui_file_explorer" formatted="false">"Файловый проводник"</string>
     <string name="ui_image_fit_to_screen" formatted="false">"Подогнать изображение под экран"</string>
     <string name="ui_size" formatted="false">"Размер"</string>
@@ -40,7 +35,6 @@
     <string name="ui_punch_hole_display_portrait" formatted="false">"Punch hole display - portrait"</string>
     <string name="ui_ask" formatted="false">"Спросить"</string>
     <string name="ui_invert_color" formatted="false">"Инвертировать цвета"</string>
-    <string name="ui_hardware_key" formatted="false">"Кнопки устройства"</string>
     <string name="ui_next_page" formatted="false">"Следующая страница"</string>
     <string name="ui_quick_view_floating_button" formatted="false">"Показывать плавающую кнопку"</string>
     <string name="ui_set_zip_file_cache_retention_period" formatted="false">"Установить срок хранения кэша архивов"</string>
@@ -57,7 +51,6 @@
     <string name="ui_sync_your_resume_page_using_google_drive" formatted="false">"Ваша страница Продолжить чтение синхронизируется с использованием Google Drive"</string>
     <string name="ui_clear_bookmarks" formatted="false">"Удалить закладки"</string>
     <string name="ui_save" formatted="false">"Сохранить"</string>
-    <string name="ui_show_a_dividing_line_between_scroll_pages" formatted="false">"Показывать разделительную линию между страницами в свитке"</string>
     <string name="ui_encoding" formatted="false">"Кодировка"</string>
     <string name="ui_clear_all_bookmarks" formatted="false">"Удаление всех закладок"</string>
     <string name="ui_cancel" formatted="false">"Отмена"</string>
@@ -91,7 +84,6 @@
     <string name="ui_enter_a_share_name" formatted="false">"Введите имя общего ресурса"</string>
     <string name="ui_cannot_delete_cache" formatted="false">"Не удалось удалить кэш"</string>
     <string name="ui_delete_cache" formatted="false">"Удалить кэш?"</string>
-    <string name="ui_could_not_load_page" formatted="false">" Не удалось загрузить страницу: "</string>
     <string name="ui_bookmark_this_page" formatted="false">"Добавить закладку на эту страницу"</string>
     <string name="ui_reset_all_settings" formatted="false">"Сбросить все настройки?"</string>
     <string name="ui_select_folder_again" formatted="false">"Выбрать папку заново"</string>
@@ -104,7 +96,6 @@
     <string name="ui_page_number_tap_to_jump" formatted="false">"Номер страницы. Нажмите для перехода"</string>
     <string name="ui_single_page" formatted="false">"Одна страница"</string>
     <string name="ui_sync_data_is_too_large" formatted="false">"Данные синхронизации слишком велики"</string>
-    <string name="ui_add_hardware_key" formatted="false">"Добавить аппаратную клавишу"</string>
     <string name="ui_delete_reading_data_and_library_registrations_book_files_will_be" formatted="false">"Удалить данные чтения и записи библиотеки? Файлы книг останутся."</string>
     <string name="ui_two_pages" formatted="false">"Две страницы"</string>
     <string name="ui_comic_explorer_1_1_2_read_comics_and_pdfs_from" formatted="false">"Comic Explorer 1.1.2\nЧтение комиксов и PDF с устройства или по сети\nБез рекламы"</string>
@@ -121,7 +112,6 @@
     <string name="ui_cannot_open_file" formatted="false">"Не удалось открыть файл."</string>
     <string name="ui_search_library" formatted="false">"Поиск в библиотеке"</string>
     <string name="ui_descending" formatted="false">"По убыванию"</string>
-    <string name="ui_continuous_vertical_scrolling" formatted="false">"Непрерывная вертикальная прокрутка"</string>
     <string name="ui_try_a_different_name" formatted="false">"Попробуйте другое имя."</string>
     <string name="ui_reader_menu" formatted="false">"Меню чтения "</string>
     <string name="ui_sync_with_google_drive" formatted="false">"Синхронизация с Google Drive"</string>
@@ -133,9 +123,7 @@
     <string name="ui_retention" formatted="false">"Срок хранения"</string>
     <string name="ui_cannot_read_cache" formatted="false">"Не удалось прочитать кэш"</string>
     <string name="ui_stretch_to_fill_screen" formatted="false">"Растянуть на весь экран"</string>
-    <string name="ui_key_binding_saved" formatted="false">"Назначение клавиши сохранено"</string>
     <string name="ui_screen_rotation" formatted="false">"Поворот экрана"</string>
-    <string name="ui_disabled" formatted="false">"Отключено"</string>
     <string name="ui_unsupported_format_choose_pdf_cbz_zip_or_images" formatted="false">"Формат не поддерживается. Выберите PDF, ZIP/CBZ, RAR/CBR, 7z или изображения."</string>
     <string name="ui_zip_compression_method_not_supported" formatted="false">"Этот метод сжатия ZIP не поддерживается"</string>
     <string name="ui_operation_failed" formatted="false">"Ошибка операции: "</string>
@@ -150,7 +138,6 @@
     <string name="ui_sharpening_strength" formatted="false">"Степень резкости"</string>
     <string name="ui_no_supported_files" formatted="false">"Нет поддерживаемых файлов"</string>
     <string name="ui_sort" formatted="false">"Сортировка"</string>
-    <string name="ui_use_volume_keys" formatted="false">"Использовать клавиши громкости"</string>
     <string name="ui_choose_the_folder_containing_your_comics" formatted="false">"Выберите папку с комиксами."</string>
     <string name="ui_books" formatted="false">"Книги"</string>
     <string name="ui_days" formatted="false">" дн."</string>
@@ -159,7 +146,6 @@
     <string name="ui_cannot_open_folder" formatted="false">"Не удалось открыть папку"</string>
     <string name="ui_cache_size" formatted="false">"Размер кэша"</string>
     <string name="ui_untitled" formatted="false">"Без названия"</string>
-    <string name="ui_first_chapter" formatted="false">"Первая глава"</string>
     <string name="ui_ftp_transfer_did_not_complete" formatted="false">"Передача по FTP не завершена"</string>
     <string name="ui_no_history" formatted="false">"История пуста"</string>
     <string name="ui_files_inside_this_folder_will_also_be_deleted" formatted="false">"\nФайлы внутри папки также будут удалены."</string>
@@ -188,7 +174,6 @@
     <string name="ui_bookmark_removed" formatted="false">"Закладка удалена"</string>
     <string name="ui_ascending_2" formatted="false">"По возрастанию"</string>
     <string name="ui_network_connections" formatted="false">"Сетевые подключения"</string>
-    <string name="ui_chapters" formatted="false">"Главы"</string>
     <string name="ui_enter_a_valid_name" formatted="false">"Введите допустимое имя"</string>
     <string name="ui_name_2" formatted="false">"Имя"</string>
     <string name="ui_parent_folder" formatted="false">"Родительская папка"</string>
@@ -206,16 +191,13 @@
     <string name="ui_cannot_delete_folder" formatted="false">"Не удалось удалить папку"</string>
     <string name="ui_cannot_delete_connection_root" formatted="false">"Нельзя удалить корень подключения"</string>
     <string name="ui_every_10_seconds" formatted="false">"Каждые 10 секунд"</string>
-    <string name="ui_change" formatted="false">"Изменить"</string>
     <string name="ui_page_thumbnails" formatted="false">"Миниатюры страниц"</string>
     <string name="ui_lock_portrait" formatted="false">"Зафиксировать портретную ориентацию"</string>
-    <string name="ui_horizontal_swipe" formatted="false">"Горизонтальное перелистывание"</string>
     <string name="ui_clear_reading_position" formatted="false">"Сбросить позицию чтения"</string>
     <string name="ui_every_5_seconds" formatted="false">"Каждые 5 секунд"</string>
     <string name="ui_file_not_found" formatted="false">"Файл не найден"</string>
     <string name="ui_cannot_open_image" formatted="false">"Не удалось открыть изображение."</string>
     <string name="ui_bookmarks_2" formatted="false">"Закладки"</string>
-    <string name="ui_press_a_key_to_bind" formatted="false">"Нажмите клавишу для назначения"</string>
     <string name="ui_book_thumbnails" formatted="false">"Миниатюры книг"</string>
     <string name="ui_remove_from_history" formatted="false">"Убрать из истории"</string>
     <string name="ui_cannot_delete_file" formatted="false">"Не удалось удалить файл"</string>
@@ -242,7 +224,6 @@
     <string name="ui_port_must_be_between_1_and_65535" formatted="false">"Порт должен быть от 1 до 65535"</string>
     <string name="ui_external_file" formatted="false">"Внешний файл"</string>
     <string name="ui_show_reading_history" formatted="false">"Показать историю чтения"</string>
-    <string name="ui_open_file" formatted="false">"Открыть файл"</string>
     <string name="ui_cannot_update_thumbnail" formatted="false">"Не удалось обновить миниатюру"</string>
     <string name="ui_invalid_image_in_archive" formatted="false">"Некорректное изображение в архиве."</string>
     <string name="ui_delete_saved_reading_positions" formatted="false">"Удалить сохранённые позиции чтения"</string>
@@ -278,7 +259,6 @@
     <string name="ui_opened_books_appear_here" formatted="false">"Открытые книги появятся здесь."</string>
     <string name="ui_cannot_connect" formatted="false">"Не удалось подключиться"</string>
     <string name="ui_folder_access_was_revoked" formatted="false">"Доступ к папке отозван."</string>
-    <string name="ui_reverse_volume_keys" formatted="false">"Поменять действия клавиш громкости"</string>
     <string name="ui_restore_default_cover" formatted="false">"Восстановить исходную обложку"</string>
     <string name="ui_cannot_save_cache" formatted="false">"Не удалось сохранить кэш"</string>
     <string name="ui_sync_failed_check_your_connection_and_google_drive_permissions" formatted="false">"Синхронизация не удалась. Проверьте подключение и разрешения Google Drive."</string>
@@ -300,9 +280,7 @@
     <string name="ui_cannot_open_a_folder_as_a_file" formatted="false">"Нельзя открыть папку как файл"</string>
     <string name="ui_reading_position" formatted="false">"Позиция чтения: "</string>
     <string name="ui_bookmarked_books" formatted="false">"Книги с закладками"</string>
-    <string name="ui_find_page">Найти страницу</string>
     <string name="ui_book_actions">Действия с книгой</string>
-    <string name="ui_scroll_mode">Режим прокрутки</string>
     <string name="ui_crop_this_book">Выбрать область обрезки (эта книга)</string>
     <string name="ui_bookmark_actions">Закладки</string>
     <string name="ui_theme_red">Вино</string>

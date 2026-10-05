@@ -23,9 +23,6 @@
     <string name="pb_both_next">All buttons go forward</string>
     <string name="pb_reverse">Swap previous and next</string>
     <string name="pb_fixed">Keep button order regardless of reading direction</string>
-    <string name="pb_scroll">Vertical scrolling</string>
-    <string name="pb_overlap">Overlap after each scroll</string>
-    <string name="pb_overlap_hint">In text-size units (sp). More overlap means a shorter scroll.</string>
     <string name="pb_reset">Reset</string>
     <string name="pb_previous">− Previous</string>
     <string name="pb_next">+ Next</string>

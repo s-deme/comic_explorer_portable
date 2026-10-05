@@ -23,9 +23,6 @@
     <string name="pb_both_next">모든 버튼을 다음으로</string>
     <string name="pb_reverse">이전과 다음 바꾸기</string>
     <string name="pb_fixed">읽기 방향에 따라 버튼 순서를 바꾸지 않음</string>
-    <string name="pb_scroll">세로 스크롤 동작</string>
-    <string name="pb_overlap">스크롤 후 겹치는 부분</string>
-    <string name="pb_overlap_hint">단위는 글자 크기 기준(sp)입니다. 겹치는 부분이 클수록 이동 거리가 짧아집니다.</string>
     <string name="pb_reset">초기값</string>
     <string name="pb_previous">− 이전</string>
     <string name="pb_next">+ 다음</string>
